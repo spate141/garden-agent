@@ -1,140 +1,263 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>garden</title>
+
+  <!-- Anti-flash: set theme before first paint -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('garden-theme') || 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+
+  <!-- Fonts: Bitter (headings/values) + Nunito Sans (UI) — matches snehal.ai -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" rel="stylesheet">
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
   <style>
-    :root {
-      --bg:      #0a0a0a;
-      --surface: #101010;
-      --border:  #1c1c1c;
-      --text:    #d1d1d1;
-      --muted:   #4a4a4a;
-      --dim:     #2a2a2a;
+    /* ── DESIGN TOKENS (ported from snehal.ai style.scss) ──────────────── */
+
+    :root,
+    [data-theme="light"] {
+      --bg:              #fafaf9;
+      --bg-alt:          #f8fafc;
+      --bg-header:       rgba(250, 250, 249, 0.92);
+      --text:            #1e293b;
+      --text-muted:      #64748b;
+      --heading:         #0f172a;
+      --border:          #e2e8f0;
+      --accent:          #1d4ed8;
+      --accent-2:        #2563eb;
+      --accent-bg:       rgba(29, 78, 216, 0.07);
+      --accent-border:   rgba(29, 78, 216, 0.2);
+      --card-bg:         #f3f3f0;
+      --card-border:     rgba(0, 0, 0, 0.08);
+      --toggle-bg:       #f1f5f9;
+      --toggle-border:   #cbd5e1;
+      --header-shadow:   0 1px 8px rgba(0, 0, 0, 0.07);
+      --selection-bg:    rgba(29, 78, 216, 0.18);
+      --selection-text:  #0f172a;
+      --color-success:   #4e7f2f;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    [data-theme="dark"] {
+      --bg:              #1f1f1e;
+      --bg-alt:          #272726;
+      --bg-header:       rgba(31, 31, 30, 0.92);
+      --text:            #e6edf3;
+      --text-muted:      #8b949e;
+      --heading:         #f0f6fc;
+      --border:          #3d3d3c;
+      --accent:          #60a5fa;
+      --accent-2:        #93c5fd;
+      --accent-bg:       rgba(96, 165, 250, 0.10);
+      --accent-border:   rgba(96, 165, 250, 0.28);
+      --card-bg:         #31312e;
+      --card-border:     rgba(255, 255, 255, 0.08);
+      --toggle-bg:       #2f2f2e;
+      --toggle-border:   #3d3d3c;
+      --header-shadow:   0 1px 8px rgba(0, 0, 0, 0.4);
+      --selection-bg:    rgba(147, 197, 253, 0.22);
+      --selection-text:  #f0f6fc;
+      --color-success:   #7db84e;
+    }
+
+    /* ── BASE ───────────────────────────────────────────────────────────── */
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      font-size: 13px;
+      font: 15px/1.6 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.2s ease, color 0.2s ease;
     }
 
-    /* ── header ─────────────────────────────────────────────────────────── */
+    ::-moz-selection { background: var(--selection-bg); color: var(--selection-text); }
+    ::selection      { background: var(--selection-bg); color: var(--selection-text); }
+
+    /* ── HEADER ─────────────────────────────────────────────────────────── */
+
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 24px;
+      gap: 12px;
+      padding: 11px 24px;
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
-      background: var(--bg);
+      background: var(--bg-header);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: var(--header-shadow);
       z-index: 10;
     }
 
     .logo {
-      font-size: 13px;
-      font-weight: 600;
+      font-family: 'Bitter', Georgia, serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--heading);
       letter-spacing: -0.01em;
-      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
     }
 
     .meta {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
     }
 
     .last-update {
-      color: var(--muted);
+      color: var(--text-muted);
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
       font-size: 11px;
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
     }
 
     .refresh-dot {
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: #4ade80;
-      opacity: 0.5;
+      background: var(--color-success);
+      opacity: 0.45;
       transition: opacity 0.3s;
+      flex-shrink: 0;
     }
     .refresh-dot.active { opacity: 1; }
 
-    /* ── stats strip ─────────────────────────────────────────────────────── */
+    /* ── THEME TOGGLE ───────────────────────────────────────────────────── */
+
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--toggle-border);
+      border-radius: 8px;
+      background: var(--toggle-bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .theme-toggle:hover {
+      border-color: var(--accent-border);
+      color: var(--accent);
+      background: var(--accent-bg);
+    }
+
+    /* In light mode show moon (click to go dark), in dark mode show sun (click to go light) */
+    .theme-toggle .icon-sun  { display: none; }
+    .theme-toggle .icon-moon { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+    /* ── STATS STRIP ────────────────────────────────────────────────────── */
+
     .stats-strip {
       display: flex;
       border-bottom: 1px solid var(--border);
       overflow-x: auto;
       scrollbar-width: none;
+      background: var(--bg);
     }
     .stats-strip::-webkit-scrollbar { display: none; }
 
     .stat {
       flex: 1;
-      min-width: 110px;
-      padding: 14px 18px;
+      min-width: 120px;
+      padding: 16px 20px;
       border-right: 1px solid var(--border);
+      transition: background 0.12s;
     }
     .stat:last-child { border-right: none; }
+    .stat:hover { background: var(--bg-alt); }
 
     .stat-label {
-      color: var(--muted);
+      color: var(--text-muted);
       font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .stat-value {
-      font-size: 20px;
-      font-weight: 300;
-      letter-spacing: -0.04em;
+      font-family: 'Bitter', Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
       font-variant-numeric: tabular-nums;
       line-height: 1;
     }
 
     .stat-unit {
-      font-size: 11px;
-      color: var(--muted);
-      margin-left: 1px;
-      font-weight: 400;
+      font-family: 'Nunito Sans', -apple-system, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-left: 2px;
       letter-spacing: 0;
     }
 
-    /* ── charts grid ─────────────────────────────────────────────────────── */
+    /* ── CHARTS GRID ────────────────────────────────────────────────────── */
+
     .charts {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      padding: 20px 24px;
+      gap: 16px;
+      padding: 24px;
+      flex: 1;
     }
 
     @media (max-width: 720px) {
-      .charts { grid-template-columns: 1fr; }
+      .charts { grid-template-columns: 1fr; padding: 16px; gap: 12px; }
     }
 
     .chart-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 16px 16px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 18px 18px 14px;
+      transition: box-shadow 0.18s ease, transform 0.18s ease;
+      min-width: 0; /* prevent grid cell blowout on mobile */
+    }
+    .chart-card:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+      transform: translateY(-1px);
+    }
+    [data-theme="dark"] .chart-card:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
 
     .chart-title {
-      color: var(--muted);
+      color: var(--text-muted);
       font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       margin-bottom: 14px;
     }
 
@@ -143,46 +266,133 @@
       height: 140px;
     }
 
-    /* ── no-data state ───────────────────────────────────────────────────── */
+    /* ── EMPTY STATE ────────────────────────────────────────────────────── */
+
     .empty {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      flex: 1;
       padding: 80px 24px;
-      gap: 10px;
+      gap: 8px;
+      text-align: center;
     }
 
-    .empty-label { color: var(--muted); font-size: 13px; }
-    .empty-hint  { color: var(--dim);   font-size: 11px; }
+    .empty-icon {
+      font-size: 36px;
+      margin-bottom: 4px;
+      opacity: 0.4;
+    }
 
-    /* ── footer ──────────────────────────────────────────────────────────── */
+    .empty-label {
+      font-family: 'Bitter', Georgia, serif;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    .empty-hint {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── FOOTER ─────────────────────────────────────────────────────────── */
+
     footer {
-      color: var(--dim);
-      font-size: 10px;
+      color: var(--text-muted);
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
       text-align: center;
-      padding: 14px 24px;
+      padding: 13px 24px;
       border-top: 1px solid var(--border);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── MOBILE ─────────────────────────────────────────────────────────── */
+
+    @media (max-width: 720px) {
+      /* Stats: wrap into a 3-column grid instead of horizontal scroll */
+      .stats-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        overflow-x: visible;
+      }
+
+      .stat {
+        min-width: 0;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      /* remove right border on every 3rd item (last column) */
+      .stat:nth-child(3n) { border-right: none; }
+
+      /* remove bottom border on last row of items */
+      .stat:nth-last-child(-n+3):nth-child(3n+1),
+      .stat:nth-last-child(-n+3):nth-child(3n+1) ~ .stat { border-bottom: none; }
+    }
+
+    @media (max-width: 480px) {
+      header        { padding: 9px 16px; }
+      .theme-toggle { width: 32px; height: 32px; border-radius: 7px; }
+      .stat         { padding: 13px 14px; }
+      .stat-value   { font-size: 19px; }
+      .last-update  { display: none; }
+    }
+
+    @media (max-width: 359px) {
+      /* Very small screens: 2 columns */
+      .stats-strip { grid-template-columns: repeat(2, 1fr); }
+      .stat:nth-child(3n)  { border-right: 1px solid var(--border); }
+      .stat:nth-child(2n)  { border-right: none; }
+      .stat:nth-last-child(-n+2):nth-child(2n+1),
+      .stat:nth-last-child(-n+2):nth-child(2n+1) ~ .stat { border-bottom: none; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <span class="logo">&#127807; garden</span>
+  <div class="logo">&#127807; garden</div>
   <div class="meta">
     {% if last_ts %}
     <span class="last-update" id="last-ts">{{ last_ts[:16].replace("T", " ") }} UTC</span>
     {% else %}
-    <span class="last-update">no data yet</span>
+    <span class="last-update" id="last-ts">no data yet</span>
     {% endif %}
     <div class="refresh-dot" id="dot" title="auto-refreshes every 60 s"></div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme">
+      <!-- Sun icon — shown in dark mode to switch back to light -->
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+           aria-hidden="true">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1"  x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22"   x2="5.64"  y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1"  y1="12" x2="3"  y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78"  x2="5.64"  y2="18.36"/>
+        <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
+      </svg>
+      <!-- Moon icon — shown in light mode to switch to dark -->
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+           aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
   </div>
 </header>
 
 {% if has_data %}
 
-<!-- stats strip -->
+<!-- current values -->
 <div class="stats-strip" id="stats-strip">
   {% for s in stats %}
   <div class="stat">
@@ -194,7 +404,7 @@
   {% endfor %}
 </div>
 
-<!-- charts -->
+<!-- time-series charts -->
 <div class="charts" id="charts-grid">
   {% for c in charts %}
   <div class="chart-card">
@@ -209,64 +419,131 @@
 {% else %}
 
 <div class="empty">
+  <div class="empty-icon">&#127807;</div>
   <div class="empty-label">No sensor data yet.</div>
-  <div class="empty-hint">Send a POST to /api/ecowitt or run scripts/fake_post.sh</div>
+  <div class="empty-hint">bash scripts/fake_post.sh http://127.0.0.1:8001</div>
 </div>
 
 {% endif %}
 
-<footer>garden-agent &nbsp;·&nbsp; <span id="footer-ts"></span></footer>
+<footer id="footer-ts"></footer>
 
 <script>
 const CHARTS = {{ charts_json | safe }};
 const HOURS  = 24;
 const instances = {};
 
-function fmtTime(iso) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+/* ── Theme ──────────────────────────────────────────────────────────────── */
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-function fmtValue(v) {
-  return parseFloat(v).toFixed(1);
+function chartThemeColors() {
+  return {
+    grid:          cssVar('--border'),
+    ticks:         cssVar('--text-muted'),
+    tooltipBg:     cssVar('--card-bg'),
+    tooltipBorder: cssVar('--border'),
+    tooltipTitle:  cssVar('--text-muted'),
+    tooltipBody:   cssVar('--text'),
+  };
 }
 
-const CHART_OPTS = (color) => ({
-  type: "line",
-  data: { labels: [], datasets: [{ data: [], borderColor: color, borderWidth: 1.5,
-    pointRadius: 0, tension: 0.3, fill: false }] },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: { legend: { display: false }, tooltip: {
-      mode: "index", intersect: false,
-      backgroundColor: "#181818", borderColor: "#2a2a2a", borderWidth: 1,
-      titleColor: "#888", bodyColor: "#d1d1d1", padding: 8,
-      callbacks: { label: ctx => " " + fmtValue(ctx.parsed.y) }
-    }},
-    scales: {
-      x: { grid: { color: "#161616" }, ticks: { color: "#3a3a3a", maxTicksLimit: 6, font: { size: 10 } } },
-      y: { grid: { color: "#161616" }, ticks: { color: "#3a3a3a", font: { size: 10 } } }
-    }
-  }
+function applyChartTheme() {
+  const c = chartThemeColors();
+  Object.values(instances).forEach(chart => {
+    ['x', 'y'].forEach(axis => {
+      chart.options.scales[axis].grid.color  = c.grid;
+      chart.options.scales[axis].ticks.color = c.ticks;
+    });
+    const tip = chart.options.plugins.tooltip;
+    tip.backgroundColor = c.tooltipBg;
+    tip.borderColor     = c.tooltipBorder;
+    tip.titleColor      = c.tooltipTitle;
+    tip.bodyColor       = c.tooltipBody;
+    chart.update('none');
+  });
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const html = document.documentElement;
+  const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = next;
+  localStorage.setItem('garden-theme', next);
+  applyChartTheme();
 });
+
+/* ── Chart factory ──────────────────────────────────────────────────────── */
+
+function makeChartOpts(color) {
+  const c = chartThemeColors();
+  return {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: color,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor:  c.tooltipBg,
+          borderColor:      c.tooltipBorder,
+          borderWidth:      1,
+          titleColor:       c.tooltipTitle,
+          bodyColor:        c.tooltipBody,
+          padding:          8,
+          callbacks: { label: ctx => ' ' + parseFloat(ctx.parsed.y).toFixed(1) }
+        }
+      },
+      scales: {
+        x: {
+          grid:  { color: c.grid },
+          ticks: { color: c.ticks, maxTicksLimit: 6, font: { size: 10 } }
+        },
+        y: {
+          grid:  { color: c.grid },
+          ticks: { color: c.ticks, font: { size: 10 } }
+        }
+      }
+    }
+  };
+}
+
+/* ── Data ───────────────────────────────────────────────────────────────── */
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 async function loadChart(key, color) {
   const resp = await fetch(`/api/series?sensor=${encodeURIComponent(key)}&hours=${HOURS}`);
   if (!resp.ok) return;
-  const rows = await resp.json();
+  const rows   = await resp.json();
   const labels = rows.map(r => fmtTime(r.ts));
   const data   = rows.map(r => r.value);
 
   if (instances[key]) {
     instances[key].data.labels = labels;
     instances[key].data.datasets[0].data = data;
-    instances[key].update("none");
+    instances[key].update('none');
   } else {
-    const canvas = document.getElementById("chart-" + key);
+    const canvas = document.getElementById('chart-' + key);
     if (!canvas) return;
-    instances[key] = new Chart(canvas, CHART_OPTS(color));
+    instances[key] = new Chart(canvas, makeChartOpts(color));
     instances[key].data.labels = labels;
     instances[key].data.datasets[0].data = data;
     instances[key].update();
@@ -274,44 +551,42 @@ async function loadChart(key, color) {
 }
 
 async function refreshStats() {
-  const resp = await fetch("/api/latest");
+  const resp = await fetch('/api/latest');
   if (!resp.ok) return;
   const rows = await resp.json();
-  const map = {};
+  const map  = {};
   rows.forEach(r => { map[r.sensor_key] = r; });
 
-  document.querySelectorAll(".stat-value[data-key]").forEach(el => {
+  document.querySelectorAll('.stat-value[data-key]').forEach(el => {
     const key = el.dataset.key;
     if (!map[key]) return;
-    const unit = el.querySelector(".stat-unit");
-    const unitHTML = unit ? unit.outerHTML : "";
-    el.innerHTML = parseFloat(map[key].value).toFixed(1) + unitHTML;
+    const unit    = el.querySelector('.stat-unit');
+    const unitHTML = unit ? unit.outerHTML : '';
+    el.innerHTML  = parseFloat(map[key].value).toFixed(1) + unitHTML;
   });
 
   if (rows.length) {
     const latest = rows.reduce((a, b) => a.ts > b.ts ? a : b);
-    const el = document.getElementById("last-ts");
-    if (el) el.textContent = latest.ts.slice(0, 16).replace("T", " ") + " UTC";
+    const el = document.getElementById('last-ts');
+    if (el) el.textContent = latest.ts.slice(0, 16).replace('T', ' ') + ' UTC';
   }
 }
 
 async function refresh() {
-  const dot = document.getElementById("dot");
-  dot.classList.add("active");
+  const dot = document.getElementById('dot');
+  dot.classList.add('active');
   await Promise.all([
     ...CHARTS.map(c => loadChart(c.key, c.color)),
     refreshStats(),
   ]);
-  dot.classList.remove("active");
+  dot.classList.remove('active');
 }
 
-// Update footer timestamp
 function tick() {
-  const el = document.getElementById("footer-ts");
+  const el = document.getElementById('footer-ts');
   if (el) el.textContent = new Date().toUTCString().slice(0, 25);
 }
 
-// Init
 refresh();
 tick();
 setInterval(refresh, 60_000);
