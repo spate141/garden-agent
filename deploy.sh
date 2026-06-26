@@ -17,6 +17,7 @@ if [ ! -f "$APP_DIR/secrets.env" ]; then
 fi
 
 # uv installs to ~/.local/bin; non-login shells may not have it on PATH
+# shellcheck source=/dev/null
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
 command -v uv >/dev/null || { echo "Error: uv not found on PATH — run: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2; exit 1; }
 
@@ -54,7 +55,7 @@ sudo systemctl restart garden-cron.timer
 
 # ── 4. Health check ───────────────────────────────────────────────────────────
 echo "==> Waiting for garden-agent to come up..."
-for i in $(seq 1 10); do
+for _ in $(seq 1 10); do
     if curl -sf http://localhost:8001/health > /dev/null 2>&1; then
         break
     fi

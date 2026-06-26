@@ -13,7 +13,7 @@ if [ ! -f "${ROOT}/secrets.env" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
+# shellcheck source=/dev/null
 source "${ROOT}/secrets.env"
 
 : "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN not set in secrets.env}"

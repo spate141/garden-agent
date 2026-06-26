@@ -9,6 +9,7 @@ ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Load DB_PATH from secrets.env if not already set
 if [[ -z "${DB_PATH:-}" ]]; then
+    # shellcheck source=/dev/null
     source "$ROOT/secrets.env"
 fi
 
