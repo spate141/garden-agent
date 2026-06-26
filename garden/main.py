@@ -19,6 +19,7 @@ from typing import Any
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from garden import storage
@@ -32,6 +33,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
+_STATIC = Path(__file__).parent / "dashboard" / "static"
 _TEMPLATES = Jinja2Templates(
     directory=Path(__file__).parent / "dashboard" / "templates"
 )
@@ -77,6 +79,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="garden-agent", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
 
 # ── /health ───────────────────────────────────────────────────────────────────

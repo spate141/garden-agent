@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" width="96" alt="garden-agent" />
+</p>
+
 # garden-agent
 
 Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway, stores it in SQLite, serves a dashboard at `your.domain.com`, and runs a deterministic-rules agent that calls Claude to write Telegram alerts and a daily morning brief.
