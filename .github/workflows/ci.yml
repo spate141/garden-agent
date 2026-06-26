@@ -16,10 +16,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: bash syntax check
-        run: bash -n deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh
+        run: bash -n deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh scripts/restore_db.sh
 
       - name: shellcheck
-        run: shellcheck deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh
+        run: shellcheck deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh scripts/restore_db.sh
 
   # ── Test: Python syntax + pytest suite ─────────────────────────────────────
   test:
