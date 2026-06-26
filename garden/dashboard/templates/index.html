@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>garden</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:      #0a0a0a;
+      --surface: #101010;
+      --border:  #1c1c1c;
+      --text:    #d1d1d1;
+      --muted:   #4a4a4a;
+      --dim:     #2a2a2a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── header ─────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .last-update {
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .refresh-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .refresh-dot.active { opacity: 1; }
+
+    /* ── stats strip ─────────────────────────────────────────────────────── */
+    .stats-strip {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .stats-strip::-webkit-scrollbar { display: none; }
+
+    .stat {
+      flex: 1;
+      min-width: 110px;
+      padding: 14px 18px;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .stat-unit {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 1px;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+
+    /* ── charts grid ─────────────────────────────────────────────────────── */
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 20px 24px;
+    }
+
+    @media (max-width: 720px) {
+      .charts { grid-template-columns: 1fr; }
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 16px 16px 12px;
+    }
+
+    .chart-title {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 140px;
+    }
+
+    /* ── no-data state ───────────────────────────────────────────────────── */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      gap: 10px;
+    }
+
+    .empty-label { color: var(--muted); font-size: 13px; }
+    .empty-hint  { color: var(--dim);   font-size: 11px; }
+
+    /* ── footer ──────────────────────────────────────────────────────────── */
+    footer {
+      color: var(--dim);
+      font-size: 10px;
+      text-align: center;
+      padding: 14px 24px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">&#127807; garden</span>
+  <div class="meta">
+    {% if last_ts %}
+    <span class="last-update" id="last-ts">{{ last_ts[:16].replace("T", " ") }} UTC</span>
+    {% else %}
+    <span class="last-update">no data yet</span>
+    {% endif %}
+    <div class="refresh-dot" id="dot" title="auto-refreshes every 60 s"></div>
+  </div>
+</header>
+
+{% if has_data %}
+
+<!-- stats strip -->
+<div class="stats-strip" id="stats-strip">
+  {% for s in stats %}
+  <div class="stat">
+    <div class="stat-label">{{ s.label }}</div>
+    <div class="stat-value" style="color:{{ s.color }}">
+      {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- charts -->
+<div class="charts" id="charts-grid">
+  {% for c in charts %}
+  <div class="chart-card">
+    <div class="chart-title">{{ c.label }}</div>
+    <div class="chart-wrap">
+      <canvas id="chart-{{ c.key }}"></canvas>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+
+<div class="empty">
+  <div class="empty-label">No sensor data yet.</div>
+  <div class="empty-hint">Send a POST to /api/ecowitt or run scripts/fake_post.sh</div>
+</div>
+
+{% endif %}
+
+<footer>garden-agent &nbsp;·&nbsp; <span id="footer-ts"></span></footer>
+
+<script>
+const CHARTS = {{ charts_json | safe }};
+const HOURS  = 24;
+const instances = {};
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtValue(v) {
+  return parseFloat(v).toFixed(1);
+}
+
+const CHART_OPTS = (color) => ({
+  type: "line",
+  data: { labels: [], datasets: [{ data: [], borderColor: color, borderWidth: 1.5,
+    pointRadius: 0, tension: 0.3, fill: false }] },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { display: false }, tooltip: {
+      mode: "index", intersect: false,
+      backgroundColor: "#181818", borderColor: "#2a2a2a", borderWidth: 1,
+      titleColor: "#888", bodyColor: "#d1d1d1", padding: 8,
+      callbacks: { label: ctx => " " + fmtValue(ctx.parsed.y) }
+    }},
+    scales: {
+      x: { grid: { color: "#161616" }, ticks: { color: "#3a3a3a", maxTicksLimit: 6, font: { size: 10 } } },
+      y: { grid: { color: "#161616" }, ticks: { color: "#3a3a3a", font: { size: 10 } } }
+    }
+  }
+});
+
+async function loadChart(key, color) {
+  const resp = await fetch(`/api/series?sensor=${encodeURIComponent(key)}&hours=${HOURS}`);
+  if (!resp.ok) return;
+  const rows = await resp.json();
+  const labels = rows.map(r => fmtTime(r.ts));
+  const data   = rows.map(r => r.value);
+
+  if (instances[key]) {
+    instances[key].data.labels = labels;
+    instances[key].data.datasets[0].data = data;
+    instances[key].update("none");
+  } else {
+    const canvas = document.getElementById("chart-" + key);
+    if (!canvas) return;
+    instances[key] = new Chart(canvas, CHART_OPTS(color));
+    instances[key].data.labels = labels;
+    instances[key].data.datasets[0].data = data;
+    instances[key].update();
+  }
+}
+
+async function refreshStats() {
+  const resp = await fetch("/api/latest");
+  if (!resp.ok) return;
+  const rows = await resp.json();
+  const map = {};
+  rows.forEach(r => { map[r.sensor_key] = r; });
+
+  document.querySelectorAll(".stat").forEach(el => {
+    const key = el.querySelector(".stat-value")?.dataset?.key;
+    // stats update via full reload for simplicity
+  });
+
+  // Update last-ts display
+  if (rows.length) {
+    const latest = rows.reduce((a, b) => a.ts > b.ts ? a : b);
+    const el = document.getElementById("last-ts");
+    if (el) el.textContent = latest.ts.slice(0, 16).replace("T", " ") + " UTC";
+  }
+}
+
+async function refresh() {
+  const dot = document.getElementById("dot");
+  dot.classList.add("active");
+  await Promise.all(CHARTS.map(c => loadChart(c.key, c.color)));
+  dot.classList.remove("active");
+}
+
+// Update footer timestamp
+function tick() {
+  const el = document.getElementById("footer-ts");
+  if (el) el.textContent = new Date().toUTCString().slice(0, 25);
+}
+
+// Init
+refresh();
+tick();
+setInterval(refresh, 60_000);
+setInterval(tick, 1_000);
+</script>
+
+</body>
+</html>

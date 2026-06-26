@@ -1,0 +1,80 @@
+# garden-agent configuration
+# All thresholds are versioned here; the LLM and deterministic rules both read from this.
+
+# ── Sensor channel map ────────────────────────────────────────────────────────
+# Maps Ecowitt field names to human-friendly labels and their storage units.
+# Add new channels here when new sensors appear — no code changes needed.
+sensors:
+  soilmoisture1:
+    label: "Bed 1 soil moisture"
+    unit: "%"
+  soilmoisture2:
+    label: "Bed 2 soil moisture"
+    unit: "%"
+  soilbatt1:
+    label: "WH51 ch1 battery"
+    unit: "V"
+  soilbatt2:
+    label: "WH51 ch2 battery"
+    unit: "V"
+  tempc:                         # normalized from tempf at ingest
+    label: "Outdoor temperature"
+    unit: "°C"
+  humidity:
+    label: "Outdoor humidity"
+    unit: "%"
+  tempinc:                       # normalized from tempinf at ingest
+    label: "Indoor temperature"
+    unit: "°C"
+  humidityin:
+    label: "Indoor humidity"
+    unit: "%"
+  baromrel_hpa:                  # normalized from baromrelin at ingest
+    label: "Relative pressure"
+    unit: "hPa"
+
+# ── Alert thresholds (deterministic rules) ────────────────────────────────────
+thresholds:
+  soil_moisture_low:
+    sensor_keys: [soilmoisture1, soilmoisture2]
+    below: 30          # alert when moisture drops below this %
+    consecutive: 3     # must see N consecutive readings below threshold
+
+  soil_moisture_rapid_drop:
+    sensor_keys: [soilmoisture1, soilmoisture2]
+    drop_pct: 15       # alert if moisture drops this many % points in window_minutes
+    window_minutes: 60
+
+  battery_low:
+    sensor_keys: [soilbatt1, soilbatt2]
+    below: 1.1         # WH51 battery ~1.5V nominal; warn below 1.1V
+
+  temp_frost:
+    sensor_keys: [tempc]
+    below: 2.0         # frost warning below 2°C (gives time before 0°C)
+
+  temp_heat:
+    sensor_keys: [tempc]
+    above: 38.0        # heat stress above 38°C
+
+# ── Dead-sensor watchdog ──────────────────────────────────────────────────────
+watchdog:
+  timeout_minutes: 20  # alert if no POST from gateway in this many minutes
+  sensor_timeout_minutes: 30  # alert if a specific sensor key stops appearing
+
+# ── Alert cooldowns & de-dup ──────────────────────────────────────────────────
+cooldowns:
+  # After an alert fires, suppress re-alerts for this many minutes
+  # (alert-once-until-cleared: re-alerts only after the condition clears then re-trips)
+  soil_moisture_low_minutes: 120
+  soil_moisture_rapid_drop_minutes: 60
+  battery_low_minutes: 1440     # once per day
+  temp_frost_minutes: 60
+  temp_heat_minutes: 60
+  watchdog_minutes: 30
+
+# ── Heartbeat ─────────────────────────────────────────────────────────────────
+heartbeat:
+  # Sent by the cron tick once per day to confirm the agent is alive
+  enabled: true
+  hour_utc: 12       # send at 12:00 UTC (adjust to your timezone)

@@ -1,0 +1,10 @@
+[Unit]
+Description=garden-agent cron tick every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=garden-cron.service
+
+[Install]
+WantedBy=timers.target

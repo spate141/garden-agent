@@ -1,0 +1,14 @@
+[Unit]
+Description=garden-agent cron tick (watchdog + heartbeat)
+After=network.target garden-agent.service
+
+[Service]
+Type=oneshot
+User=YOUR_VM_USER
+WorkingDirectory=/home/YOUR_VM_USER/apps/garden-agent
+EnvironmentFile=/home/YOUR_VM_USER/apps/garden-agent/secrets.env
+ExecStart=/home/YOUR_VM_USER/apps/garden-agent/.venv/bin/python -m garden.agent.runner --cron
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=garden-cron
+TimeoutStartSec=60

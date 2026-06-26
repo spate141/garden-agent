@@ -1,0 +1,13 @@
+[Unit]
+Description=garden-agent nightly SQLite backup
+After=garden-agent.service
+
+[Service]
+Type=oneshot
+User=YOUR_VM_USER
+WorkingDirectory=/home/YOUR_VM_USER/apps/garden-agent
+EnvironmentFile=/home/YOUR_VM_USER/apps/garden-agent/secrets.env
+ExecStart=/bin/bash /home/YOUR_VM_USER/apps/garden-agent/scripts/backup_db.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=garden-backup
