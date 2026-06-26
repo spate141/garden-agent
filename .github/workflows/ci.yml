@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+
+  # ── Lint: shell scripts + deploy.sh ────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash syntax check
+        run: bash -n deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh
+
+      - name: shellcheck
+        run: shellcheck deploy.sh scripts/backup_db.sh scripts/fake_post.sh scripts/tg_test.sh
+
+  # ── Test: Python syntax + pytest suite ─────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Python syntax check
+        run: uv run python -m compileall -q garden
+
+      - name: Run tests
+        run: uv run pytest -q
