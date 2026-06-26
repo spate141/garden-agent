@@ -10,7 +10,11 @@ RELOAD_NEEDED=0
 echo "==> garden-agent deploy starting (user: $USER)"
 echo "    app dir: $APP_DIR"
 
-# ── 0. Pre-flight checks ──────────────────────────────────────────────────────
+# ── 0. Pull latest code ───────────────────────────────────────────────────────
+echo "==> Pulling latest code..."
+cd "$APP_DIR" && git pull
+
+# ── 1. Pre-flight checks ──────────────────────────────────────────────────────
 if [ ! -f "$APP_DIR/secrets.env" ]; then
     echo "Error: secrets.env not found at $APP_DIR — services will not start." >&2
     exit 1
@@ -21,11 +25,11 @@ fi
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
 command -v uv >/dev/null || { echo "Error: uv not found on PATH — run: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2; exit 1; }
 
-# ── 1. Python dependencies ────────────────────────────────────────────────────
+# ── 2. Python dependencies ────────────────────────────────────────────────────
 echo "==> Syncing Python deps..."
 cd "$APP_DIR" && uv sync --quiet
 
-# ── 2. Systemd service files (sed placeholder, copy, reload) ─────────────────
+# ── 3. Systemd service files (sed placeholder, copy, reload) ─────────────────
 for UNIT in garden-agent.service garden-cron.service garden-cron.timer garden-backup.service garden-backup.timer; do
     SRC="$APP_DIR/systemd/$UNIT"
     DST="$SYSTEMD_DIR/$UNIT"
@@ -45,7 +49,7 @@ if [ "$RELOAD_NEEDED" -eq 1 ]; then
     sudo systemctl daemon-reload
 fi
 
-# ── 3. Restart services ───────────────────────────────────────────────────────
+# ── 4. Restart services ───────────────────────────────────────────────────────
 echo "==> Restarting garden-agent..."
 sudo systemctl reset-failed garden-agent 2>/dev/null || true
 sudo systemctl restart garden-agent
@@ -53,7 +57,7 @@ sudo systemctl restart garden-agent
 echo "==> Restarting garden-cron.timer..."
 sudo systemctl restart garden-cron.timer
 
-# ── 4. Health check ───────────────────────────────────────────────────────────
+# ── 5. Health check ───────────────────────────────────────────────────────────
 echo "==> Waiting for garden-agent to come up..."
 for _ in $(seq 1 10); do
     if curl -sf http://localhost:8001/health > /dev/null 2>&1; then
@@ -67,7 +71,7 @@ HEALTH=$(curl -s http://localhost:8001/health || echo "(no response — service 
 echo "$HEALTH"
 echo ""
 
-# ── 5. Status summary ─────────────────────────────────────────────────────────
+# ── 6. Status summary ─────────────────────────────────────────────────────────
 echo "==> Service status:"
 sudo systemctl is-active --quiet garden-agent      && echo "    garden-agent      : active" || echo "    garden-agent      : FAILED"
 sudo systemctl is-active --quiet garden-cron.timer && echo "    garden-cron.timer : active" || echo "    garden-cron.timer : FAILED"
