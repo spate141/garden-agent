@@ -8,49 +8,56 @@ Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway
 
 ```mermaid
 flowchart TD
-    GW["🌡️ GW1200 Gateway"]
-    Timer["⏱️ systemd timer\nevery 15 min"]
-    Browser["🌐 Browser"]
+    GW["GW1200 gateway<br/><small>HTTPS POST · every ~5 min</small>"]
+    Timer["systemd timer<br/><small>cron tick · every 15 min</small>"]
+    Browser["Browser<br/><small>dashboard UI</small>"]
 
     subgraph fastapi ["FastAPI · localhost:8001"]
-        INGEST["POST /api/ecowitt\nparse · normalize · store"]
-        SERVE["GET /  ·  /api/latest  ·  /api/series"]
+        INGEST["POST /api/ecowitt<br/><small>parse · normalize · store · evaluate</small>"]
+        SERVE["GET endpoints<br/><small>/ · /api/latest · /api/series</small>"]
     end
 
-    DB[("SQLite\nsnapshots · readings\nalert_state")]
+    DB[("SQLite<br/><small>snapshots · readings · alert_state</small>")]
 
     subgraph agent ["garden.agent"]
-        RULES["rules.py\ndeterministic threshold checks"]
-        RUNNER["runner.py\ncooldown · alert-once-until-cleared\nmorning brief scheduler"]
-        LLM["llm.py · Claude Sonnet 4-6\nalert prose + morning brief"]
-        WEATHER["weather.py\nOpen-Meteo · 120 min cache"]
+        RUNNER["runner.py<br/><small>cooldown · alert-once · brief scheduler</small>"]
+        RULES["rules.py<br/><small>deterministic threshold checks</small>"]
+        LLM["llm.py<br/><small>alert prose · morning brief</small>"]
+        WEATHER["weather.py<br/><small>Open-Meteo · 120 min cache</small>"]
     end
 
-    TG["📱 Telegram"]
-    ANT["Anthropic API"]
-    OM["☀️ Open-Meteo\nno API key required"]
+    TG["Telegram<br/><small>alerts + daily brief</small>"]
+    ANT["Anthropic API<br/><small>Claude Sonnet 4.6</small>"]
+    OM["Open-Meteo<br/><small>no API key required</small>"]
 
-    GW -->|"HTTPS POST · every ~5 min"| INGEST
-    INGEST -->|"write snapshot + readings"| DB
-    INGEST -->|"evaluate_instant()"| RUNNER
+    GW -->|snapshot + readings| INGEST
+    INGEST --> DB
+    INGEST -->|evaluate_instant| RUNNER
+    Timer -->|run_cron_tick| RUNNER
 
-    Timer -->|"run_cron_tick()\nwatchdog checks + brief"| RUNNER
+    RUNNER -->|run_instant / run_cron| RULES
+    RULES -->|reads history| DB
+    RULES -->|RuleResult list| RUNNER
 
-    RUNNER -->|"run_instant() or run_cron()"| RULES
-    RULES -->|"reads sensor history"| DB
-    RULES -->|"RuleResult list"| RUNNER
-
-    RUNNER -->|"rule fired + cooldown clear\nwrite_alert()"| LLM
-    RUNNER -->|"7 am local · once per day\nsend_daily_brief()"| LLM
-
-    LLM -->|"get_forecast()"| WEATHER
-    WEATHER -->|"daily + hourly data"| OM
-    LLM -->|"messages.create()"| ANT
-
-    RUNNER -->|"tg(title, body)"| TG
+    RUNNER -->|rule fired · cooldown clear| LLM
+    RUNNER -->|7am local · once/day| LLM
+    LLM -->|get_forecast| WEATHER
+    WEATHER --> OM
+    LLM -->|messages.create| ANT
+    RUNNER -->|tg title, body| TG
 
     Browser --> SERVE
-    SERVE -->|"latest() · series()"| DB
+    SERVE -->|latest / series| DB
+
+    classDef data fill:#E6F1FB,stroke:#185FA5,color:#0C447C;
+    classDef ctrl fill:#EEEDFE,stroke:#534AB7,color:#26215C;
+    classDef store fill:#FAEEDA,stroke:#BA7517,color:#633806;
+    classDef ext fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+
+    class INGEST,SERVE data;
+    class RUNNER,RULES,LLM,WEATHER ctrl;
+    class DB store;
+    class GW,Timer,Browser,TG,ANT,OM ext;
 ```
 
 ## Requirements
