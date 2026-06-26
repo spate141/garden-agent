@@ -109,9 +109,42 @@ Cadence: cron (every 15 min)
 - While `active`, re-alerts are suppressed for the cooldown window.
 - Once the condition clears (e.g. moisture recovers), `active` is reset — the rule re-arms and will fire again next time the condition is tripped.
 
-## Heartbeat
+## Morning Brief
 
-A daily alive-ping is sent at `heartbeat.hour_utc` (default 12:00 UTC) reporting sensor count and last reading timestamp. Disable with `heartbeat.enabled: false` in `config.yaml`.
+Replaces the old heartbeat. Sent once per day at `daily_brief.hour_local` (default 7am) in your
+local timezone (`GARDEN_TIMEZONE` in `secrets.env`). The brief is written by the LLM and covers:
+
+- Today's weather (temperature, rain chance, conditions) via Open-Meteo — no API key needed
+- Current moisture level in each bed and how it's trending
+- A watering plan: skip/delay if rain is expected; water deeper in a heatwave; estimate hose minutes otherwise
+
+Proving the system is alive is a side effect of the brief itself. Disable with `daily_brief.enabled: false` in `config.yaml`.
+
+### Weather & location
+
+Set these in `secrets.env` (not `config.yaml` — the repo is public):
+
+```
+GARDEN_ZIPCODE=78701
+GARDEN_COUNTRY=us
+GARDEN_TIMEZONE=America/Chicago
+```
+
+Or provide coordinates directly to skip geocoding:
+
+```
+GARDEN_LAT=30.2672
+GARDEN_LON=-97.7431
+```
+
+Forecast is fetched from [Open-Meteo](https://open-meteo.com/) — free, no account needed.
+It is cached for `weather.cache_minutes` (default 120 min) to avoid repeated calls.
+
+### Watering advice in alerts
+
+When a soil-moisture rule fires during the day, the alert message includes a hose-duration
+estimate (~12 L/min assumed) adjusted for the moisture deficit and the weather forecast.
+If meaningful rain is expected within a few hours, the message says to wait.
 
 ## Tuning thresholds
 

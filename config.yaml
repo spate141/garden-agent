@@ -73,8 +73,27 @@ cooldowns:
   temp_heat_minutes: 60
   watchdog_minutes: 30
 
-# ── Heartbeat ─────────────────────────────────────────────────────────────────
-heartbeat:
-  # Sent by the cron tick once per day to confirm the agent is alive
+# ── LLM model selection ───────────────────────────────────────────────────────
+# Any Anthropic model ID works. Change here; no code edits needed.
+# Model IDs: claude-sonnet-4-6, claude-haiku-4-5-20251001, claude-opus-4-8
+llm:
+  model: claude-sonnet-4-6
+  max_tokens_alert: 512
+  max_tokens_brief: 512
+
+# ── Weather forecast (Open-Meteo, no API key required) ───────────────────────
+# Location is set in secrets.env (GARDEN_ZIPCODE etc.) — never here.
+weather:
   enabled: true
-  hour_utc: 12       # send at 12:00 UTC (adjust to your timezone)
+  cache_minutes: 120    # how long to reuse a fetched forecast before refreshing
+
+# ── Daily morning brief ───────────────────────────────────────────────────────
+# Replaces the old heartbeat. Sent once per day around hour_local in your timezone.
+# Timezone is set by GARDEN_TIMEZONE in secrets.env.
+daily_brief:
+  enabled: true
+  hour_local: 7         # send around 7am local time
+
+# ── Heartbeat (kept for back-compat, superseded by daily_brief) ───────────────
+heartbeat:
+  enabled: false

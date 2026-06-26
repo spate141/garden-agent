@@ -3,7 +3,9 @@ runner.py — Evaluate rules, apply cooldowns, dispatch Telegram alerts.
 
 Two entry points:
   evaluate_instant(snap_id, ts, metrics) — called inline on every POST
-  run_cron()                             — called by the systemd timer every 15 min
+  run_cron_tick()                        — called by the systemd timer every 15 min
+
+The cron tick also handles the daily morning brief (replaces the old heartbeat).
 """
 
 from __future__ import annotations
@@ -11,12 +13,14 @@ from __future__ import annotations
 import argparse
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from garden import storage
 from garden.agent import llm
 from garden.agent.rules import RuleResult, run_cron, run_instant
+from garden.agent.weather import forecast_summary, get_forecast
 from garden.config import cfg
-from garden.telegram import heartbeat, tg
+from garden.telegram import tg
 
 log = logging.getLogger("garden.runner")
 
@@ -76,7 +80,6 @@ def _evaluate(results: list[RuleResult]) -> None:
             _dispatch(result)
         else:
             if was_active:
-                # Condition cleared — reset so it can fire again next time
                 log.info("Condition cleared: %s", result.rule_id)
                 storage.set_alert_state(result.rule_id, result.sensor_key, active=False)
 
@@ -91,7 +94,7 @@ def evaluate_instant(snap_id: int, ts: str, metrics: dict) -> None:
 
 
 def run_cron_tick() -> None:
-    """Run cron rules + heartbeat. Called by the systemd timer."""
+    """Run cron rules + daily brief. Called by the systemd timer every 15 min."""
     log.info("Cron tick starting")
     try:
         results = run_cron()
@@ -100,26 +103,110 @@ def run_cron_tick() -> None:
         log.exception("Cron rule evaluation failed")
 
     try:
-        _maybe_heartbeat()
+        _maybe_daily_brief()
     except Exception:
-        log.exception("Heartbeat failed")
+        log.exception("Daily brief failed")
 
     log.info("Cron tick complete")
 
 
-def _maybe_heartbeat() -> None:
-    if not cfg.heartbeat.get("enabled", True):
-        return
-    hour_utc = cfg.heartbeat.get("hour_utc", 12)
-    now = datetime.now(timezone.utc)
-    if now.hour != hour_utc:
+# ── Daily morning brief ───────────────────────────────────────────────────────
+
+_BRIEF_RULE_ID = "daily_brief"
+
+
+def _sensor_summary() -> str:
+    """
+    Build a compact sensor summary for the LLM from the latest readings.
+    Focuses on the things a gardener cares about: soil beds, outdoor temp/humidity.
+    """
+    rows = storage.latest()
+    if not rows:
+        return "No sensor data available yet."
+
+    PRIORITY = ["soilmoisture1", "soilmoisture2", "tempc", "humidity", "soilbatt1", "soilbatt2"]
+    by_key = {r["sensor_key"]: r for r in rows}
+
+    lines = []
+    for key in PRIORITY:
+        if key in by_key:
+            r = by_key[key]
+            label = cfg.sensor_label(key)
+            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+
+    # Any other sensors not in priority list
+    for key, r in by_key.items():
+        if key not in PRIORITY:
+            label = cfg.sensor_label(key)
+            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+
+    return "\n".join(lines) if lines else "No sensor data available."
+
+
+def _local_now() -> datetime:
+    """Current time in the configured local timezone."""
+    tz_name = cfg.location.get("timezone", "UTC")
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        log.warning("Unknown timezone %r, falling back to UTC", tz_name)
+        tz = ZoneInfo("UTC")
+    return datetime.now(tz)
+
+
+def _already_sent_today(local_now: datetime) -> bool:
+    """True if the brief was already sent today (local date)."""
+    state = storage.get_alert_state(_BRIEF_RULE_ID)
+    last_fired = state.get("last_fired_ts", "")
+    if not last_fired:
+        return False
+    try:
+        last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
+        tz_name = cfg.location.get("timezone", "UTC")
+        tz = ZoneInfo(tz_name)
+        last_local = last_dt.astimezone(tz)
+        return last_local.date() == local_now.date()
+    except Exception:
+        return False
+
+
+def send_daily_brief(force: bool = False) -> None:
+    """
+    Send the morning garden brief. Called by run_cron_tick() and the --brief CLI flag.
+
+    Args:
+        force: if True, skip the hour check and dedup (for testing / manual send).
+    """
+    if not cfg.daily_brief.get("enabled", True):
+        log.info("Daily brief disabled in config")
         return
 
-    info = storage.health_info()
-    heartbeat(
-        sensor_count=info.get("sensors_seen", 0),
-        last_ts=info.get("last_reading_ts"),
-    )
+    local_now = _local_now()
+
+    if not force:
+        hour_local = cfg.daily_brief.get("hour_local", 7)
+        if local_now.hour != hour_local:
+            return
+        if _already_sent_today(local_now):
+            log.debug("Daily brief already sent today, skipping")
+            return
+
+    log.info("Sending daily brief (force=%s, local time=%s)", force, local_now.strftime("%H:%M %Z"))
+
+    fc = get_forecast()
+    sensor_sum = _sensor_summary()
+    body = llm.write_daily_brief(fc, sensor_sum)
+
+    weather_line = forecast_summary(fc)
+    title = f"Morning Brief · {local_now.strftime('%a %b %-d')}"
+
+    tg(title, body)
+    storage.set_alert_state(_BRIEF_RULE_ID, "", active=False, last_fired_ts=_now_iso())
+    log.info("Daily brief sent")
+
+
+def _maybe_daily_brief() -> None:
+    send_daily_brief(force=False)
 
 
 # ── CLI entry point (used by garden-cron.service) ────────────────────────────
@@ -129,8 +216,13 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--cron", action="store_true", help="Run cron tick")
+    parser = argparse.ArgumentParser(description="garden-agent cron runner")
+    parser.add_argument("--cron",  action="store_true", help="Run cron tick (rules + brief)")
+    parser.add_argument("--brief", action="store_true", help="Force-send morning brief now (ignores hour/dedup)")
     args = parser.parse_args()
-    if args.cron:
+
+    if args.brief:
+        storage.init_db()
+        send_daily_brief(force=True)
+    elif args.cron:
         run_cron_tick()

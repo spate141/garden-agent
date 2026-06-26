@@ -1,14 +1,26 @@
 """
-llm.py — LLM prose generation for alert messages.
+llm.py — LLM prose generation for alert messages and the daily morning brief.
 
-Calls claude-haiku-4-5 to write a short, actionable Telegram message when a
-rule fires. The LLM only writes prose — it never decides whether to alert.
-Falls back to the rule's templated body if the API call fails.
+Uses claude-haiku-4-5-20251001. Two public functions:
+
+  write_alert(rule_id, sensor_key, title, fallback_body)
+      Called when a deterministic rule fires. Returns an actionable Telegram
+      message body. Weather context is injected when available; for watering
+      rules the LLM is explicitly asked to estimate hose minutes and factor rain.
+      Falls back to fallback_body if the API call fails.
+
+  write_daily_brief(forecast, sensor_summary)
+      Called once per morning by the cron tick. Returns a 4-6 sentence brief
+      covering weather, per-bed status, and a watering plan for the day.
+      Falls back to a plain-text summary if the API call fails.
+
+The LLM never decides whether to alert — that's always the deterministic rules.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import anthropic
 
@@ -27,8 +39,10 @@ def _client() -> anthropic.Anthropic:
     return _CLIENT
 
 
+# ── Context builders ──────────────────────────────────────────────────────────
+
 def _recent_context(sensor_key: str) -> str:
-    """Build a short context string from the last 3h of readings for a sensor."""
+    """Last 6 readings (up to 3h) for a sensor, oldest→newest."""
     if not sensor_key:
         return ""
     rows = storage.series(sensor_key, hours=3)
@@ -45,12 +59,34 @@ def _outdoor_temp_context() -> str:
     return f"Current outdoor temperature: {recent[0]:.1f}°C"
 
 
-_SYSTEM = """\
-You are a concise garden monitoring assistant. When a sensor threshold is breached,
-write a short, plain-English Telegram message (2-4 sentences max) that tells the
-gardener exactly what is happening and what action to take. Be specific — include
-the actual sensor reading. Do not use markdown, bullet points, or headers.
-Do not start with "Alert" or repeat the title. Be direct and calm.\
+def _weather_context() -> str:
+    """Compact weather line, or empty string if weather is unavailable."""
+    try:
+        from garden.agent.weather import forecast_summary, get_forecast
+        return forecast_summary(get_forecast())
+    except Exception:
+        return ""
+
+
+# ── Alert prose ───────────────────────────────────────────────────────────────
+
+_ALERT_SYSTEM = """\
+You are a concise garden monitoring assistant. A sensor threshold has been breached.
+Write a short, plain-English Telegram message (2-4 sentences) telling the gardener
+exactly what is happening and what action to take. Be specific — include the actual
+sensor reading. Do not use markdown, bullet points, or headers. Do not start with
+"Alert" or repeat the title. Be direct and calm.\
+"""
+
+_WATERING_SYSTEM = """\
+You are a concise garden monitoring assistant. A soil-moisture sensor is below the
+watering threshold. Write a short, plain-English Telegram message (2-4 sentences) that:
+1. States which bed needs water and the current moisture reading.
+2. Estimates how many minutes to run a standard garden hose (~12 L/min flow) to
+   recover the bed — use the moisture deficit and bed size you can infer from context.
+3. Adjusts advice based on weather: if meaningful rain is expected in the next few
+   hours, suggest waiting; in a heatwave (>35°C), advise watering deeper/longer.
+Do not use markdown, bullet points, or headers. Be specific and practical.\
 """
 
 
@@ -62,17 +98,21 @@ def write_alert(
 ) -> str:
     """
     Returns LLM-written prose for the alert body.
-    Falls back to fallback_body if the API call fails.
+    Falls back to fallback_body if the API call fails or key is missing.
     """
     if not cfg.anthropic_api_key:
         return fallback_body
 
-    label = cfg.sensor_label(sensor_key) if sensor_key else ""
-    recent_ctx = _recent_context(sensor_key)
-    temp_ctx = _outdoor_temp_context()
+    is_watering = rule_id.startswith("soil_moisture_")
+    system = _WATERING_SYSTEM if is_watering else _ALERT_SYSTEM
 
-    context_lines = [c for c in [recent_ctx, temp_ctx] if c]
-    context_block = "\n".join(context_lines) if context_lines else "No recent context available."
+    label       = cfg.sensor_label(sensor_key) if sensor_key else ""
+    recent_ctx  = _recent_context(sensor_key)
+    temp_ctx    = _outdoor_temp_context()
+    weather_ctx = _weather_context()
+
+    context_parts = [c for c in [recent_ctx, temp_ctx, weather_ctx] if c]
+    context_block = "\n".join(context_parts) if context_parts else "No context available."
 
     user_prompt = f"""\
 Rule triggered: {title}
@@ -81,20 +121,80 @@ Rule ID: {rule_id}
 
 {context_block}
 
-Fallback message (use as a reference for facts, but rewrite naturally):
+Fallback message (use as a reference for the facts, but rewrite naturally):
 {fallback_body}
 """
 
     try:
         response = _client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            system=_SYSTEM,
+            model=cfg.llm.get("model", "claude-sonnet-4-6"),
+            max_tokens=cfg.llm.get("max_tokens_alert", 220),
+            system=system,
             messages=[{"role": "user", "content": user_prompt}],
         )
         text = response.content[0].text.strip()
-        log.info("LLM prose generated for %s (%d chars)", rule_id, len(text))
+        log.info("LLM alert prose for %s (%d chars)", rule_id, len(text))
         return text
     except Exception as exc:
-        log.warning("LLM call failed for %s, using fallback: %s", rule_id, exc)
+        log.warning("LLM alert call failed for %s, using fallback: %s", rule_id, exc)
         return fallback_body
+
+
+# ── Daily morning brief ───────────────────────────────────────────────────────
+
+_BRIEF_SYSTEM = """\
+You are the user's personal gardener. Write a warm, concise morning briefing in plain
+text (4-6 sentences, no markdown, no bullet points, no headers). Cover:
+1. Today's weather in one sentence.
+2. How the garden beds look right now based on sensor readings.
+3. A clear watering plan: skip or postpone if meaningful rain is expected today; water
+   longer/deeper if it's going to be very hot (>35°C); otherwise give a simple recommendation.
+Be practical, friendly, and specific. Sign off naturally — no formal closing.\
+"""
+
+
+def write_daily_brief(
+    forecast: dict[str, Any] | None,
+    sensor_summary: str,
+) -> str:
+    """
+    Generate a morning garden briefing. Returns LLM prose or a plain fallback.
+    """
+    if not cfg.anthropic_api_key:
+        return _brief_fallback(forecast, sensor_summary)
+
+    from garden.agent.weather import forecast_summary
+    weather_line = forecast_summary(forecast)
+
+    user_prompt = f"""\
+Weather today: {weather_line}
+
+Current garden sensor readings:
+{sensor_summary}
+
+Write the morning briefing.
+"""
+
+    try:
+        response = _client().messages.create(
+            model=cfg.llm.get("model", "claude-sonnet-4-6"),
+            max_tokens=cfg.llm.get("max_tokens_brief", 320),
+            system=_BRIEF_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        text = response.content[0].text.strip()
+        log.info("LLM morning brief generated (%d chars)", len(text))
+        return text
+    except Exception as exc:
+        log.warning("LLM brief call failed, using fallback: %s", exc)
+        return _brief_fallback(forecast, sensor_summary)
+
+
+def _brief_fallback(
+    forecast: dict[str, Any] | None,
+    sensor_summary: str,
+) -> str:
+    """Plain-text fallback when the LLM is unavailable."""
+    from garden.agent.weather import forecast_summary
+    weather_line = forecast_summary(forecast)
+    return f"Good morning! {weather_line}\n\nGarden status:\n{sensor_summary}"

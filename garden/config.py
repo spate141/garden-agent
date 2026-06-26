@@ -47,12 +47,24 @@ class _Config:
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
         self.db_path: Path = Path(os.getenv("DB_PATH", "garden.sqlite3"))
 
+        # ── location (from secrets.env — gitignored, never in config.yaml) ──
+        self.location: dict[str, str] = {
+            "zipcode":  os.getenv("GARDEN_ZIPCODE", ""),
+            "country":  os.getenv("GARDEN_COUNTRY", "us"),
+            "timezone": os.getenv("GARDEN_TIMEZONE", "UTC"),
+            "lat":      os.getenv("GARDEN_LAT", ""),
+            "lon":      os.getenv("GARDEN_LON", ""),
+        }
+
         # ── config.yaml subtrees (accessed as dicts by the rest of the code) ─
         self.sensors: dict[str, Any] = raw.get("sensors", {})
         self.thresholds: dict[str, Any] = raw.get("thresholds", {})
         self.watchdog: dict[str, Any] = raw.get("watchdog", {})
         self.cooldowns: dict[str, Any] = raw.get("cooldowns", {})
-        self.heartbeat: dict[str, Any] = raw.get("heartbeat", {})
+        self.heartbeat: dict[str, Any] = raw.get("heartbeat", {})   # kept for back-compat
+        self.llm: dict[str, Any] = raw.get("llm", {})
+        self.weather: dict[str, Any] = raw.get("weather", {})
+        self.daily_brief: dict[str, Any] = raw.get("daily_brief", {})
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
