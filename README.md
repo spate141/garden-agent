@@ -175,7 +175,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now garden-cron.timer
 ```
 
-Nightly DB backup (02:00 UTC, keeps last 7 days):
+Nightly DB backup (02:00 UTC, keeps last 7 days locally + pushes to Cloudflare R2):
 
 ```bash
 sed -i 's/YOUR_VM_USER/'"$USER"'/g' systemd/garden-backup.service
@@ -183,6 +183,19 @@ sudo cp systemd/garden-backup.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now garden-backup.timer
 ```
+
+R2 offsite backup is optional — add these to `secrets.env` to enable (see [docs/deploy.md](docs/deploy.md) for setup):
+
+| Key | Description |
+|-----|-------------|
+| `R2_ACCOUNT_ID` | Cloudflare account ID (R2 overview sidebar) |
+| `R2_BUCKET` | Bucket name, e.g. `garden-backups` |
+| `R2_ACCESS_KEY_ID` | From R2 → Manage API Tokens |
+| `R2_SECRET_ACCESS_KEY` | From R2 → Manage API Tokens |
+
+Also install rclone once: `curl https://rclone.org/install.sh | sudo bash`
+
+Restore from R2 onto a fresh VM: `bash scripts/restore_db.sh`
 
 Journal log rotation (cap at 200MB):
 
