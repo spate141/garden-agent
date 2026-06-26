@@ -353,9 +353,503 @@
       .stat:nth-last-child(-n+2):nth-child(2n+1),
       .stat:nth-last-child(-n+2):nth-child(2n+1) ~ .stat { border-bottom: none; }
     }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GARDEN HERO — self-contained palette, cozy Stardew-adjacent style
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .garden {
+      width: 100%;
+      overflow: hidden;
+      border-bottom: 2px solid rgba(0,0,0,0.08);
+      /* Garden-own tokens — isolated from page tokens */
+      --g-wood:      #7a4f28;
+      --g-wood-hi:   #a0703a;
+      --g-wood-sh:   #4e2e0e;
+      --g-chip-bg:   rgba(253, 248, 238, 0.96);
+      --g-chip-text: #3b2008;
+      --g-chip-shad: rgba(60,30,0,0.14);
+    }
+    [data-theme="dark"] .garden {
+      --g-chip-bg:   rgba(42, 30, 15, 0.96);
+      --g-chip-text: #e8d4b8;
+      --g-chip-shad: rgba(0,0,0,0.35);
+      --g-wood:      #5e3c1a;
+      --g-wood-hi:   #7a5228;
+      --g-wood-sh:   #321806;
+    }
+
+    /* ── Sky strip ── */
+    .garden-sky {
+      position: relative;
+      width: 100%;
+      height: 86px;
+      background: linear-gradient(180deg, #5ba8d8 0%, #c8e8ff 100%);
+      overflow: hidden;
+      transition: background 3s ease, filter 3s ease;
+    }
+
+    .sky-sun {
+      position: absolute;
+      top: 14px;
+      right: 72px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffd94a;
+      box-shadow: 0 0 22px 7px rgba(255,220,50,0.55);
+      z-index: 2;
+      transition: opacity 2s ease, background 2s ease, box-shadow 2s ease;
+    }
+
+    .sky-moon {
+      position: absolute;
+      top: 14px;
+      right: 72px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 38%, #e8e4c8 60%, #b8b498 100%);
+      box-shadow: 0 0 14px 4px rgba(220,215,180,0.35);
+      opacity: 0;
+      z-index: 2;
+      transition: opacity 2s ease;
+    }
+
+    .sky-cloud {
+      position: absolute;
+      height: 22px;
+      border-radius: 50px;
+      background: rgba(255,255,255,0.85);
+      filter: blur(1.5px);
+      z-index: 1;
+      transition: opacity 3s ease, background 3s ease;
+    }
+    .sky-cloud::before,
+    .sky-cloud::after {
+      content: '';
+      position: absolute;
+      background: inherit;
+      border-radius: 50%;
+    }
+    .sky-cloud::before { width: 55%; height: 160%; top: -50%; left: 18%; }
+    .sky-cloud::after  { width: 40%; height: 130%; top: -35%; right: 18%; }
+
+    .sky-chips {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .sky-chip {
+      background: var(--g-chip-bg);
+      color: var(--g-chip-text);
+      border-radius: 12px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'Nunito Sans', sans-serif;
+      box-shadow: 0 2px 8px var(--g-chip-shad);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .sky-chip-label { font-weight: 600; opacity: 0.6; font-size: 10px; margin-right: 1px; }
+
+    /* ── Ground strip ── */
+    .garden-ground {
+      background: linear-gradient(180deg, #c8b48a 0%, #b8a47a 100%);
+      padding: 14px 24px 22px;
+      display: flex;
+      gap: 22px;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .garden-ground::-webkit-scrollbar { display: none; }
+    [data-theme="dark"] .garden-ground {
+      background: linear-gradient(180deg, #5a4828 0%, #4a3818 100%);
+    }
+
+    /* ── Bed card ── */
+    .g-bed {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .g-bed-name {
+      font-family: 'Nunito Sans', sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--g-chip-text);
+      opacity: 0.7;
+      margin-bottom: 5px;
+    }
+
+    /* Wooden raised-bed frame */
+    .g-bed-frame {
+      position: relative;
+      width: 210px;
+      height: 158px;
+      border-radius: 6px;
+      /* Multi-layer wooden plank border illusion */
+      background:
+        linear-gradient(to right,  var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to left,   var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to bottom, var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to top,    var(--g-wood-sh) 0, var(--g-wood) 4px, var(--g-wood-hi) 6px, var(--g-wood) 11px, transparent 11px);
+      box-shadow: 3px 5px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+      overflow: hidden;
+    }
+
+    /* Plank grain lines */
+    .g-bed-frame::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(90deg,
+          transparent 0, transparent 34px,
+          rgba(0,0,0,0.07) 34px, rgba(0,0,0,0.07) 35px);
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    /* Soil area */
+    .g-soil {
+      position: absolute;
+      inset: 13px 13px 16px;
+      border-radius: 2px;
+      background-color: #d4b896;
+      transition: background-color 2s ease;
+      overflow: hidden;
+    }
+
+    /* Dry soil cracks */
+    .g-soil::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(28deg,
+          transparent 0, transparent 9px,
+          rgba(0,0,0,0.07) 9px, rgba(0,0,0,0.07) 10px),
+        repeating-linear-gradient(118deg,
+          transparent 0, transparent 13px,
+          rgba(0,0,0,0.05) 13px, rgba(0,0,0,0.05) 14px);
+      opacity: var(--crack-op, 1);
+      transition: opacity 2s ease;
+      pointer-events: none;
+    }
+
+    /* Moisture bar (5-segment) */
+    .g-moist-bar {
+      position: absolute;
+      bottom: 5px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      gap: 3px;
+      z-index: 5;
+    }
+    .g-moist-seg {
+      flex: 1;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.18);
+      transition: background 1.2s ease;
+    }
+    .g-moist-seg.filled { background: rgba(74,222,128,0.9); }
+    .g-moist-seg.filled.low { background: rgba(251,146,60,0.95); }
+
+    /* Asleep / no-signal overlay */
+    .g-bed.g-asleep .g-bed-frame { filter: grayscale(0.7) brightness(0.82); }
+    .g-bed.g-asleep .g-bed-frame::after {
+      content: '📡 no signal';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: rgba(80,50,20,0.55);
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .g-bed.g-asleep .g-chip { opacity: 0.5; }
+
+    /* Plant container */
+    .g-plants {
+      position: absolute;
+      inset: 2px 4px 22px;
+    }
+
+    /* Outer wrapper — driven by wilt (transitions smoothly) */
+    .g-plant {
+      position: absolute;
+      bottom: 0;
+      width: 44px;
+      height: 56px;
+      transform-origin: center bottom;
+      transform: rotate(var(--g-wilt-rot, 0deg));
+      filter: saturate(var(--g-sat, 1)) brightness(var(--g-bright, 1));
+      transition: transform 1.8s ease, filter 1.8s ease;
+    }
+
+    /* Inner wrapper — driven by ambient sway animation */
+    .g-plant-inner {
+      width: 100%;
+      height: 100%;
+      transform-origin: center bottom;
+      transform: rotate(var(--g-rot, 0deg));
+    }
+    .g-plant-inner svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Value chips below bed */
+    .g-chips {
+      display: flex;
+      gap: 6px;
+      padding: 8px 2px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .g-chip {
+      background: var(--g-chip-bg);
+      color: var(--g-chip-text);
+      border-radius: 9px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'Nunito Sans', sans-serif;
+      box-shadow: 0 1px 5px var(--g-chip-shad);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .g-chip-label {
+      font-weight: 600;
+      opacity: 0.6;
+      font-size: 10px;
+    }
+
+    /* Low-battery pulse */
+    .g-chip.g-batt-low { animation: g-batt-pulse 2.4s ease-in-out infinite; }
+    @keyframes g-batt-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* Droplet alert ping */
+    .g-droplet-ping {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      font-size: 18px;
+      z-index: 12;
+      opacity: 0;
+      pointer-events: none;
+      animation: g-ping 1.8s ease-out forwards;
+    }
+    @keyframes g-ping {
+      0%   { opacity: 0;   transform: translateY(0)    scale(0.5); }
+      18%  { opacity: 1;   transform: translateY(-6px) scale(1.15); }
+      80%  { opacity: 0.6; transform: translateY(-12px) scale(1); }
+      100% { opacity: 0;   transform: translateY(-18px) scale(0.85); }
+    }
+
+    /* Responsive */
+    @media (max-width: 720px) {
+      .garden-ground {
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 16px 18px;
+      }
+      .garden-sky { height: 72px; }
+      .sky-chips  { gap: 5px; }
+      .sky-chip   { font-size: 11px; padding: 4px 9px; }
+    }
+
+    /* ── Ambient animation (no-preference only) ─────────────────────────── */
+    @media (prefers-reduced-motion: no-preference) {
+
+      /* Gentle plant sway — inner wrapper only, so wilt transition is unaffected */
+      .g-plant-inner {
+        animation: g-sway 4.2s ease-in-out infinite;
+        animation-delay: var(--g-delay, 0s);
+      }
+      @keyframes g-sway {
+        0%, 100% { transform: rotate(var(--g-rot, 0deg)); }
+        35%       { transform: rotate(calc(var(--g-rot, 0deg) + 2.8deg)); }
+        68%       { transform: rotate(calc(var(--g-rot, 0deg) - 1.8deg)); }
+      }
+
+      /* Cloud drift */
+      .sky-cloud {
+        animation: g-cloud-drift var(--g-cdur, 22s) linear infinite;
+        animation-delay: var(--g-cdelay, 0s);
+      }
+      @keyframes g-cloud-drift {
+        0%   { transform: translateX(-250px); }
+        100% { transform: translateX(calc(100vw + 250px)); }
+      }
+
+      /* Sun shimmer */
+      .sky-sun {
+        animation: g-sun-shimmer 3.8s ease-in-out infinite;
+      }
+      @keyframes g-sun-shimmer {
+        0%, 100% { box-shadow: 0 0 22px 7px rgba(255,220,50,0.55); }
+        50%       { box-shadow: 0 0 34px 12px rgba(255,220,50,0.75); }
+      }
+
+      /* Fireflies */
+      .g-firefly {
+        animation: g-firefly-blink var(--g-fdur, 2.2s) ease-in-out infinite;
+        animation-delay: var(--g-fdelay, 0s);
+      }
+      @keyframes g-firefly-blink {
+        0%, 100% { opacity: 0; transform: translate(0, 0) scale(0.7); }
+        50%       { opacity: 0.85; transform: translate(var(--g-fx, 4px), var(--g-fy, -5px)) scale(1.1); }
+      }
+    }
   </style>
 </head>
 <body>
+
+<!-- ── SVG plant sprite definitions (hidden) ──────────────────────────────── -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+
+    <!-- TOMATO: red round fruit, green calyx, stem -->
+    <symbol id="sprite-tomato" viewBox="0 0 40 52">
+      <rect x="19" y="1" width="2.5" height="9" rx="1.2" fill="#2d6a1f"/>
+      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#3d8a2a" transform="rotate(-38 20 12)"/>
+      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#4aaa35" transform="rotate(0 20 12)"/>
+      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#3d8a2a" transform="rotate(38 20 12)"/>
+      <circle  cx="20" cy="13" r="4.5" fill="#3a8028"/>
+      <circle  cx="20" cy="30" r="16.5" fill="#cc2a1e"/>
+      <circle  cx="20" cy="30" r="16.5" fill="#e8402e" opacity="0.55"/>
+      <ellipse cx="14" cy="23" rx="4.5" ry="3.5" fill="rgba(255,255,255,0.22)" transform="rotate(-30 14 23)"/>
+      <circle  cx="20" cy="45" r="2.5" fill="#a01c12"/>
+    </symbol>
+
+    <!-- EGGPLANT: deep purple teardrop, green calyx -->
+    <symbol id="sprite-eggplant" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#4aaa35" transform="rotate(-42 20 12)"/>
+      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#3d8a2a" transform="rotate(0 20 12)"/>
+      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#4aaa35" transform="rotate(42 20 12)"/>
+      <circle  cx="20" cy="13" r="4" fill="#3a8028"/>
+      <ellipse cx="20" cy="34" rx="13.5" ry="17" fill="#4a1e7a"/>
+      <ellipse cx="20" cy="34" rx="11"   ry="14" fill="#6432a0" opacity="0.6"/>
+      <ellipse cx="14" cy="25" rx="3.5"  ry="5.5" fill="rgba(255,255,255,0.18)" transform="rotate(-15 14 25)"/>
+      <ellipse cx="20" cy="49" rx="4.5" ry="2.5" fill="#321055"/>
+    </symbol>
+
+    <!-- OKRA: green ridged pod tapering to a point -->
+    <symbol id="sprite-okra" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="8" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="15" cy="10" rx="6" ry="2" fill="#4aaa35" transform="rotate(-28 15 10)"/>
+      <ellipse cx="25" cy="10" rx="6" ry="2" fill="#3d8a2a" transform="rotate(28 25 10)"/>
+      <rect    x="13" y="8" width="14" height="32" rx="6" fill="#4a8c2f"/>
+      <rect    x="13" y="8" width="14" height="32" rx="6" fill="#5aa838" opacity="0.45"/>
+      <line x1="20" y1="8"  x2="20" y2="40" stroke="#38701e" stroke-width="1.5"/>
+      <line x1="15" y1="10" x2="15" y2="38" stroke="#38701e" stroke-width="0.9"/>
+      <line x1="25" y1="10" x2="25" y2="38" stroke="#38701e" stroke-width="0.9"/>
+      <ellipse cx="14.5" cy="20" rx="2" ry="6" fill="rgba(255,255,255,0.16)"/>
+      <ellipse cx="20"   cy="43" rx="4" ry="2.5" fill="#2a6018"/>
+    </symbol>
+
+    <!-- PEAS: plump curved pod with three bumps, tendril -->
+    <symbol id="sprite-peas" viewBox="0 0 40 52">
+      <path d="M30 9 Q36 5 33 11 Q30 15 35 17" stroke="#4aaa35" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <rect x="18.5" y="2" width="2.5" height="11" rx="1.2" fill="#3d8a2a"/>
+      <ellipse cx="20" cy="32" rx="11" ry="17" fill="#58b83a" transform="rotate(-6 20 32)"/>
+      <circle  cx="20" cy="20" r="4.5" fill="#4aaa35" opacity="0.72" transform="rotate(-6 20 20)"/>
+      <circle  cx="19" cy="31" r="4.5" fill="#4aaa35" opacity="0.72" transform="rotate(-6 19 31)"/>
+      <circle  cx="20" cy="42" r="4"   fill="#4aaa35" opacity="0.68" transform="rotate(-6 20 42)"/>
+      <ellipse cx="20" cy="32" rx="11" ry="17" fill="none" stroke="#3d8a2a" stroke-width="1.2" transform="rotate(-6 20 32)"/>
+      <ellipse cx="14" cy="26" rx="2.5" ry="6" fill="rgba(255,255,255,0.18)" transform="rotate(-6 14 26)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER: blocky golden-yellow bell shape -->
+    <symbol id="sprite-sweet_pepper" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="15" cy="11" rx="6.5" ry="2.2" fill="#4aaa35" transform="rotate(-24 15 11)"/>
+      <ellipse cx="25" cy="11" rx="6.5" ry="2.2" fill="#3d8a2a" transform="rotate(24 25 11)"/>
+      <ellipse cx="20" cy="10" rx="5.5" ry="2.2" fill="#4aaa35"/>
+      <rect    x="8"  y="11" width="24" height="28" rx="10" fill="#d4a010"/>
+      <rect    x="8"  y="11" width="24" height="28" rx="10" fill="#e8bc20" opacity="0.4"/>
+      <ellipse cx="14" cy="20" rx="3.5" ry="5.5" fill="rgba(255,255,255,0.24)" transform="rotate(-12 14 20)"/>
+      <ellipse cx="20" cy="43" rx="12" ry="5" fill="#b88a08"/>
+      <line x1="20" y1="37" x2="20" y2="48" stroke="#9a7006" stroke-width="2"/>
+      <line x1="14" y1="39" x2="13" y2="47" stroke="#9a7006" stroke-width="1.5"/>
+      <line x1="26" y1="39" x2="27" y2="47" stroke="#9a7006" stroke-width="1.5"/>
+    </symbol>
+
+    <!-- HOT PEPPER: slim tapered red/orange chili, slight curve -->
+    <symbol id="sprite-hot_pepper" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="2.8" height="9" rx="1.4" fill="#2d6a1f"/>
+      <ellipse cx="25" cy="11" rx="7" ry="2.2" fill="#4aaa35" transform="rotate(28 25 11)"/>
+      <ellipse cx="19" cy="30" rx="6.5" ry="18.5" fill="#d42010" transform="rotate(4 19 30)"/>
+      <ellipse cx="19" cy="30" rx="5"   ry="15"   fill="#e83825" opacity="0.5" transform="rotate(4 19 30)"/>
+      <ellipse cx="15" cy="22" rx="2"   ry="6.5"  fill="rgba(255,210,200,0.26)" transform="rotate(4 15 22)"/>
+      <ellipse cx="20" cy="48" rx="3.5" ry="2"    fill="#8a0e04" transform="rotate(4 20 48)"/>
+    </symbol>
+
+    <!-- ZUCCHINI: dark green striped cylinder, yellow flower tip -->
+    <symbol id="sprite-zucchini" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="8" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="15" cy="10" rx="6" ry="2" fill="#4aaa35" transform="rotate(-22 15 10)"/>
+      <ellipse cx="25" cy="10" rx="6" ry="2" fill="#3d8a2a" transform="rotate(22 25 10)"/>
+      <rect    x="12" y="8" width="16" height="34" rx="7.5" fill="#256018"/>
+      <rect    x="14.5" y="8" width="3" height="34" rx="1.5" fill="#308028" opacity="0.55"/>
+      <rect    x="19"   y="8" width="2.5" height="34" rx="1.2" fill="#308028" opacity="0.38"/>
+      <rect    x="23"   y="8" width="2.5" height="34" rx="1.2" fill="#308028" opacity="0.28"/>
+      <ellipse cx="13.5" cy="20" rx="1.8" ry="6.5" fill="rgba(255,255,255,0.14)"/>
+      <ellipse cx="20"   cy="45" rx="6.5" ry="4"   fill="#e09800"/>
+      <ellipse cx="20"   cy="44" rx="4.5" ry="3"   fill="#f8c000"/>
+    </symbol>
+
+    <!-- UNKNOWN fallback: simple green sprout -->
+    <symbol id="sprite-unknown" viewBox="0 0 40 52">
+      <rect x="18.5" y="18" width="3" height="30" rx="1.5" fill="#3d8a2a"/>
+      <ellipse cx="12" cy="26" rx="8.5" ry="3.8" fill="#4aaa35" transform="rotate(-32 12 26)"/>
+      <ellipse cx="28" cy="26" rx="8.5" ry="3.8" fill="#3d8a2a" transform="rotate(32 28 26)"/>
+      <ellipse cx="20" cy="17" rx="5.5" ry="7.5" fill="#5abe40"/>
+      <rect    x="18.5" y="10" width="3" height="9" rx="1.5" fill="#3d8a2a"/>
+    </symbol>
+
+  </defs>
+</svg>
 
 <header>
   <div class="logo">&#127807; Raised Garden Beds Sensors Data</div>
@@ -392,6 +886,35 @@
 </header>
 
 {% if has_data %}
+
+<!-- ── GARDEN HERO ─────────────────────────────────────────────────────────── -->
+<section class="garden" id="garden" aria-label="Garden beds visualization">
+  <div class="garden-sky" id="garden-sky">
+    <div class="sky-sun"  id="sky-sun"  aria-hidden="true"></div>
+    <div class="sky-moon" id="sky-moon" aria-hidden="true"></div>
+    <!-- clouds injected by JS -->
+    <div class="sky-chips" role="region" aria-label="Outdoor conditions">
+      <span class="sky-chip" aria-label="Outdoor temperature">
+        <span aria-hidden="true">🌡️</span>
+        <span class="sky-chip-label">Temp</span>
+        <span id="wv-temp">—</span>
+      </span>
+      <span class="sky-chip" aria-label="Outdoor humidity">
+        <span aria-hidden="true">💧</span>
+        <span class="sky-chip-label">Humidity</span>
+        <span id="wv-hum">—</span>
+      </span>
+      <span class="sky-chip" aria-label="Atmospheric pressure">
+        <span aria-hidden="true">🌬️</span>
+        <span class="sky-chip-label">Pressure</span>
+        <span id="wv-pres">—</span>
+      </span>
+    </div>
+  </div>
+  <div class="garden-ground" id="garden-beds" aria-live="polite">
+    <!-- bed cards injected by JS -->
+  </div>
+</section>
 
 <!-- current values -->
 <div class="stats-strip" id="stats-strip">
@@ -430,11 +953,467 @@
 <footer id="footer-ts"></footer>
 
 <script>
+/* ════════════════════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════════════════════ */
+
 const CHARTS = {{ charts_json | safe }};
 const HOURS  = 24;
-const instances = {};
 
-/* ── Theme ──────────────────────────────────────────────────────────────── */
+/** Bed/plant configuration — edit this array to add/change beds or plants.
+ *  Plant types: tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini */
+const BEDS = [
+  {
+    id: 'bed1',
+    name: 'Bed 1',
+    sensors: { soil_moisture: 'soilmoisture1', soil_battery: 'soilbatt1' },
+    plants: ['tomato'],
+  },
+  {
+    id: 'bed2',
+    name: 'Bed 2',
+    sensors: { soil_moisture: 'soilmoisture2', soil_battery: 'soilbatt2' },
+    plants: ['eggplant', 'okra'],
+  },
+];
+
+const WEATHER_KEYS = { temp: 'tempc', humidity: 'humidity', pressure: 'baromrel_hpa' };
+
+/** Mirror thresholds from config.yaml so art agrees with Telegram alerts */
+const G = { dry: 30, battLow: 1.1, staleMin: 30 };
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VALID SPRITE SET
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const SPRITES = new Set([
+  'tomato', 'eggplant', 'okra', 'peas', 'sweet_pepper', 'hot_pepper', 'zucchini',
+]);
+function spriteHref(type) {
+  return '#sprite-' + (SPRITES.has(type) ? type : 'unknown');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SEEDED RNG — deterministic jitter (stable across refreshes per bed)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function strHash(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+function mkRng(seed) {
+  let s = (seed | 0) + 0x6d2b79f5;
+  return function () {
+    s = Math.imul(s ^ (s >>> 15), 1 | s);
+    s ^= s + Math.imul(s ^ (s >>> 7), 61 | s);
+    return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COLOR UTILS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function lerpRgb(a, b, t) {
+  t = Math.max(0, Math.min(1, t));
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+}
+
+/** Interpolate soil color: dry (pale sandy) → wet (dark rich brown) */
+function moistColor(pct) {
+  const t = Math.min(1, (pct || 0) / 75);
+  const [r, g, b] = lerpRgb([212, 184, 150], [68, 36, 12], t);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TIME OF DAY
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function tod() {
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  if (h < 5 || h >= 22) return 'night';
+  if (h < 7)            return 'dawn';
+  if (h < 17)           return 'day';
+  if (h < 19)           return 'dusk';
+  return 'evening';
+}
+
+const SKY_PALETTE = {
+  night:   ['#08082e', '#181848'],
+  dawn:    ['#ff9a3c', '#ffd194'],
+  day:     ['#5ba8d8', '#c8e8ff'],
+  dusk:    ['#e85820', '#ffac5e'],
+  evening: ['#2a1858', '#6030a0'],
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GARDEN — RENDER BEDS  (called once on load)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function renderBeds() {
+  const container = document.getElementById('garden-beds');
+  if (!container) return;
+  container.innerHTML = '';
+  _initClouds();
+
+  BEDS.forEach(function (bed) {
+    const rng = mkRng(strHash(bed.id));
+
+    /* ── outer bed card ── */
+    const bedEl = document.createElement('div');
+    bedEl.className = 'g-bed';
+    bedEl.dataset.bed = bed.id;
+
+    /* bed name */
+    const nameEl = document.createElement('div');
+    nameEl.className = 'g-bed-name';
+    nameEl.textContent = bed.name;
+    bedEl.appendChild(nameEl);
+
+    /* ── wooden frame ── */
+    const frameEl = document.createElement('div');
+    frameEl.className = 'g-bed-frame';
+
+    /* ── soil ── */
+    const soilEl = document.createElement('div');
+    soilEl.className = 'g-soil';
+    soilEl.id = 'soil-' + bed.id;
+    soilEl.style.setProperty('--crack-op', '1');
+
+    /* ── plants ── */
+    const plantsEl = document.createElement('div');
+    plantsEl.className = 'g-plants';
+
+    const n = bed.plants.length;
+    bed.plants.forEach(function (type, i) {
+      const plantEl = document.createElement('div');
+      plantEl.className = 'g-plant';
+
+      /* seeded jitter */
+      const jx  = (rng() - 0.5) * 18;
+      const jy  = (rng() - 0.5) * 8;
+      const rot = (rng() - 0.5) * 7;
+      const delay = rng() * 2.8;
+
+      /* x-position: evenly spaced, capped so plants don't overflow */
+      let frac;
+      if (n === 1)      frac = 0.5;
+      else if (n === 2) frac = 0.3 + i * 0.4;
+      else              frac = 0.2 + (i / (n - 1)) * 0.6;
+
+      /* frame interior is 210-26=184px wide; plant is 44px; center offset = -22px */
+      plantEl.style.setProperty('--g-rot',       rot + 'deg');
+      plantEl.style.setProperty('--g-delay',     delay + 's');
+      plantEl.style.setProperty('--g-wilt-rot',  '0deg');
+      plantEl.style.setProperty('--g-sat',       '1');
+      plantEl.style.setProperty('--g-bright',    '1');
+
+      /* position via absolute coords inside .g-plants */
+      plantEl.style.left   = 'calc(' + (frac * 100) + '% + ' + jx + 'px - 22px)';
+      plantEl.style.bottom = Math.max(0, 4 + jy * 0.3) + 'px';
+
+      /* z-order: lower plants (higher bottom) appear in front */
+      plantEl.style.zIndex = i;
+
+      const inner = document.createElement('div');
+      inner.className = 'g-plant-inner';
+      inner.innerHTML =
+        '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="44" height="56">' +
+        '<use href="' + spriteHref(type) + '"/>' +
+        '</svg>';
+      plantEl.appendChild(inner);
+      plantsEl.appendChild(plantEl);
+    });
+
+    /* ── moisture bar (5 segs) ── */
+    const mbar = document.createElement('div');
+    mbar.className = 'g-moist-bar';
+    mbar.id = 'mbar-' + bed.id;
+    for (let s = 0; s < 5; s++) {
+      const seg = document.createElement('div');
+      seg.className = 'g-moist-seg';
+      mbar.appendChild(seg);
+    }
+
+    soilEl.appendChild(plantsEl);
+    frameEl.appendChild(soilEl);
+    frameEl.appendChild(mbar);
+    bedEl.appendChild(frameEl);
+
+    /* ── value chips ── */
+    const chipsEl = document.createElement('div');
+    chipsEl.className = 'g-chips';
+
+    /* soil moisture chip */
+    const moistChip = document.createElement('span');
+    moistChip.className = 'g-chip';
+    moistChip.id = 'chip-moist-' + bed.id;
+    moistChip.setAttribute('aria-label', bed.name + ' soil moisture');
+    moistChip.innerHTML =
+      '<span class="g-chip-label">Soil</span>' +
+      '<span id="cv-moist-' + bed.id + '">—</span>';
+    chipsEl.appendChild(moistChip);
+
+    /* battery chip */
+    const battChip = document.createElement('span');
+    battChip.className = 'g-chip';
+    battChip.id = 'chip-batt-' + bed.id;
+    battChip.setAttribute('aria-label', bed.name + ' battery');
+    battChip.innerHTML =
+      '<span aria-hidden="true">🔋</span>' +
+      '<span id="cv-batt-' + bed.id + '">—</span>';
+    chipsEl.appendChild(battChip);
+
+    bedEl.appendChild(chipsEl);
+    container.appendChild(bedEl);
+  });
+}
+
+function _initClouds() {
+  const sky = document.getElementById('garden-sky');
+  if (!sky) return;
+  sky.querySelectorAll('.sky-cloud').forEach(function (c) { c.remove(); });
+  [
+    { left: -100, top: 12, width: 110, dur: 24, delay: 0 },
+    { left: 220,  top: 20, width:  78, dur: 32, delay: -12 },
+    { left: 460,  top: 8,  width: 130, dur: 28, delay: -20 },
+  ].forEach(function (c) {
+    const el = document.createElement('div');
+    el.className = 'sky-cloud';
+    el.style.cssText = 'left:' + c.left + 'px;top:' + c.top + 'px;width:' + c.width + 'px;';
+    el.style.setProperty('--g-cdur',   c.dur + 's');
+    el.style.setProperty('--g-cdelay', c.delay + 's');
+    sky.appendChild(el);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GARDEN — DATA HELPERS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function parseLatest(rows) {
+  const readings = {}, ts = {};
+  let lastUpdated = null;
+  rows.forEach(function (r) {
+    readings[r.sensor_key] = r.value;
+    ts[r.sensor_key]       = r.ts;
+    if (!lastUpdated || r.ts > lastUpdated) lastUpdated = r.ts;
+  });
+  return { readings: readings, ts: ts, lastUpdated: lastUpdated };
+}
+
+function isStale(isoTs) {
+  if (!isoTs) return true;
+  return (Date.now() - new Date(isoTs).getTime()) / 60000 > G.staleMin;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GARDEN — UPDATE  (called each refresh with the /api/latest rows)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const _prevDry = {};
+
+function updateGarden(rows) {
+  const { readings, ts } = parseLatest(rows);
+  const timeOfDay = tod();
+
+  _updateSky(readings, ts, timeOfDay);
+
+  BEDS.forEach(function (bed) {
+    const moistKey = bed.sensors.soil_moisture;
+    const battKey  = bed.sensors.soil_battery;
+    const moist    = readings[moistKey];
+    const batt     = readings[battKey];
+    const moistTs  = ts[moistKey];
+    const stale    = isStale(moistTs);
+
+    const bedEl = document.querySelector('[data-bed="' + bed.id + '"]');
+    if (!bedEl) return;
+
+    /* ── Stale / no-signal state ── */
+    if (stale) {
+      bedEl.classList.add('g-asleep');
+      _setText('cv-moist-' + bed.id, '—');
+      _setText('cv-batt-' + bed.id, '—');
+      const bc = document.getElementById('chip-batt-' + bed.id);
+      if (bc) bc.classList.remove('g-batt-low');
+      bedEl.querySelectorAll('.g-moist-seg').forEach(function (s) {
+        s.classList.remove('filled', 'low');
+      });
+      bedEl.querySelectorAll('.g-plant').forEach(function (p) {
+        p.style.setProperty('--g-wilt-rot', '-10deg');
+        p.style.setProperty('--g-sat',      '0.3');
+        p.style.setProperty('--g-bright',   '0.7');
+      });
+      return;
+    }
+
+    bedEl.classList.remove('g-asleep');
+
+    /* ── Soil color ── */
+    const soilEl = document.getElementById('soil-' + bed.id);
+    if (soilEl && moist != null) {
+      soilEl.style.backgroundColor = moistColor(moist);
+      soilEl.style.setProperty('--crack-op', Math.max(0, 1 - moist / 35).toFixed(2));
+    }
+
+    /* ── Moisture bar ── */
+    const mbar = bedEl.querySelector('.g-moist-bar');
+    if (mbar && moist != null) {
+      const filled = Math.round((moist / 100) * 5);
+      const isLow  = moist < G.dry;
+      mbar.querySelectorAll('.g-moist-seg').forEach(function (seg, i) {
+        if (i < filled) {
+          seg.classList.add('filled');
+          isLow ? seg.classList.add('low') : seg.classList.remove('low');
+        } else {
+          seg.classList.remove('filled', 'low');
+        }
+      });
+    }
+
+    /* ── Soil moisture chip ── */
+    _setText('cv-moist-' + bed.id, moist != null ? moist.toFixed(0) + '%' : '—');
+
+    /* ── Plant wilt (smooth CSS transition via custom props) ── */
+    if (moist != null) {
+      const wf      = moist < G.dry ? (G.dry - moist) / G.dry : 0;
+      const wiltRot = -(wf * 18).toFixed(1);
+      const sat     = (1 - wf * 0.65).toFixed(3);
+      const bright  = (1 - wf * 0.15).toFixed(3);
+      bedEl.querySelectorAll('.g-plant').forEach(function (p) {
+        p.style.setProperty('--g-wilt-rot', wiltRot + 'deg');
+        p.style.setProperty('--g-sat',      sat);
+        p.style.setProperty('--g-bright',   bright);
+      });
+
+      /* one-shot droplet ping when bed first crosses dry threshold */
+      const isDry = moist < G.dry;
+      if (isDry && !_prevDry[bed.id]) _triggerDropletPing(bed.id);
+      _prevDry[bed.id] = isDry;
+    }
+
+    /* ── Battery chip ── */
+    _setText('cv-batt-' + bed.id, batt != null ? batt.toFixed(1) + 'V' : '—');
+    const battChip = document.getElementById('chip-batt-' + bed.id);
+    if (battChip) {
+      batt != null && batt < G.battLow
+        ? battChip.classList.add('g-batt-low')
+        : battChip.classList.remove('g-batt-low');
+    }
+  });
+}
+
+/* ── Sky + weather strip update ── */
+function _updateSky(readings, ts, timeOfDay) {
+  const sky  = document.getElementById('garden-sky');
+  const sun  = document.getElementById('sky-sun');
+  const moon = document.getElementById('sky-moon');
+  if (!sky) return;
+
+  /* sky gradient */
+  const [top, bot] = SKY_PALETTE[timeOfDay] || SKY_PALETTE.day;
+  sky.style.background = 'linear-gradient(180deg,' + top + ' 0%,' + bot + ' 100%)';
+
+  /* sun vs moon */
+  const showSun = (timeOfDay === 'day' || timeOfDay === 'dawn' || timeOfDay === 'dusk');
+  if (sun)  sun.style.opacity  = showSun ? '1' : '0';
+  if (moon) moon.style.opacity = showSun ? '0' : '1';
+
+  /* warm sun at dawn/dusk */
+  if (sun) {
+    if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
+      sun.style.background  = '#ff9040';
+      sun.style.boxShadow   = '0 0 22px 8px rgba(255,140,40,0.6)';
+    } else {
+      sun.style.background  = '#ffd94a';
+      sun.style.boxShadow   = '0 0 22px 7px rgba(255,220,50,0.55)';
+    }
+  }
+
+  /* clouds: opacity driven by humidity + pressure */
+  const hum  = readings[WEATHER_KEYS.humidity];
+  const pres = readings[WEATHER_KEYS.pressure];
+  let cf = 0.75;
+  if (hum  != null && hum  > 70)   cf += (hum - 70)    / 60;
+  if (pres != null && pres < 1010) cf += (1010 - pres)  / 35;
+  cf = Math.min(2.0, cf);
+
+  const cloudy = cf > 1.3;
+  sky.querySelectorAll('.sky-cloud').forEach(function (c, i) {
+    c.style.opacity    = Math.min(0.96, (0.5 + i * 0.12) * cf).toFixed(2);
+    c.style.background = cloudy ? 'rgba(200,200,205,0.88)' : 'rgba(255,255,255,0.88)';
+  });
+
+  /* temp tint on the sky (day only) */
+  const temp = readings[WEATHER_KEYS.temp];
+  if (timeOfDay === 'day' && temp != null) {
+    if      (temp > 32) sky.style.filter = 'sepia(0.14) saturate(1.1)';
+    else if (temp < 5)  sky.style.filter = 'hue-rotate(18deg) saturate(0.88)';
+    else                sky.style.filter = '';
+  } else {
+    sky.style.filter = '';
+  }
+
+  /* fireflies at night — add if not present, remove otherwise */
+  if (timeOfDay === 'night' || timeOfDay === 'evening') {
+    if (!sky.querySelector('.g-firefly')) _addFireflies();
+  } else {
+    sky.querySelectorAll('.g-firefly').forEach(function (f) { f.remove(); });
+  }
+
+  /* weather value chips */
+  _setText('wv-temp', temp  != null ? temp.toFixed(1)  + '°C'  : '—');
+  _setText('wv-hum',  hum   != null ? hum.toFixed(0)   + '%'   : '—');
+  _setText('wv-pres', pres  != null ? pres.toFixed(0)  + ' hPa': '—');
+}
+
+function _addFireflies() {
+  const ground = document.getElementById('garden-ground');
+  if (!ground) return;
+  const positions = [
+    { left: 12, bottom: 40, dur: 2.1, delay: 0,    fx:  4, fy: -5 },
+    { left: 48, bottom: 60, dur: 2.8, delay: -0.8, fx: -3, fy: -6 },
+    { left: 75, bottom: 35, dur: 1.9, delay: -1.5, fx:  5, fy: -4 },
+  ];
+  positions.forEach(function (p) {
+    const el = document.createElement('span');
+    el.className = 'g-firefly';
+    el.setAttribute('aria-hidden', 'true');
+    el.textContent = '✨';
+    el.style.cssText =
+      'position:absolute;font-size:10px;left:' + p.left + '%;bottom:' + p.bottom + 'px;' +
+      'pointer-events:none;z-index:5;';
+    el.style.setProperty('--g-fdur',   p.dur + 's');
+    el.style.setProperty('--g-fdelay', p.delay + 's');
+    el.style.setProperty('--g-fx',     p.fx + 'px');
+    el.style.setProperty('--g-fy',     p.fy + 'px');
+    ground.appendChild(el);
+  });
+}
+
+function _triggerDropletPing(bedId) {
+  const frame = document.querySelector('[data-bed="' + bedId + '"] .g-bed-frame');
+  if (!frame) return;
+  const ping = document.createElement('span');
+  ping.className = 'g-droplet-ping';
+  ping.setAttribute('aria-hidden', 'true');
+  ping.textContent = '💧';
+  frame.appendChild(ping);
+  setTimeout(function () { ping.remove(); }, 2200);
+}
+
+function _setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THEME
+   ════════════════════════════════════════════════════════════════════════════ */
 
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -453,8 +1432,8 @@ function chartThemeColors() {
 
 function applyChartTheme() {
   const c = chartThemeColors();
-  Object.values(instances).forEach(chart => {
-    ['x', 'y'].forEach(axis => {
+  Object.values(instances).forEach(function (chart) {
+    ['x', 'y'].forEach(function (axis) {
       chart.options.scales[axis].grid.color  = c.grid;
       chart.options.scales[axis].ticks.color = c.ticks;
     });
@@ -467,7 +1446,7 @@ function applyChartTheme() {
   });
 }
 
-document.getElementById('theme-toggle').addEventListener('click', () => {
+document.getElementById('theme-toggle').addEventListener('click', function () {
   const html = document.documentElement;
   const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
   html.dataset.theme = next;
@@ -475,7 +1454,11 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   applyChartTheme();
 });
 
-/* ── Chart factory ──────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   CHART FACTORY
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const instances = {};
 
 function makeChartOpts(color) {
   const c = chartThemeColors();
@@ -507,7 +1490,7 @@ function makeChartOpts(color) {
           titleColor:       c.tooltipTitle,
           bodyColor:        c.tooltipBody,
           padding:          8,
-          callbacks: { label: ctx => ' ' + parseFloat(ctx.parsed.y).toFixed(1) }
+          callbacks: { label: function (ctx) { return ' ' + parseFloat(ctx.parsed.y).toFixed(1); } }
         }
       },
       scales: {
@@ -524,41 +1507,41 @@ function makeChartOpts(color) {
   };
 }
 
-/* ── Data ───────────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   DATA FETCH
+   ════════════════════════════════════════════════════════════════════════════ */
 
 function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 async function loadChart(key, color) {
-  const resp = await fetch(`/api/series?sensor=${encodeURIComponent(key)}&hours=${HOURS}`);
+  const resp = await fetch('/api/series?sensor=' + encodeURIComponent(key) + '&hours=' + HOURS);
   if (!resp.ok) return;
   const rows   = await resp.json();
-  const labels = rows.map(r => fmtTime(r.ts));
-  const data   = rows.map(r => r.value);
+  const labels = rows.map(function (r) { return fmtTime(r.ts); });
+  const data   = rows.map(function (r) { return r.value; });
 
   if (instances[key]) {
-    instances[key].data.labels = labels;
-    instances[key].data.datasets[0].data = data;
+    instances[key].data.labels            = labels;
+    instances[key].data.datasets[0].data  = data;
     instances[key].update('none');
   } else {
     const canvas = document.getElementById('chart-' + key);
     if (!canvas) return;
     instances[key] = new Chart(canvas, makeChartOpts(color));
-    instances[key].data.labels = labels;
-    instances[key].data.datasets[0].data = data;
+    instances[key].data.labels            = labels;
+    instances[key].data.datasets[0].data  = data;
     instances[key].update();
   }
 }
 
-async function refreshStats() {
-  const resp = await fetch('/api/latest');
-  if (!resp.ok) return;
-  const rows = await resp.json();
-  const map  = {};
-  rows.forEach(r => { map[r.sensor_key] = r; });
+/** Update the stat-strip values from a latest-rows array */
+function updateStats(rows) {
+  const map = {};
+  rows.forEach(function (r) { map[r.sensor_key] = r; });
 
-  document.querySelectorAll('.stat-value[data-key]').forEach(el => {
+  document.querySelectorAll('.stat-value[data-key]').forEach(function (el) {
     const key = el.dataset.key;
     if (!map[key]) return;
     const unit    = el.querySelector('.stat-unit');
@@ -567,20 +1550,29 @@ async function refreshStats() {
   });
 
   if (rows.length) {
-    const latest = rows.reduce((a, b) => a.ts > b.ts ? a : b);
+    const latest = rows.reduce(function (a, b) { return a.ts > b.ts ? a : b; });
     const el = document.getElementById('last-ts');
     if (el) el.textContent = latest.ts.slice(0, 16).replace('T', ' ') + ' UTC';
   }
 }
 
+/** Single fetch feeds both the stat strip and the garden */
 async function refresh() {
   const dot = document.getElementById('dot');
-  dot.classList.add('active');
-  await Promise.all([
-    ...CHARTS.map(c => loadChart(c.key, c.color)),
-    refreshStats(),
-  ]);
-  dot.classList.remove('active');
+  if (dot) dot.classList.add('active');
+
+  /* One /api/latest call, shared by stat strip + garden */
+  const latestResp = await fetch('/api/latest');
+  if (latestResp.ok) {
+    const rows = await latestResp.json();
+    updateStats(rows);
+    updateGarden(rows);
+  }
+
+  /* Charts fetch independently (need /api/series per sensor) */
+  await Promise.all(CHARTS.map(function (c) { return loadChart(c.key, c.color); }));
+
+  if (dot) dot.classList.remove('active');
 }
 
 function tick() {
@@ -588,6 +1580,8 @@ function tick() {
   if (el) el.textContent = new Date().toUTCString().slice(0, 25);
 }
 
+/* ── Boot ── */
+renderBeds();
 refresh();
 tick();
 setInterval(refresh, 60_000);
