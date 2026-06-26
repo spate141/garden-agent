@@ -46,10 +46,10 @@ def tg(title: str, body: str, html: bool = False) -> bool:
     from garden.config import cfg
 
     if html:
-        text = f"\U0001f331 Garden:{title}\n\n{body}"
+        text = f"\U0001f331 Garden: {title}\n\n{body}"
         parse_mode = "HTML"
     else:
-        text = f"\U0001f331 Garden:{title}\n\n{body}"
+        text = f"\U0001f331 Garden: {title}\n\n{body}"
         parse_mode = None
 
     if len(text) > _MAX_CHARS:

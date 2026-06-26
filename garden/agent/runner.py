@@ -174,7 +174,11 @@ def _already_sent_today(local_now: datetime) -> bool:
     try:
         last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
         tz_name = cfg.location.get("timezone", "UTC")
-        tz = ZoneInfo(tz_name)
+        try:
+            tz = ZoneInfo(tz_name)
+        except ZoneInfoNotFoundError:
+            log.warning("Unknown timezone %r in _already_sent_today, falling back to UTC", tz_name)
+            tz = ZoneInfo("UTC")
         last_local = last_dt.astimezone(tz)
         return last_local.date() == local_now.date()
     except Exception:

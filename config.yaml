@@ -71,7 +71,7 @@ cooldowns:
   battery_low_minutes: 1440     # once per day
   temp_frost_minutes: 60
   temp_heat_minutes: 60
-  watchdog_minutes: 120
+  watchdog_minutes: 360
 
 # ── LLM model selection ───────────────────────────────────────────────────────
 # Any Anthropic model ID works. Change here; no code edits needed.
