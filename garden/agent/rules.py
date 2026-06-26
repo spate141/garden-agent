@@ -149,7 +149,7 @@ def check_temp_frost() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] < threshold
         body = (
-            f"{label} is {recent[0]:.1f}°C — frost risk. Consider covering plants."
+            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F — frost risk. Consider covering plants."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_frost:{key}",
@@ -174,7 +174,7 @@ def check_temp_heat() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] > threshold
         body = (
-            f"{label} is {recent[0]:.1f}°C — heat stress risk. Consider shade or watering."
+            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F — heat stress risk. Consider shade or watering."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_heat:{key}",

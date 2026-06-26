@@ -125,6 +125,8 @@ def _sensor_summary() -> str:
         return "No sensor data available yet."
 
     PRIORITY = ["soilmoisture1", "soilmoisture2", "tempc", "humidity", "soilbatt1", "soilbatt2"]
+    # Keys whose stored unit is °C but should display in °F
+    CELSIUS_KEYS = {"tempc", "tempinc"} | {f"temp{i}c" for i in range(1, 9)}
     by_key = {r["sensor_key"]: r for r in rows}
 
     lines = []
@@ -132,13 +134,19 @@ def _sensor_summary() -> str:
         if key in by_key:
             r = by_key[key]
             label = cfg.sensor_label(key)
-            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+            if key in CELSIUS_KEYS:
+                lines.append(f"  {label}: {r['value'] * 9 / 5 + 32:.1f}°F")
+            else:
+                lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
 
     # Any other sensors not in priority list
     for key, r in by_key.items():
         if key not in PRIORITY:
             label = cfg.sensor_label(key)
-            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+            if key in CELSIUS_KEYS:
+                lines.append(f"  {label}: {r['value'] * 9 / 5 + 32:.1f}°F")
+            else:
+                lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
 
     return "\n".join(lines) if lines else "No sensor data available."
 
@@ -200,7 +208,7 @@ def send_daily_brief(force: bool = False) -> None:
     weather_line = forecast_summary(fc)
     title = f"Morning Brief · {local_now.strftime('%a %b %-d')}"
 
-    tg(title, body)
+    tg(title, body, html=True)
     storage.set_alert_state(_BRIEF_RULE_ID, "", active=False, last_fired_ts=_now_iso())
     log.info("Daily brief sent")
 

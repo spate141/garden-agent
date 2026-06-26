@@ -51,11 +51,11 @@ thresholds:
 
   temp_frost:
     sensor_keys: [tempc]
-    below: 2.0         # frost warning below 2°C (gives time before 0°C)
+    below: 2.0         # frost warning below 2°C / 35.6°F (stored in °C internally)
 
   temp_heat:
     sensor_keys: [tempc]
-    above: 38.0        # heat stress above 38°C
+    above: 38.0        # heat stress above 38°C / 100.4°F (stored in °C internally)
 
 # ── Dead-sensor watchdog ──────────────────────────────────────────────────────
 watchdog:

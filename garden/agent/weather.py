@@ -116,7 +116,7 @@ def get_forecast() -> dict[str, Any] | None:
     Cached in-process for cfg.weather['cache_minutes'] (default 120 min).
 
     Returned dict keys:
-      today_high_c, today_low_c       — °C
+      today_high_f, today_low_f        — °F  (Open-Meteo returns °F when temperature_unit=fahrenheit)
       precip_mm                        — total precip today (mm)
       precip_prob_pct                  — max precip probability today (%)
       wind_max_kph                     — max wind today (km/h)
@@ -147,8 +147,9 @@ def get_forecast() -> dict[str, Any] | None:
         r = httpx.get(
             "https://api.open-meteo.com/v1/forecast",
             params={
-                "latitude":  lat,
-                "longitude": lon,
+                "latitude":         lat,
+                "longitude":        lon,
+                "temperature_unit": "fahrenheit",
                 "daily": (
                     "temperature_2m_max,temperature_2m_min,precipitation_sum,"
                     "precipitation_probability_max,wind_speed_10m_max,weather_code"
@@ -171,8 +172,8 @@ def get_forecast() -> dict[str, Any] | None:
         hourly = raw["hourly"]
 
         fc: dict[str, Any] = {
-            "today_high_c":    daily["temperature_2m_max"][0],
-            "today_low_c":     daily["temperature_2m_min"][0],
+            "today_high_f":    daily["temperature_2m_max"][0],
+            "today_low_f":     daily["temperature_2m_min"][0],
             "precip_mm":       daily["precipitation_sum"][0],
             "precip_prob_pct": daily["precipitation_probability_max"][0],
             "wind_max_kph":    daily["wind_speed_10m_max"][0],
@@ -196,8 +197,8 @@ def get_forecast() -> dict[str, Any] | None:
         _cache_ts = now_mono
 
         log.info(
-            "Forecast: %s, %.1f°C/%.1f°C, rain %.0f%% / %.1f mm",
-            fc["conditions"], fc["today_high_c"], fc["today_low_c"],
+            "Forecast: %s, %.1f°F/%.1f°F, rain %.0f%% / %.1f mm",
+            fc["conditions"], fc["today_high_f"], fc["today_low_f"],
             fc["precip_prob_pct"], fc["precip_mm"],
         )
         return dict(fc)
@@ -219,7 +220,7 @@ def forecast_summary(fc: dict[str, Any] | None) -> str:
         note = f" Rain likely within ~{hrs + 1}h."
 
     return (
-        f"Today: {fc['today_high_c']:.1f}°C high / {fc['today_low_c']:.1f}°C low, "
+        f"Today: {fc['today_high_f']:.1f}°F high / {fc['today_low_f']:.1f}°F low, "
         f"{fc['conditions']}, rain {rain}, "
         f"wind to {fc['wind_max_kph']:.0f} km/h.{note}"
     )

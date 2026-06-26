@@ -52,11 +52,15 @@ def _recent_context(sensor_key: str) -> str:
     return f"Recent readings (oldest→newest): {', '.join(vals)}"
 
 
+def _c_to_f(c: float) -> float:
+    return c * 9 / 5 + 32
+
+
 def _outdoor_temp_context() -> str:
     recent = storage.recent_values("tempc", 1)
     if not recent:
         return ""
-    return f"Current outdoor temperature: {recent[0]:.1f}°C"
+    return f"Current outdoor temperature: {_c_to_f(recent[0]):.1f}°F"
 
 
 def _weather_context() -> str:
@@ -85,7 +89,7 @@ watering threshold. Write a short, plain-English Telegram message (2-4 sentences
 2. Estimates how many minutes to run a standard garden hose (~12 L/min flow) to
    recover the bed — use the moisture deficit and bed size you can infer from context.
 3. Adjusts advice based on weather: if meaningful rain is expected in the next few
-   hours, suggest waiting; in a heatwave (>35°C), advise watering deeper/longer.
+   hours, suggest waiting; in a heatwave (>95°F), advise watering deeper/longer.
 Do not use markdown, bullet points, or headers. Be specific and practical.\
 """
 
@@ -143,13 +147,27 @@ Fallback message (use as a reference for the facts, but rewrite naturally):
 # ── Daily morning brief ───────────────────────────────────────────────────────
 
 _BRIEF_SYSTEM = """\
-You are the user's personal gardener. Write a warm, concise morning briefing in plain
-text (4-6 sentences, no markdown, no bullet points, no headers). Cover:
-1. Today's weather in one sentence.
-2. How the garden beds look right now based on sensor readings.
-3. A clear watering plan: skip or postpone if meaningful rain is expected today; water
-   longer/deeper if it's going to be very hot (>35°C); otherwise give a simple recommendation.
-Be practical, friendly, and specific. Sign off naturally — no formal closing.\
+You are a garden monitoring assistant. Format the morning brief as a structured Telegram
+message using Telegram HTML (only <b>, <i>, <code> tags — no markdown, no other HTML).
+
+Use exactly this layout — keep it tight, scannable, action-focused:
+
+<b>☀️ Weather</b>
+[one line: high/low, conditions, rain %, wind]
+
+<b>🌱 Beds</b>
+[one line per bed: name — moisture % — one-word status (Good / Thirsty / Dry)]
+
+<b>💧 Watering plan</b>
+[one line per bed that needs water: bed name — action — estimated hose minutes (~12 L/min)]
+[if no beds need water, say "All beds OK — skip today"]
+[if rain expected, say "Rain expected — hold off"]
+
+<b>⚠️ Watch</b>
+[only if there is something to flag: battery low, heat risk, frost, sensor issue]
+[omit this section entirely if nothing to flag]
+
+No prose paragraphs. No sign-off. Numbers over words. Be direct.\
 """
 
 
@@ -194,7 +212,8 @@ def _brief_fallback(
     forecast: dict[str, Any] | None,
     sensor_summary: str,
 ) -> str:
-    """Plain-text fallback when the LLM is unavailable."""
+    """HTML-formatted fallback when the LLM is unavailable."""
     from garden.agent.weather import forecast_summary
     weather_line = forecast_summary(forecast)
-    return f"Good morning! {weather_line}\n\nGarden status:\n{sensor_summary}"
+    lines = [f"<b>☀️ Weather</b>\n{weather_line}", f"<b>🌱 Beds</b>\n{sensor_summary}"]
+    return "\n\n".join(lines)
