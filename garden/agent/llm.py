@@ -110,23 +110,26 @@ def write_alert(
     is_watering = rule_id.startswith("soil_moisture_")
     system = _WATERING_SYSTEM if is_watering else _ALERT_SYSTEM
 
-    label       = cfg.sensor_label(sensor_key) if sensor_key else ""
-    recent_ctx  = _recent_context(sensor_key)
-    temp_ctx    = _outdoor_temp_context()
-    weather_ctx = _weather_context()
+    label = cfg.sensor_label(sensor_key) if sensor_key else ""
 
-    context_parts = [c for c in [recent_ctx, temp_ctx, weather_ctx] if c]
-    context_block = "\n".join(context_parts) if context_parts else "No context available."
+    # Weather + temp context and sensor history are only useful for watering decisions.
+    # Battery and temperature alerts have everything they need in fallback_body already.
+    context_parts: list[str] = []
+    if is_watering:
+        context_parts = [c for c in [
+            _recent_context(sensor_key),
+            _outdoor_temp_context(),
+            _weather_context(),
+        ] if c]
+
+    context_block = "\n".join(context_parts) if context_parts else ""
 
     user_prompt = f"""\
-Rule triggered: {title}
+Rule: {title}
 Sensor: {label or "gateway"}
-Rule ID: {rule_id}
 
-{context_block}
-
-Fallback message (use as a reference for the facts, but rewrite naturally):
-{fallback_body}
+{(context_block + chr(10) + chr(10)) if context_block else ""}\
+Facts: {fallback_body}
 """
 
     try:

@@ -63,7 +63,10 @@ def _dispatch(result: RuleResult) -> None:
     """Fire the alert and update alert_state."""
     now = _now_iso()
     log.info("Alert firing: %s — %s", result.rule_id, result.title)
-    body = llm.write_alert(result.rule_id, result.sensor_key, result.title, result.body)
+    if result.rule_id.startswith("watchdog:"):
+        body = result.body
+    else:
+        body = llm.write_alert(result.rule_id, result.sensor_key, result.title, result.body)
     tg(result.title, body)
     storage.set_alert_state(result.rule_id, result.sensor_key, active=True, last_fired_ts=now)
 

@@ -71,15 +71,15 @@ cooldowns:
   battery_low_minutes: 1440     # once per day
   temp_frost_minutes: 60
   temp_heat_minutes: 60
-  watchdog_minutes: 30
+  watchdog_minutes: 120
 
 # ── LLM model selection ───────────────────────────────────────────────────────
 # Any Anthropic model ID works. Change here; no code edits needed.
 # Model IDs: claude-sonnet-4-6, claude-haiku-4-5-20251001, claude-opus-4-8
 llm:
   model: claude-sonnet-4-6
-  max_tokens_alert: 512
-  max_tokens_brief: 512
+  max_tokens_alert: 160   # 2-4 sentences ~80-120 tokens; 160 is safe headroom
+  max_tokens_brief: 350   # 3-4 structured HTML sections; 512 was ~45% wasted
 
 # ── Weather forecast (Open-Meteo, no API key required) ───────────────────────
 # Location is set in secrets.env (GARDEN_ZIPCODE etc.) — never here.
