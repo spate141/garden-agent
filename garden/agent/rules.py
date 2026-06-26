@@ -56,7 +56,7 @@ def check_soil_moisture_low() -> list[RuleResult]:
             rule_id=f"soil_moisture_low:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Low soil moisture — {label}",
+            title=f"Low soil moisture: {label}",
             body=body,
         ))
     return results
@@ -86,7 +86,7 @@ def check_soil_moisture_rapid_drop() -> list[RuleResult]:
                 rule_id=f"soil_moisture_rapid_drop:{key}",
                 sensor_key=key,
                 fired=False,
-                title=f"Rapid moisture drop — {label}",
+                title=f"Rapid moisture drop: {label}",
                 body="",
             ))
             continue
@@ -105,7 +105,7 @@ def check_soil_moisture_rapid_drop() -> list[RuleResult]:
             rule_id=f"soil_moisture_rapid_drop:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Rapid moisture drop — {label}",
+            title=f"Rapid moisture drop: {label}",
             body=body,
         ))
     return results
@@ -130,7 +130,7 @@ def check_battery_low() -> list[RuleResult]:
             rule_id=f"battery_low:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Low battery — {label}",
+            title=f"Low battery: {label}",
             body=body,
         ))
     return results
@@ -149,13 +149,13 @@ def check_temp_frost() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] < threshold
         body = (
-            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F — frost risk. Consider covering plants."
+            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F. Frost risk. Consider covering plants."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_frost:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Frost warning — {label}",
+            title=f"Frost warning: {label}",
             body=body,
         ))
     return results
@@ -174,13 +174,13 @@ def check_temp_heat() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] > threshold
         body = (
-            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F — heat stress risk. Consider shade or watering."
+            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F. Heat stress risk. Consider shade or watering."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_heat:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Heat warning — {label}",
+            title=f"Heat warning: {label}",
             body=body,
         ))
     return results
@@ -211,7 +211,7 @@ def check_watchdog() -> list[RuleResult]:
             rule_id=f"watchdog:{key}",
             sensor_key=key,
             fired=fired,
-            title=f"Sensor silent — {label}",
+            title=f"Sensor silent: {label}",
             body=body,
         ))
     return results

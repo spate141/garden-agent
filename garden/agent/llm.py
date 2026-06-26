@@ -156,12 +156,12 @@ Use exactly this layout — keep it tight, scannable, action-focused:
 [one line: high/low, conditions, rain %, wind]
 
 <b>🌱 Beds</b>
-[one line per bed: name — moisture % — one-word status (Good / Thirsty / Dry)]
+[one line per bed: name, moisture %, one-word status (Good / Thirsty / Dry)]
 
 <b>💧 Watering plan</b>
-[one line per bed that needs water: bed name — action — estimated hose minutes (~12 L/min)]
-[if no beds need water, say "All beds OK — skip today"]
-[if rain expected, say "Rain expected — hold off"]
+[one line per bed that needs water: bed name, action, estimated hose minutes (~12 L/min)]
+[if no beds need water, say "All beds OK, skip today"]
+[if rain expected, say "Rain expected, hold off"]
 
 <b>⚠️ Watch</b>
 [only if there is something to flag: battery low, heat risk, frost, sensor issue]
