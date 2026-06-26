@@ -19,7 +19,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+
 from pathlib import Path
 from typing import Any, Generator
 
@@ -150,7 +150,6 @@ def latest() -> list[dict[str, Any]]:
 
 def series(sensor_key: str, hours: int = 24) -> list[dict[str, Any]]:
     """Time-series for one sensor over the last `hours` hours."""
-    since = datetime.now(timezone.utc).isoformat()
     with _conn() as con:
         rows = con.execute(
             """

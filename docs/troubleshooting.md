@@ -2,7 +2,7 @@
 
 ## Dashboard / API
 
-**`garden.snehal.ai` not loading**
+**`your.domain.com` not loading**
 ```bash
 # Check tunnel is running
 sudo systemctl status cloudflared

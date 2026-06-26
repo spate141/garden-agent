@@ -187,7 +187,7 @@
   {% for s in stats %}
   <div class="stat">
     <div class="stat-label">{{ s.label }}</div>
-    <div class="stat-value" style="color:{{ s.color }}">
+    <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
       {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
     </div>
   </div>
@@ -280,12 +280,14 @@ async function refreshStats() {
   const map = {};
   rows.forEach(r => { map[r.sensor_key] = r; });
 
-  document.querySelectorAll(".stat").forEach(el => {
-    const key = el.querySelector(".stat-value")?.dataset?.key;
-    // stats update via full reload for simplicity
+  document.querySelectorAll(".stat-value[data-key]").forEach(el => {
+    const key = el.dataset.key;
+    if (!map[key]) return;
+    const unit = el.querySelector(".stat-unit");
+    const unitHTML = unit ? unit.outerHTML : "";
+    el.innerHTML = parseFloat(map[key].value).toFixed(1) + unitHTML;
   });
 
-  // Update last-ts display
   if (rows.length) {
     const latest = rows.reduce((a, b) => a.ts > b.ts ? a : b);
     const el = document.getElementById("last-ts");
@@ -296,7 +298,10 @@ async function refreshStats() {
 async function refresh() {
   const dot = document.getElementById("dot");
   dot.classList.add("active");
-  await Promise.all(CHARTS.map(c => loadChart(c.key, c.color)));
+  await Promise.all([
+    ...CHARTS.map(c => loadChart(c.key, c.color)),
+    refreshStats(),
+  ]);
   dot.classList.remove("active");
 }
 

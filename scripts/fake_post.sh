@@ -24,7 +24,8 @@ PASSKEY="${2:-${PASSKEY:-test_passkey}}"
 # Normal readings (healthy garden)
 SOIL1=55
 SOIL2=48
-TEMP=22.0
+TEMP_C=22.0
+TEMP_F=71.6
 if [ "${LOW:-0}" = "1" ]; then
     SOIL1=22
     SOIL2=18
@@ -33,14 +34,14 @@ fi
 NOW="$(date -u '+%Y-%m-%d %H:%M:%S')"
 
 echo "→ POSTing to ${HOST}/api/ecowitt (PASSKEY=${PASSKEY})"
-echo "  soilmoisture1=${SOIL1}%  soilmoisture2=${SOIL2}%  tempf=$(echo "${TEMP} * 9/5 + 32" | bc -l | xargs printf '%.1f')"
+echo "  soilmoisture1=${SOIL1}%  soilmoisture2=${SOIL2}%  tempf=${TEMP_F} (${TEMP_C}°C)"
 echo ""
 
 curl -sf -X POST "${HOST}/api/ecowitt" \
   --data-urlencode "PASSKEY=${PASSKEY}" \
   --data-urlencode "stationtype=GW1200A_V2.1.4" \
   --data-urlencode "dateutc=${NOW}" \
-  --data-urlencode "tempf=71.6" \
+  --data-urlencode "tempf=${TEMP_F}" \
   --data-urlencode "humidity=62" \
   --data-urlencode "tempinf=73.4" \
   --data-urlencode "humidityin=55" \

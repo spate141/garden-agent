@@ -27,23 +27,40 @@ _MAX_CHARS = 4096
 _RETRIES = 3
 
 
-def tg(title: str, body: str) -> bool:
+def _escape_html(s: str) -> str:
+    """Escape characters that Telegram's HTML parser would misinterpret."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def tg(title: str, body: str, html: bool = False) -> bool:
     """
     Send a Telegram message.
+
+    Pass html=True only when body contains intentional HTML tags (e.g. <b>).
+    Plain alert messages are sent as plain text to avoid parse errors from
+    LLM-generated content that may contain < or > characters.
 
     Returns True on success, False on all-retries-exhausted failure.
     Failure is always logged; callers can ignore the return value.
     """
     from garden.config import cfg
 
-    text = f"\U0001f331 Garden — {title}\n\n{body}"
+    if html:
+        text = f"\U0001f331 Garden — {title}\n\n{body}"
+        parse_mode = "HTML"
+    else:
+        text = f"\U0001f331 Garden — {title}\n\n{body}"
+        parse_mode = None
+
     if len(text) > _MAX_CHARS:
         cut = _MAX_CHARS - 6
         text = text[:cut] + "\n[…]"
         log.warning("Message truncated to %d chars", _MAX_CHARS)
 
     url = f"{_TG_API}/bot{cfg.telegram_token}/sendMessage"
-    payload = {"chat_id": cfg.telegram_chat_id, "text": text, "parse_mode": "HTML"}
+    payload: dict = {"chat_id": cfg.telegram_chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
 
     for attempt in range(1, _RETRIES + 1):
         try:
@@ -76,4 +93,5 @@ def heartbeat(sensor_count: int, last_ts: str | None) -> bool:
         f"Monitor is alive.\n"
         f"Sensors reporting: <b>{sensor_count}</b>\n"
         f"Last reading: <b>{last}</b>",
+        html=True,
     )

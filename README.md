@@ -1,6 +1,6 @@
 # garden-agent
 
-Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway, stores it in SQLite, serves a dashboard at `garden.snehal.ai`, and runs a deterministic-rules agent that calls Claude to write Telegram alerts.
+Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway, stores it in SQLite, serves a dashboard at `your.domain.com`, and runs a deterministic-rules agent that calls Claude to write Telegram alerts.
 
 ```
 GW1200 gateway ──HTTPS POST──> FastAPI /api/ecowitt ──> SQLite
@@ -50,8 +50,8 @@ Required values in `secrets.env`:
 | Key | Description |
 |-----|-------------|
 | `INGEST_PASSKEY` | Any random string; set the same value in the GW1200 custom-server config. `openssl rand -hex 16` works. |
-| `TELEGRAM_BOT_TOKEN` | From @BotFather. See `bot.md`. |
-| `TELEGRAM_CHAT_ID` | Your personal chat ID. See `bot.md`. |
+| `TELEGRAM_BOT_TOKEN` | From @BotFather. See [docs/telegram.md](docs/telegram.md). |
+| `TELEGRAM_CHAT_ID` | Your personal chat ID. See [docs/telegram.md](docs/telegram.md). |
 | `ANTHROPIC_API_KEY` | From [console.anthropic.com](https://console.anthropic.com/settings/keys). Used for alert prose (Stage 8). |
 | `DB_PATH` | SQLite file path. Default: `garden.sqlite3`. |
 
@@ -102,7 +102,7 @@ sudo systemctl enable --now garden-agent
 curl -s localhost:8001/health
 ```
 
-Cloudflare Tunnel (`garden.snehal.ai` → `localhost:8001`):
+Cloudflare Tunnel (`your.domain.com` → `localhost:8001`):
 
 ```bash
 # Install cloudflared
@@ -112,13 +112,13 @@ curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloud
 # Authenticate + create tunnel
 cloudflared tunnel login
 cloudflared tunnel create garden
-cloudflared tunnel route dns garden garden.snehal.ai
+cloudflared tunnel route dns garden your.domain.com
 
 # Write ~/.cloudflared/config.yml:
 #   tunnel: <TUNNEL_ID>
 #   credentials-file: /home/<user>/.cloudflared/<TUNNEL_ID>.json
 #   ingress:
-#     - hostname: garden.snehal.ai
+#     - hostname: your.domain.com
 #       service: http://localhost:8001
 #     - service: http_status:404
 
@@ -126,7 +126,7 @@ sudo cloudflared service install
 sudo systemctl enable --now cloudflared
 
 # Verify
-curl https://garden.snehal.ai/health
+curl https://your.domain.com/health
 ```
 
 Cron tick (watchdog + heartbeat, every 15 min):
@@ -162,7 +162,7 @@ In the GW1200 web UI or WSView app → **Customized Server**:
 | Field | Value |
 |-------|-------|
 | Protocol | Ecowitt |
-| Server IP / Hostname | `garden.snehal.ai` |
+| Server IP / Hostname | `your.domain.com` |
 | Path | `/api/ecowitt` |
 | Port | `443` |
 | Upload interval | `60` s |
