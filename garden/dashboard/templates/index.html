@@ -967,13 +967,13 @@ const BEDS = [
     id: 'bed1',
     name: 'Bed 1',
     sensors: { soil_moisture: 'soilmoisture1', soil_battery: 'soilbatt1' },
-    plants: ['tomato'],
+    plants: ['tomato', 'tomato', 'tomato'],
   },
   {
     id: 'bed2',
     name: 'Bed 2',
     sensors: { soil_moisture: 'soilmoisture2', soil_battery: 'soilbatt2' },
-    plants: ['eggplant', 'okra'],
+    plants: ['eggplant', 'eggplant', 'okra', 'okra'],
   },
 ];
 
@@ -1088,13 +1088,19 @@ function renderBeds() {
     plantsEl.className = 'g-plants';
 
     const n = bed.plants.length;
+    /* scale plant size down as count grows; min 22px wide */
+    const pw = Math.max(22, Math.min(44, Math.floor(130 / n)));
+    const ph = Math.round(pw * 1.27);
     bed.plants.forEach(function (type, i) {
       const plantEl = document.createElement('div');
       plantEl.className = 'g-plant';
+      plantEl.style.width  = pw + 'px';
+      plantEl.style.height = ph + 'px';
 
-      /* seeded jitter */
-      const jx  = (rng() - 0.5) * 18;
-      const jy  = (rng() - 0.5) * 8;
+      /* seeded jitter — scale with plant size */
+      const jitterRange = pw * 0.35;
+      const jx  = (rng() - 0.5) * jitterRange;
+      const jy  = (rng() - 0.5) * 6;
       const rot = (rng() - 0.5) * 7;
       const delay = rng() * 2.8;
 
@@ -1102,9 +1108,8 @@ function renderBeds() {
       let frac;
       if (n === 1)      frac = 0.5;
       else if (n === 2) frac = 0.3 + i * 0.4;
-      else              frac = 0.2 + (i / (n - 1)) * 0.6;
+      else              frac = 0.15 + (i / (n - 1)) * 0.7;
 
-      /* frame interior is 210-26=184px wide; plant is 44px; center offset = -22px */
       plantEl.style.setProperty('--g-rot',       rot + 'deg');
       plantEl.style.setProperty('--g-delay',     delay + 's');
       plantEl.style.setProperty('--g-wilt-rot',  '0deg');
@@ -1112,7 +1117,7 @@ function renderBeds() {
       plantEl.style.setProperty('--g-bright',    '1');
 
       /* position via absolute coords inside .g-plants */
-      plantEl.style.left   = 'calc(' + (frac * 100) + '% + ' + jx + 'px - 22px)';
+      plantEl.style.left   = 'calc(' + (frac * 100) + '% + ' + jx + 'px - ' + (pw / 2) + 'px)';
       plantEl.style.bottom = Math.max(0, 4 + jy * 0.3) + 'px';
 
       /* z-order: lower plants (higher bottom) appear in front */
@@ -1121,7 +1126,7 @@ function renderBeds() {
       const inner = document.createElement('div');
       inner.className = 'g-plant-inner';
       inner.innerHTML =
-        '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="44" height="56">' +
+        '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="' + pw + '" height="' + ph + '">' +
         '<use href="' + spriteHref(type) + '"/>' +
         '</svg>';
       plantEl.appendChild(inner);
