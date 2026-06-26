@@ -1,27 +1,53 @@
 # garden-agent
 
-Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway, stores it in SQLite, serves a dashboard at `your.domain.com`, and runs a deterministic-rules agent that calls Claude to write Telegram alerts.
+Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway, stores it in SQLite, serves a dashboard at `your.domain.com`, and runs a deterministic-rules agent that calls Claude to write Telegram alerts and a daily morning brief.
 
+```mermaid
+flowchart TD
+    GW["🌡️ GW1200 Gateway"]
+    Timer["⏱️ systemd timer\nevery 15 min"]
+    Browser["🌐 Browser"]
+
+    subgraph fastapi ["FastAPI · localhost:8001"]
+        INGEST["POST /api/ecowitt\nparse · normalize · store"]
+        SERVE["GET /  ·  /api/latest  ·  /api/series"]
+    end
+
+    DB[("SQLite\nsnapshots · readings\nalert_state")]
+
+    subgraph agent ["garden.agent"]
+        RULES["rules.py\ndeterministic threshold checks"]
+        RUNNER["runner.py\ncooldown · alert-once-until-cleared\nmorning brief scheduler"]
+        LLM["llm.py · Claude Sonnet 4-6\nalert prose + morning brief"]
+        WEATHER["weather.py\nOpen-Meteo · 120 min cache"]
+    end
+
+    TG["📱 Telegram"]
+    ANT["Anthropic API"]
+    OM["☀️ Open-Meteo\nno API key required"]
+
+    GW -->|"HTTPS POST · every ~5 min"| INGEST
+    INGEST -->|"write snapshot + readings"| DB
+    INGEST -->|"evaluate_instant()"| RUNNER
+
+    Timer -->|"run_cron_tick()\nwatchdog checks + brief"| RUNNER
+
+    RUNNER -->|"run_instant() or run_cron()"| RULES
+    RULES -->|"reads sensor history"| DB
+    RULES -->|"RuleResult list"| RUNNER
+
+    RUNNER -->|"rule fired + cooldown clear\nwrite_alert()"| LLM
+    RUNNER -->|"7 am local · once per day\nsend_daily_brief()"| LLM
+
+    LLM -->|"get_forecast()"| WEATHER
+    WEATHER -->|"daily + hourly data"| OM
+    LLM -->|"messages.create()"| ANT
+
+    RUNNER -->|"tg(title, body)"| TG
+
+    Browser --> SERVE
+    SERVE -->|"latest() · series()"| DB
 ```
-GW1200 gateway ──HTTPS POST──> FastAPI /api/ecowitt ──> SQLite
-                                      │
-                         ┌────────────┼────────────┐
-                         ▼            ▼             ▼
-                    dashboard     agent rules    /api/*
-                  (Chart.js)   (thresholds +   (JSON series)
-                               LLM prose)
-                                    │
-                                    ▼
-                              Telegram bot
-```
-
-## Docs
-
-- [Deploy (GCP VM + Cloudflare Tunnel)](docs/deploy.md)
-- [Telegram bot setup](docs/telegram.md)
-- [Sensor reference](docs/sensors.md)
-- [Alert rules reference](docs/alerts.md)
-- [Troubleshooting](docs/troubleshooting.md)
 
 ## Requirements
 

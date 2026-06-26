@@ -265,7 +265,11 @@ def run_instant() -> list[RuleResult]:
 # ── run all cron rules (called every 15 min) ──────────────────────────────────
 
 def run_cron() -> list[RuleResult]:
-    results: list[RuleResult] = []
+    gateway = check_gateway_watchdog()
+    # If the gateway itself is silent, per-sensor alerts are all downstream noise
+    # from the same root cause. Return only the gateway alert.
+    if gateway.fired:
+        return [gateway]
+    results: list[RuleResult] = [gateway]
     results.extend(check_watchdog())
-    results.append(check_gateway_watchdog())
     return results
