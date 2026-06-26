@@ -1,6 +1,8 @@
 [Unit]
 Description=garden-agent FastAPI service
 After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,8 +12,6 @@ EnvironmentFile=/home/YOUR_VM_USER/apps/garden-agent/secrets.env
 ExecStart=/home/YOUR_VM_USER/apps/garden-agent/.venv/bin/uvicorn garden.main:app --host 127.0.0.1 --port 8001
 Restart=on-failure
 RestartSec=10
-StartLimitIntervalSec=120
-StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=garden-agent

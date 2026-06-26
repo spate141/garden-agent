@@ -229,8 +229,3 @@ backups/
 # Cloudflare tunnel credentials
 .cloudflared/*.json
 .idea/
-
-# Personal / local-only files (never commit)
-CLAUDE.md
-docs/deploy.md
-docs/plan.md
