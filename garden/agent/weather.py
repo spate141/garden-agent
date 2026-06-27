@@ -116,10 +116,10 @@ def get_forecast() -> dict[str, Any] | None:
     Cached in-process for cfg.weather['cache_minutes'] (default 120 min).
 
     Returned dict keys:
-      today_high_f, today_low_f        — °F  (Open-Meteo returns °F when temperature_unit=fahrenheit)
-      precip_mm                        — total precip today (mm)
+      today_high_f, today_low_f        — °F
+      precip_in                        — total precip today (inches)
       precip_prob_pct                  — max precip probability today (%)
-      wind_max_kph                     — max wind today (km/h)
+      wind_max_mph                     — max wind today (mph)
       weather_code, conditions         — WMO code + human text
       next_12h_peak_rain_pct           — highest rain probability in next 12h (%)
       next_12h_peak_hour_offset        — hours from now until that peak
@@ -149,7 +149,9 @@ def get_forecast() -> dict[str, Any] | None:
             params={
                 "latitude":         lat,
                 "longitude":        lon,
-                "temperature_unit": "fahrenheit",
+                "temperature_unit":   "fahrenheit",
+                "wind_speed_unit":    "mph",
+                "precipitation_unit": "inch",
                 "daily": (
                     "temperature_2m_max,temperature_2m_min,precipitation_sum,"
                     "precipitation_probability_max,wind_speed_10m_max,weather_code"
@@ -174,9 +176,9 @@ def get_forecast() -> dict[str, Any] | None:
         fc: dict[str, Any] = {
             "today_high_f":    daily["temperature_2m_max"][0],
             "today_low_f":     daily["temperature_2m_min"][0],
-            "precip_mm":       daily["precipitation_sum"][0],
+            "precip_in":       daily["precipitation_sum"][0],
             "precip_prob_pct": daily["precipitation_probability_max"][0],
-            "wind_max_kph":    daily["wind_speed_10m_max"][0],
+            "wind_max_mph":    daily["wind_speed_10m_max"][0],
             "weather_code":    daily["weather_code"][0],
             "conditions":      _WMO.get(int(daily["weather_code"][0]), "unknown"),
         }
@@ -197,9 +199,9 @@ def get_forecast() -> dict[str, Any] | None:
         _cache_ts = now_mono
 
         log.info(
-            "Forecast: %s, %.1f°F/%.1f°F, rain %.0f%% / %.1f mm",
+            "Forecast: %s, %.1f°F/%.1f°F, rain %.0f%% / %.2f in",
             fc["conditions"], fc["today_high_f"], fc["today_low_f"],
-            fc["precip_prob_pct"], fc["precip_mm"],
+            fc["precip_prob_pct"], fc["precip_in"],
         )
         return dict(fc)
 
@@ -213,7 +215,7 @@ def forecast_summary(fc: dict[str, Any] | None) -> str:
     if not fc:
         return "Weather: unavailable."
 
-    rain = f"{fc['precip_prob_pct']:.0f}% chance, {fc['precip_mm']:.1f} mm"
+    rain = f"{fc['precip_prob_pct']:.0f}% chance, {fc['precip_in']:.2f} in"
     note = ""
     if fc.get("next_12h_peak_rain_pct", 0) >= 40:
         hrs = fc["next_12h_peak_hour_offset"]
@@ -222,5 +224,5 @@ def forecast_summary(fc: dict[str, Any] | None) -> str:
     return (
         f"Today: {fc['today_high_f']:.1f}°F high / {fc['today_low_f']:.1f}°F low, "
         f"{fc['conditions']}, rain {rain}, "
-        f"wind to {fc['wind_max_kph']:.0f} km/h.{note}"
+        f"wind to {fc['wind_max_mph']:.0f} mph.{note}"
     )

@@ -24,7 +24,6 @@ PASSKEY="${2:-${PASSKEY:-test_passkey}}"
 # Normal readings (healthy garden)
 SOIL1=55
 SOIL2=48
-TEMP_C=22.0
 TEMP_F=71.6
 if [ "${LOW:-0}" = "1" ]; then
     SOIL1=22
@@ -34,7 +33,7 @@ fi
 NOW="$(date -u '+%Y-%m-%d %H:%M:%S')"
 
 echo "→ POSTing to ${HOST}/api/ecowitt (PASSKEY=${PASSKEY})"
-echo "  soilmoisture1=${SOIL1}%  soilmoisture2=${SOIL2}%  tempf=${TEMP_F} (${TEMP_C}°C)"
+echo "  soilmoisture1=${SOIL1}%  soilmoisture2=${SOIL2}%  tempf=${TEMP_F}°F"
 echo ""
 
 curl -sf -X POST "${HOST}/api/ecowitt" \

@@ -5,7 +5,7 @@ The GW1200 sends one POST per snapshot with all sensor channels as
 form-encoded fields.  We:
   1. Validate PASSKEY against INGEST_PASSKEY (reject 401 otherwise).
   2. Parse the known numeric fields.
-  3. Normalize units: °F → °C, inHg → hPa, voltage/% pass-through.
+  3. Store values in US customary units (°F, inHg, mph, in) — no metric conversion.
   4. Return a snapshot dict ready for storage.write_snapshot().
 """
 
@@ -19,40 +19,35 @@ log = logging.getLogger("garden.ingest")
 
 # ── Ecowitt field → (storage key, unit, conversion) ──────────────────────────
 # conversion: a callable float→float, or None for pass-through.
-
-def _f_to_c(f: float) -> float:
-    return round((f - 32) * 5 / 9, 2)
-
-def _inhg_to_hpa(inhg: float) -> float:
-    return round(inhg * 33.8639, 2)
+# All values stored in US customary units; no metric conversion needed.
 
 # (storage_key, unit, convert_fn | None)
 _FIELD_MAP: dict[str, tuple[str, str, Any]] = {
-    # outdoor air
-    "tempf":        ("tempc",           "°C",  _f_to_c),
-    "humidity":     ("humidity",        "%",   None),
+    # outdoor air — station sends °F; store as-is
+    "tempf":        ("temp_f",          "°F",   None),
+    "humidity":     ("humidity",        "%",    None),
     # indoor
-    "tempinf":      ("tempinc",         "°C",  _f_to_c),
-    "humidityin":   ("humidityin",      "%",   None),
-    # pressure
-    "baromrelin":   ("baromrel_hpa",    "hPa", _inhg_to_hpa),
-    "baromabsin":   ("baromabs_hpa",    "hPa", _inhg_to_hpa),
+    "tempinf":      ("temp_in_f",       "°F",   None),
+    "humidityin":   ("humidityin",      "%",    None),
+    # pressure — station sends inHg; store as-is
+    "baromrelin":   ("baromrel_inhg",   "inHg", None),
+    "baromabsin":   ("baromabs_inhg",   "inHg", None),
     # soil — channels 1-8 (only present channels will appear in the POST)
-    **{f"soilmoisture{i}": (f"soilmoisture{i}", "%",  None) for i in range(1, 9)},
-    **{f"soilbatt{i}":     (f"soilbatt{i}",     "V",  None) for i in range(1, 9)},
-    # extra temp/humidity sensors (WN31 channels 1-8)
-    **{f"temp{i}f":  (f"temp{i}c",   "°C", _f_to_c)  for i in range(1, 9)},
-    **{f"humidity{i}": (f"humidity{i}", "%", None)    for i in range(1, 9)},
-    # wind (future — accept gracefully)
-    "winddir":      ("winddir",    "°",    None),
-    "windspeedmph": ("windspeed_kph", "km/h", lambda v: round(v * 1.60934, 2)),
-    "windgustmph":  ("windgust_kph",  "km/h", lambda v: round(v * 1.60934, 2)),
+    **{f"soilmoisture{i}": (f"soilmoisture{i}", "%", None) for i in range(1, 9)},
+    **{f"soilbatt{i}":     (f"soilbatt{i}",     "V", None) for i in range(1, 9)},
+    # extra temp/humidity sensors (WN31 channels 1-8) — station sends °F
+    **{f"temp{i}f":    (f"temp{i}_f",   "°F", None) for i in range(1, 9)},
+    **{f"humidity{i}": (f"humidity{i}", "%",   None) for i in range(1, 9)},
+    # wind — station sends mph; store as-is
+    "winddir":      ("winddir",         "°",   None),
+    "windspeedmph": ("windspeed_mph",   "mph", None),
+    "windgustmph":  ("windgust_mph",    "mph", None),
     # UV / solar
-    "uv":           ("uv_index",   "",     None),
-    "solarradiation": ("solar_wm2", "W/m²", None),
-    # rain
-    "rainratein":   ("rainrate_mmh",  "mm/h", lambda v: round(v * 25.4, 2)),
-    "dailyrainin":  ("rain_daily_mm", "mm",   lambda v: round(v * 25.4, 2)),
+    "uv":           ("uv_index",        "",    None),
+    "solarradiation": ("solar_wm2",   "W/m²", None),
+    # rain — station sends inches; store as-is
+    "rainratein":   ("rainrate_inh",    "in/h", None),
+    "dailyrainin":  ("rain_daily_in",   "in",   None),
 }
 
 

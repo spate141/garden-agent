@@ -17,21 +17,21 @@ sensors:
   soilbatt2:
     label: "WH51 ch2 battery"
     unit: "V"
-  tempc:                         # normalized from tempf at ingest
+  temp_f:                        # outdoor temp from station (°F, stored as-is)
     label: "Outdoor temperature"
-    unit: "°C"
+    unit: "°F"
   humidity:
     label: "Outdoor humidity"
     unit: "%"
-  tempinc:                       # normalized from tempinf at ingest
+  temp_in_f:                     # indoor temp from station (°F, stored as-is)
     label: "Indoor temperature"
-    unit: "°C"
+    unit: "°F"
   humidityin:
     label: "Indoor humidity"
     unit: "%"
-  baromrel_hpa:                  # normalized from baromrelin at ingest
+  baromrel_inhg:                 # relative pressure from station (inHg, stored as-is)
     label: "Relative pressure"
-    unit: "hPa"
+    unit: "inHg"
 
 # ── Alert thresholds (deterministic rules) ────────────────────────────────────
 thresholds:
@@ -50,12 +50,12 @@ thresholds:
     below: 1.1         # WH51 battery ~1.5V nominal; warn below 1.1V
 
   temp_frost:
-    sensor_keys: [tempc]
-    below: 2.0         # frost warning below 2°C / 35.6°F (stored in °C internally)
+    sensor_keys: [temp_f]
+    below: 35.6        # frost warning below 35.6°F (2°C)
 
   temp_heat:
-    sensor_keys: [tempc]
-    above: 38.0        # heat stress above 38°C / 100.4°F (stored in °C internally)
+    sensor_keys: [temp_f]
+    above: 100.4       # heat stress above 100.4°F (38°C)
 
 # ── Dead-sensor watchdog ──────────────────────────────────────────────────────
 watchdog:

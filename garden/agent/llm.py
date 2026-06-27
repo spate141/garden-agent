@@ -52,15 +52,11 @@ def _recent_context(sensor_key: str) -> str:
     return f"Recent readings (oldest→newest): {', '.join(vals)}"
 
 
-def _c_to_f(c: float) -> float:
-    return c * 9 / 5 + 32
-
-
 def _outdoor_temp_context() -> str:
-    recent = storage.recent_values("tempc", 1)
+    recent = storage.recent_values("temp_f", 1)
     if not recent:
         return ""
-    return f"Current outdoor temperature: {_c_to_f(recent[0]):.1f}°F"
+    return f"Current outdoor temperature: {recent[0]:.1f}°F"
 
 
 def _weather_context() -> str:

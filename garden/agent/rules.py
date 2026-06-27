@@ -141,7 +141,7 @@ def check_battery_low() -> list[RuleResult]:
 def check_temp_frost() -> list[RuleResult]:
     t = cfg.thresholds.get("temp_frost", {})
     keys = t.get("sensor_keys", [])
-    threshold = t.get("below", 2.0)
+    threshold = t.get("below", 35.6)
 
     results = []
     for key in keys:
@@ -149,7 +149,7 @@ def check_temp_frost() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] < threshold
         body = (
-            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F. Frost risk. Consider covering plants."
+            f"{label} is {recent[0]:.1f}°F. Frost risk. Consider covering plants."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_frost:{key}",
@@ -166,7 +166,7 @@ def check_temp_frost() -> list[RuleResult]:
 def check_temp_heat() -> list[RuleResult]:
     t = cfg.thresholds.get("temp_heat", {})
     keys = t.get("sensor_keys", [])
-    threshold = t.get("above", 38.0)
+    threshold = t.get("above", 100.4)
 
     results = []
     for key in keys:
@@ -174,7 +174,7 @@ def check_temp_heat() -> list[RuleResult]:
         recent = storage.recent_values(key, 1)
         fired = bool(recent) and recent[0] > threshold
         body = (
-            f"{label} is {recent[0] * 9 / 5 + 32:.1f}°F. Heat stress risk. Consider shade or watering."
+            f"{label} is {recent[0]:.1f}°F. Heat stress risk. Consider shade or watering."
         ) if fired else ""
         results.append(RuleResult(
             rule_id=f"temp_heat:{key}",

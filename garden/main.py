@@ -42,26 +42,26 @@ _TEMPLATES = Jinja2Templates(
 
 _SENSOR_ORDER = [
     "soilmoisture1", "soilmoisture2",
-    "tempc", "humidity",
-    "baromrel_hpa",
-    "tempinc", "humidityin",
+    "temp_f", "humidity",
+    "baromrel_inhg",
+    "temp_in_f", "humidityin",
     "soilbatt1", "soilbatt2",
 ]
 
 _SENSOR_COLORS: dict[str, str] = {
     "soilmoisture1": "#4ade80",
     "soilmoisture2": "#22c55e",
-    "tempc":         "#fb923c",
+    "temp_f":        "#fb923c",
     "humidity":      "#60a5fa",
-    "tempinc":       "#fdba74",
+    "temp_in_f":     "#fdba74",
     "humidityin":    "#93c5fd",
-    "baromrel_hpa":  "#a78bfa",
+    "baromrel_inhg": "#a78bfa",
     "soilbatt1":     "#fbbf24",
     "soilbatt2":     "#f59e0b",
 }
 
 # sensor keys that appear as stats only — no time-series chart
-_STATS_ONLY = {"soilbatt1", "soilbatt2", "humidityin", "tempinc"}
+_STATS_ONLY = {"soilbatt1", "soilbatt2", "humidityin", "temp_in_f"}
 
 
 def _color(key: str) -> str:

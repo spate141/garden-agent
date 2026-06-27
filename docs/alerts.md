@@ -54,10 +54,10 @@ Fires when outdoor temperature drops below frost warning threshold.
 
 | Config key | Default | Description |
 |------------|---------|-------------|
-| `thresholds.temp_frost.below` | `2.0` | °C threshold (warns before 0°C) |
+| `thresholds.temp_frost.below` | `35.6` | °F threshold (warns before 32°F) |
 | `cooldowns.temp_frost_minutes` | `60` | Re-alert suppression window |
 
-Sensors: `tempc`
+Sensors: `temp_f`
 Cadence: instant (fires on POST)
 
 ---
@@ -68,10 +68,10 @@ Fires when outdoor temperature exceeds heat stress threshold.
 
 | Config key | Default | Description |
 |------------|---------|-------------|
-| `thresholds.temp_heat.above` | `38.0` | °C threshold |
+| `thresholds.temp_heat.above` | `100.4` | °F threshold |
 | `cooldowns.temp_heat_minutes` | `60` | Re-alert suppression window |
 
-Sensors: `tempc`
+Sensors: `temp_f`
 Cadence: instant (fires on POST)
 
 ---
