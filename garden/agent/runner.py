@@ -180,7 +180,7 @@ def _already_sent_today(local_now: datetime) -> bool:
             log.warning("Unknown timezone %r in _already_sent_today, falling back to UTC", tz_name)
             tz = ZoneInfo("UTC")
         last_local = last_dt.astimezone(tz)
-        return last_local.date() == local_now.date()
+        return last_local.date() == local_now.astimezone(tz).date()
     except Exception:
         return False
 
