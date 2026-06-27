@@ -155,6 +155,14 @@ async def dashboard(request: Request):
 
     last_ts = max((r["ts"] for r in latest_rows), default=None) if latest_rows else None
 
+    # Thresholds read from config.yaml so the dashboard art agrees with the agent rules.
+    # The same values drive check_soil_moisture_low, check_battery_low, check_watchdog.
+    garden_thresholds = json.dumps({
+        "dry":      cfg.thresholds.get("soil_moisture_low", {}).get("below", 30),
+        "battLow":  cfg.thresholds.get("battery_low", {}).get("below", 1.1),
+        "staleMin": cfg.watchdog.get("sensor_timeout_minutes", 30),
+    })
+
     return _TEMPLATES.TemplateResponse(
         request,
         "index.html",
@@ -164,5 +172,6 @@ async def dashboard(request: Request):
             "charts_json": json.dumps(charts),
             "last_ts": last_ts,
             "has_data": bool(latest_rows),
+            "garden_thresholds": garden_thresholds,
         },
     )

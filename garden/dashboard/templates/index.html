@@ -362,21 +362,36 @@
       width: 100%;
       overflow: hidden;
       border-bottom: 2px solid rgba(0,0,0,0.08);
-      /* Garden-own tokens — isolated from page tokens */
-      --g-wood:      #7a4f28;
-      --g-wood-hi:   #a0703a;
-      --g-wood-sh:   #4e2e0e;
-      --g-chip-bg:   rgba(253, 248, 238, 0.96);
-      --g-chip-text: #3b2008;
-      --g-chip-shad: rgba(60,30,0,0.14);
+      /* Garden palette -- ported from reference_bed.html :root */
+      --g-wood-light:       #b07a44;
+      --g-wood:             #8a5a30;
+      --g-wood-dark:        #5e3a1c;
+      --g-wood-shadow:      #412713;
+      --g-soil-dry:         #9c7350;
+      --g-soil-mid:         #6b4a2e;
+      --g-soil-wet:         #3f2a18;
+      --g-soil-damp-patch:  rgba(40,24,12,0.55);
+      --g-leaf:             #5a8a3c;
+      --g-leaf-dark:        #3f6b29;
+      --g-leaf-wilt:        #8a9a5c;
+      --g-chip-bg:          #f3e9d2;
+      --g-chip-ink:         #4a3623;
+      --g-chip-shadow:      rgba(40,24,12,0.35);
+      --g-label-wood:       #6b4527;
+      --g-grass:            #6fa64c;
+      --g-grass-dark:       #588a3a;
     }
     [data-theme="dark"] .garden {
-      --g-chip-bg:   rgba(42, 30, 15, 0.96);
-      --g-chip-text: #e8d4b8;
-      --g-chip-shad: rgba(0,0,0,0.35);
-      --g-wood:      #5e3c1a;
-      --g-wood-hi:   #7a5228;
-      --g-wood-sh:   #321806;
+      --g-chip-bg:          rgba(42, 30, 15, 0.96);
+      --g-chip-ink:         #e8d4b8;
+      --g-chip-shadow:      rgba(0,0,0,0.35);
+      --g-wood-light:       #7a5228;
+      --g-wood:             #5e3c1a;
+      --g-wood-dark:        #321806;
+      --g-wood-shadow:      #1e0e04;
+      --g-soil-dry:         #7a5535;
+      --g-soil-mid:         #4e3620;
+      --g-soil-wet:         #2d1c0d;
     }
 
     /* ── Sky strip ── */
@@ -451,13 +466,13 @@
 
     .sky-chip {
       background: var(--g-chip-bg);
-      color: var(--g-chip-text);
+      color: var(--g-chip-ink);
       border-radius: 12px;
       padding: 5px 11px;
       font-size: 12px;
       font-weight: 700;
       font-family: 'Nunito Sans', sans-serif;
-      box-shadow: 0 2px 8px var(--g-chip-shad);
+      box-shadow: 0 2px 8px var(--g-chip-shadow);
       display: flex;
       align-items: center;
       gap: 4px;
@@ -468,9 +483,36 @@
     }
     .sky-chip-label { font-weight: 600; opacity: 0.6; font-size: 10px; margin-right: 1px; }
 
+    /* ── Grass horizon strip -- stitches the sky-to-ground color seam ── */
+    .garden-horizon {
+      height: 14px;
+      background: linear-gradient(to bottom, var(--g-grass) 0%, var(--g-grass-dark) 100%);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.20);
+      position: relative;
+      z-index: 1;
+    }
+    /* subtle vertical streaks suggest individual grass blades */
+    .garden-horizon::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(90deg,
+          transparent 0px, transparent 5px,
+          rgba(255,255,255,0.10) 5px, rgba(255,255,255,0.10) 6px,
+          transparent 6px, transparent 10px,
+          rgba(0,0,0,0.07) 10px, rgba(0,0,0,0.07) 11px);
+      pointer-events: none;
+    }
+    [data-theme="dark"] .garden-horizon {
+      --g-grass:      #5a8c3a;
+      --g-grass-dark: #486e2c;
+    }
+
     /* ── Ground strip ── */
     .garden-ground {
-      background: linear-gradient(180deg, #c8b48a 0%, #b8a47a 100%);
+      /* richer earth tone; beds stand out more against darker ground */
+      background: linear-gradient(180deg, #7a6040 0%, #604828 100%);
       padding: 14px 24px 22px;
       display: flex;
       gap: 22px;
@@ -478,10 +520,11 @@
       align-items: flex-start;
       overflow-x: auto;
       scrollbar-width: none;
+      position: relative;  /* needed for pebble SVG overlay */
     }
     .garden-ground::-webkit-scrollbar { display: none; }
     [data-theme="dark"] .garden-ground {
-      background: linear-gradient(180deg, #5a4828 0%, #4a3818 100%);
+      background: linear-gradient(180deg, #2a1c0e 0%, #1a100a 100%);
     }
 
     /* ── Bed card ── */
@@ -499,7 +542,7 @@
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--g-chip-text);
+      color: var(--g-chip-ink);
       opacity: 0.7;
       margin-bottom: 5px;
     }
@@ -512,10 +555,10 @@
       border-radius: 6px;
       /* Multi-layer wooden plank border illusion */
       background:
-        linear-gradient(to right,  var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
-        linear-gradient(to left,   var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
-        linear-gradient(to bottom, var(--g-wood-sh) 0, var(--g-wood) 5px, var(--g-wood-hi) 7px, var(--g-wood) 13px, transparent 13px),
-        linear-gradient(to top,    var(--g-wood-sh) 0, var(--g-wood) 4px, var(--g-wood-hi) 6px, var(--g-wood) 11px, transparent 11px);
+        linear-gradient(to right,  var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to left,   var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to bottom, var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
+        linear-gradient(to top,    var(--g-wood-shadow) 0, var(--g-wood) 4px, var(--g-wood-light) 6px, var(--g-wood) 11px, transparent 11px);
       box-shadow: 3px 5px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
       overflow: hidden;
     }
@@ -533,71 +576,102 @@
       z-index: 6;
     }
 
-    /* Soil area */
+    /* Soil area -- gradient driven by moisture via JS inline props */
     .g-soil {
       position: absolute;
       inset: 13px 13px 16px;
       border-radius: 2px;
-      background-color: #d4b896;
-      transition: background-color 2s ease;
+      /* default gradient for healthy/damp soil; JS overrides with computed colors */
+      background: linear-gradient(to bottom, var(--g-soil-mid), var(--g-soil-wet));
       overflow: hidden;
     }
 
-    /* Dry soil cracks */
-    .g-soil::before {
+    /* Front rail -- overlaps soil bottom so plants sit inside the bed */
+    .g-front-rail {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 28px;
+      background: linear-gradient(to bottom, var(--g-wood) 0%, var(--g-wood-dark) 100%);
+      border-top: 4px solid var(--g-wood-light);
+      border-radius: 0 0 4px 4px;
+      z-index: 8;
+      overflow: hidden;
+    }
+    /* plank seam lines on the front rail */
+    .g-front-rail::before {
       content: '';
       position: absolute;
       inset: 0;
-      background-image:
-        repeating-linear-gradient(28deg,
-          transparent 0, transparent 9px,
-          rgba(0,0,0,0.07) 9px, rgba(0,0,0,0.07) 10px),
-        repeating-linear-gradient(118deg,
-          transparent 0, transparent 13px,
-          rgba(0,0,0,0.05) 13px, rgba(0,0,0,0.05) 14px);
-      opacity: var(--crack-op, 1);
-      transition: opacity 2s ease;
+      background-image: repeating-linear-gradient(90deg,
+        transparent 0, transparent 66px,
+        var(--g-wood-shadow) 66px, var(--g-wood-shadow) 68px);
+      opacity: 0.55;
+    }
+
+    /* Damp soil patch under each plant root (child of .g-plant) */
+    .g-damp-patch {
+      position: absolute;
+      bottom: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: var(--g-soil-damp-patch);
+      transition: width 1.8s ease, height 1.8s ease, opacity 1.8s ease;
       pointer-events: none;
     }
 
-    /* Moisture bar (5-segment) */
-    .g-moist-bar {
+    /* Rooted base mound at plant foot (child of .g-plant, behind sprite) */
+    .g-plant-base {
       position: absolute;
-      bottom: 5px;
-      left: 14px;
-      right: 14px;
-      display: flex;
-      gap: 3px;
-      z-index: 5;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: var(--g-leaf-dark);
+      pointer-events: none;
     }
-    .g-moist-seg {
-      flex: 1;
-      height: 5px;
-      border-radius: 3px;
-      background: rgba(255,255,255,0.18);
-      transition: background 1.2s ease;
-    }
-    .g-moist-seg.filled { background: rgba(74,222,128,0.9); }
-    .g-moist-seg.filled.low { background: rgba(251,146,60,0.95); }
 
-    /* Asleep / no-signal overlay */
-    .g-bed.g-asleep .g-bed-frame { filter: grayscale(0.7) brightness(0.82); }
-    .g-bed.g-asleep .g-bed-frame::after {
-      content: '📡 no signal';
+    /* Asleep / sleeping state */
+    .g-bed.g-asleep .g-bed-frame { filter: grayscale(.85) brightness(.6); }
+
+    /* Sleep overlay: hidden by default, shown when bed gains g-asleep */
+    .g-sleep-overlay {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      color: rgba(80,50,20,0.55);
-      text-transform: uppercase;
+      gap: 6px;
       pointer-events: none;
-      z-index: 10;
+      z-index: 11;
+      opacity: 0;
+      transition: opacity 0.8s ease;
     }
-    .g-bed.g-asleep .g-chip { opacity: 0.5; }
+    .g-bed.g-asleep .g-sleep-overlay { opacity: 1; }
+    .g-zzz {
+      font-size: 17px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      color: rgba(210, 196, 174, 0.88);
+      letter-spacing: 5px;
+    }
+    .g-nosig {
+      font-size: 9px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      color: rgba(210, 196, 174, 0.55);
+      letter-spacing: 0.05em;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .g-zzz {
+        animation: g-zzz-float 3.2s ease-in-out infinite;
+      }
+      @keyframes g-zzz-float {
+        0%, 100% { transform: translateY(0)   scale(1);    opacity: 0.88; }
+        50%       { transform: translateY(-5px) scale(1.06); opacity: 1;    }
+      }
+    }
 
     /* Plant container */
     .g-plants {
@@ -630,41 +704,58 @@
       overflow: visible;
     }
 
-    /* Value chips below bed */
-    .g-chips {
-      display: flex;
-      gap: 6px;
-      padding: 8px 2px 0;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .g-chip {
-      background: var(--g-chip-bg);
-      color: var(--g-chip-text);
-      border-radius: 9px;
-      padding: 4px 9px;
-      font-size: 12px;
-      font-weight: 700;
-      font-family: 'Nunito Sans', sans-serif;
-      box-shadow: 0 1px 5px var(--g-chip-shad);
+    /* Wood label nailed to the front rail */
+    .g-label {
+      position: absolute;
+      bottom: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 62%;
+      height: 22px;
+      background: var(--g-label-wood);
+      border: 2px solid var(--g-wood-shadow);
+      border-radius: 3px;
       display: flex;
       align-items: center;
-      gap: 3px;
-      white-space: nowrap;
-      letter-spacing: 0.01em;
+      justify-content: space-around;
+      z-index: 9;
+      box-sizing: border-box;
     }
-    .g-chip-label {
-      font-weight: 600;
-      opacity: 0.6;
+    .g-label::before,
+    .g-label::after {
+      content: '';
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #2a160a;
+      box-shadow: 0 12px 0 #2a160a;
+      pointer-events: none;
+    }
+    .g-label::before { top: 2px; left: 5px; }
+    .g-label::after  { top: 2px; right: 5px; }
+    .g-label-moist {
       font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      color: #f3e9d2;
+      white-space: nowrap;
+    }
+    .g-label-batt {
+      font-size: 10px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      color: #cdeccd;
+      white-space: nowrap;
     }
 
-    /* Low-battery pulse */
-    .g-chip.g-batt-low { animation: g-batt-pulse 2.4s ease-in-out infinite; }
+    /* Low-battery soft pulse */
+    .g-label-batt.g-batt-low {
+      color: #ff9977;
+      animation: g-batt-pulse 2.4s ease-in-out infinite;
+    }
     @keyframes g-batt-pulse {
       0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
+      50%       { opacity: 0.35; }
     }
 
     /* Droplet alert ping */
@@ -748,95 +839,124 @@
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
 
-    <!-- TOMATO: red round fruit, green calyx, stem -->
+    <!-- TOMATO: overlapping round fruit cluster = wide bushy dome silhouette -->
     <symbol id="sprite-tomato" viewBox="0 0 40 52">
-      <rect x="19" y="1" width="2.5" height="9" rx="1.2" fill="#2d6a1f"/>
-      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#3d8a2a" transform="rotate(-38 20 12)"/>
-      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#4aaa35" transform="rotate(0 20 12)"/>
-      <ellipse cx="20" cy="12" rx="9" ry="2.5" fill="#3d8a2a" transform="rotate(38 20 12)"/>
-      <circle  cx="20" cy="13" r="4.5" fill="#3a8028"/>
-      <circle  cx="20" cy="30" r="16.5" fill="#cc2a1e"/>
-      <circle  cx="20" cy="30" r="16.5" fill="#e8402e" opacity="0.55"/>
-      <ellipse cx="14" cy="23" rx="4.5" ry="3.5" fill="rgba(255,255,255,0.22)" transform="rotate(-30 14 23)"/>
-      <circle  cx="20" cy="45" r="2.5" fill="#a01c12"/>
+      <rect x="18.5" y="2" width="3" height="10" rx="1.5" fill="#2d6a1f"/>
+      <!-- wide calyx spread -->
+      <ellipse cx="20" cy="13" rx="11" ry="2.8" fill="#3d8a2a" transform="rotate(-30 20 13)"/>
+      <ellipse cx="20" cy="13" rx="11" ry="2.8" fill="#4aaa35" transform="rotate(0 20 13)"/>
+      <ellipse cx="20" cy="13" rx="11" ry="2.8" fill="#3d8a2a" transform="rotate(30 20 13)"/>
+      <circle cx="20" cy="14" r="4.5" fill="#3a8028"/>
+      <!-- fruit cluster: three overlapping circles -> wide bushy dome -->
+      <circle cx="12" cy="33" r="11" fill="#c82018"/>
+      <circle cx="28" cy="33" r="11" fill="#c82018"/>
+      <circle cx="20" cy="26" r="10" fill="#d83028"/>
+      <circle cx="20" cy="40" r="10" fill="#e04030"/>
+      <ellipse cx="11" cy="25" rx="3.5" ry="2.5" fill="rgba(255,255,255,0.22)" transform="rotate(-25 11 25)"/>
+      <ellipse cx="27" cy="25" rx="3" ry="2" fill="rgba(255,255,255,0.18)" transform="rotate(22 27 25)"/>
     </symbol>
 
-    <!-- EGGPLANT: deep purple teardrop, green calyx -->
+    <!-- EGGPLANT: single tall teardrop, wide-top narrow-bottom -->
     <symbol id="sprite-eggplant" viewBox="0 0 40 52">
-      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2d6a1f"/>
-      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#4aaa35" transform="rotate(-42 20 12)"/>
-      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#3d8a2a" transform="rotate(0 20 12)"/>
-      <ellipse cx="20" cy="12" rx="8.5" ry="2.5" fill="#4aaa35" transform="rotate(42 20 12)"/>
-      <circle  cx="20" cy="13" r="4" fill="#3a8028"/>
-      <ellipse cx="20" cy="34" rx="13.5" ry="17" fill="#4a1e7a"/>
-      <ellipse cx="20" cy="34" rx="11"   ry="14" fill="#6432a0" opacity="0.6"/>
-      <ellipse cx="14" cy="25" rx="3.5"  ry="5.5" fill="rgba(255,255,255,0.18)" transform="rotate(-15 14 25)"/>
-      <ellipse cx="20" cy="49" rx="4.5" ry="2.5" fill="#321055"/>
+      <rect x="18.5" y="1" width="3" height="8" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="20" cy="10" rx="8" ry="2.2" fill="#4aaa35" transform="rotate(-40 20 10)"/>
+      <ellipse cx="20" cy="10" rx="8" ry="2.2" fill="#3d8a2a" transform="rotate(0 20 10)"/>
+      <ellipse cx="20" cy="10" rx="8" ry="2.2" fill="#4aaa35" transform="rotate(40 20 10)"/>
+      <circle cx="20" cy="11" r="3.8" fill="#3a8028"/>
+      <!-- teardrop body: wide shoulder, tapers to bottom point -->
+      <path d="M20 11 Q30 17 31 31 Q32 45 20 51 Q8 45 9 31 Q10 17 20 11 Z" fill="#4a1870"/>
+      <ellipse cx="14" cy="28" rx="3.5" ry="8" fill="rgba(160,80,255,0.28)" transform="rotate(-8 14 28)"/>
+      <ellipse cx="20" cy="14" rx="3" ry="2" fill="rgba(255,255,255,0.14)"/>
     </symbol>
 
-    <!-- OKRA: green ridged pod tapering to a point -->
+    <!-- OKRA: very slender central pod + radiating side arms = spiky silhouette -->
     <symbol id="sprite-okra" viewBox="0 0 40 52">
       <rect x="18.5" y="1" width="3" height="8" rx="1.5" fill="#2d6a1f"/>
-      <ellipse cx="15" cy="10" rx="6" ry="2" fill="#4aaa35" transform="rotate(-28 15 10)"/>
-      <ellipse cx="25" cy="10" rx="6" ry="2" fill="#3d8a2a" transform="rotate(28 25 10)"/>
-      <rect    x="13" y="8" width="14" height="32" rx="6" fill="#4a8c2f"/>
-      <rect    x="13" y="8" width="14" height="32" rx="6" fill="#5aa838" opacity="0.45"/>
-      <line x1="20" y1="8"  x2="20" y2="40" stroke="#38701e" stroke-width="1.5"/>
-      <line x1="15" y1="10" x2="15" y2="38" stroke="#38701e" stroke-width="0.9"/>
-      <line x1="25" y1="10" x2="25" y2="38" stroke="#38701e" stroke-width="0.9"/>
-      <ellipse cx="14.5" cy="20" rx="2" ry="6" fill="rgba(255,255,255,0.16)"/>
-      <ellipse cx="20"   cy="43" rx="4" ry="2.5" fill="#2a6018"/>
+      <ellipse cx="14" cy="9" rx="7" ry="1.8" fill="#4aaa35" transform="rotate(-30 14 9)"/>
+      <ellipse cx="26" cy="9" rx="7" ry="1.8" fill="#3d8a2a" transform="rotate(30 26 9)"/>
+      <!-- narrow central pod, tapering to a point -->
+      <path d="M17 9 Q18.5 8 20 7 Q21.5 8 23 9 L23 40 Q21.5 44 20 46 Q18.5 44 17 40 Z" fill="#3e8020"/>
+      <path d="M17 9 Q18.5 8 20 7 Q21.5 8 23 9 L23 40 Q21.5 44 20 46 Q18.5 44 17 40 Z" fill="#5aa838" opacity="0.38"/>
+      <line x1="20" y1="7" x2="20" y2="46" stroke="#2a5e12" stroke-width="1"/>
+      <!-- radiating side pods: "star" arms make silhouette wide in the middle -->
+      <path d="M17 19 Q10 16 7 13" stroke="#3e8020" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M23 19 Q30 16 33 13" stroke="#4a9a28" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M17 29 Q10 27 7 24" stroke="#3e8020" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M23 29 Q30 27 33 24" stroke="#4a9a28" stroke-width="3.5" fill="none" stroke-linecap="round"/>
     </symbol>
 
-    <!-- PEAS: plump curved pod with three bumps, tendril -->
+    <!-- PEAS: thin vine with oval pods branching to the side, curly tendrils -->
     <symbol id="sprite-peas" viewBox="0 0 40 52">
-      <path d="M30 9 Q36 5 33 11 Q30 15 35 17" stroke="#4aaa35" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <rect x="18.5" y="2" width="2.5" height="11" rx="1.2" fill="#3d8a2a"/>
-      <ellipse cx="20" cy="32" rx="11" ry="17" fill="#58b83a" transform="rotate(-6 20 32)"/>
-      <circle  cx="20" cy="20" r="4.5" fill="#4aaa35" opacity="0.72" transform="rotate(-6 20 20)"/>
-      <circle  cx="19" cy="31" r="4.5" fill="#4aaa35" opacity="0.72" transform="rotate(-6 19 31)"/>
-      <circle  cx="20" cy="42" r="4"   fill="#4aaa35" opacity="0.68" transform="rotate(-6 20 42)"/>
-      <ellipse cx="20" cy="32" rx="11" ry="17" fill="none" stroke="#3d8a2a" stroke-width="1.2" transform="rotate(-6 20 32)"/>
-      <ellipse cx="14" cy="26" rx="2.5" ry="6" fill="rgba(255,255,255,0.18)" transform="rotate(-6 14 26)"/>
+      <!-- wispy tendrils -->
+      <path d="M22 10 Q30 6 28 14 Q26 20 32 19" stroke="#4aaa35" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M18 30 Q10 26 12 33 Q14 39 8 37" stroke="#3d8a2a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- central vine: thin, slightly wavering -->
+      <path d="M20 50 Q22 40 20 30 Q18 20 21 8" stroke="#3d8a2a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <!-- three plump pods along the vine -->
+      <ellipse cx="25" cy="16" rx="7.5" ry="4.5" fill="#58b83a" transform="rotate(-18 25 16)"/>
+      <ellipse cx="17" cy="30" rx="7.5" ry="4.5" fill="#4aaa35" transform="rotate(12 17 30)"/>
+      <ellipse cx="23" cy="43" rx="8" ry="4.8" fill="#52b035" transform="rotate(-10 23 43)"/>
+      <!-- pea bumps visible inside pods -->
+      <circle cx="23" cy="15" r="2.5" fill="#4aaa35" opacity="0.75"/>
+      <circle cx="27" cy="18" r="2.5" fill="#4aaa35" opacity="0.75"/>
+      <circle cx="15" cy="29" r="2.5" fill="#3d8a2a" opacity="0.75"/>
+      <circle cx="19" cy="32" r="2.5" fill="#3d8a2a" opacity="0.75"/>
+      <circle cx="21" cy="42" r="2.5" fill="#3d8a2a" opacity="0.72"/>
+      <circle cx="25" cy="45" r="2.5" fill="#3d8a2a" opacity="0.68"/>
     </symbol>
 
-    <!-- SWEET PEPPER: blocky golden-yellow bell shape -->
+    <!-- SWEET PEPPER: wide blocky bell with three-lobed bottom -->
     <symbol id="sprite-sweet_pepper" viewBox="0 0 40 52">
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2d6a1f"/>
-      <ellipse cx="15" cy="11" rx="6.5" ry="2.2" fill="#4aaa35" transform="rotate(-24 15 11)"/>
-      <ellipse cx="25" cy="11" rx="6.5" ry="2.2" fill="#3d8a2a" transform="rotate(24 25 11)"/>
-      <ellipse cx="20" cy="10" rx="5.5" ry="2.2" fill="#4aaa35"/>
-      <rect    x="8"  y="11" width="24" height="28" rx="10" fill="#d4a010"/>
-      <rect    x="8"  y="11" width="24" height="28" rx="10" fill="#e8bc20" opacity="0.4"/>
-      <ellipse cx="14" cy="20" rx="3.5" ry="5.5" fill="rgba(255,255,255,0.24)" transform="rotate(-12 14 20)"/>
-      <ellipse cx="20" cy="43" rx="12" ry="5" fill="#b88a08"/>
-      <line x1="20" y1="37" x2="20" y2="48" stroke="#9a7006" stroke-width="2"/>
-      <line x1="14" y1="39" x2="13" y2="47" stroke="#9a7006" stroke-width="1.5"/>
-      <line x1="26" y1="39" x2="27" y2="47" stroke="#9a7006" stroke-width="1.5"/>
+      <ellipse cx="14" cy="11" rx="7" ry="2.2" fill="#4aaa35" transform="rotate(-22 14 11)"/>
+      <ellipse cx="26" cy="11" rx="7" ry="2.2" fill="#3d8a2a" transform="rotate(22 26 11)"/>
+      <ellipse cx="20" cy="10" rx="6" ry="2" fill="#4aaa35"/>
+      <!-- wide blocky body -->
+      <rect x="7" y="10" width="26" height="28" rx="11" fill="#c89010"/>
+      <rect x="7" y="10" width="26" height="20" rx="11" fill="#e8b018" opacity="0.45"/>
+      <ellipse cx="12" cy="19" rx="4" ry="6.5" fill="rgba(255,255,255,0.26)" transform="rotate(-12 12 19)"/>
+      <!-- three bottom lobes = bell pepper outline -->
+      <ellipse cx="13" cy="40" rx="5.5" ry="4.5" fill="#b07808"/>
+      <ellipse cx="20" cy="41" rx="5.5" ry="4.5" fill="#a86e06"/>
+      <ellipse cx="27" cy="40" rx="5.5" ry="4.5" fill="#b07808"/>
+      <line x1="17" y1="12" x2="17" y2="40" stroke="#9a6806" stroke-width="1" opacity="0.45"/>
+      <line x1="23" y1="12" x2="23" y2="40" stroke="#9a6806" stroke-width="1" opacity="0.45"/>
     </symbol>
 
-    <!-- HOT PEPPER: slim tapered red/orange chili, slight curve -->
+    <!-- HOT PEPPER: bouquet of three slim tapered pods (vs eggplant's single large teardrop) -->
     <symbol id="sprite-hot_pepper" viewBox="0 0 40 52">
-      <rect x="18.5" y="1" width="2.8" height="9" rx="1.4" fill="#2d6a1f"/>
-      <ellipse cx="25" cy="11" rx="7" ry="2.2" fill="#4aaa35" transform="rotate(28 25 11)"/>
-      <ellipse cx="19" cy="30" rx="6.5" ry="18.5" fill="#d42010" transform="rotate(4 19 30)"/>
-      <ellipse cx="19" cy="30" rx="5"   ry="15"   fill="#e83825" opacity="0.5" transform="rotate(4 19 30)"/>
-      <ellipse cx="15" cy="22" rx="2"   ry="6.5"  fill="rgba(255,210,200,0.26)" transform="rotate(4 15 22)"/>
-      <ellipse cx="20" cy="48" rx="3.5" ry="2"    fill="#8a0e04" transform="rotate(4 20 48)"/>
+      <rect x="18.5" y="1" width="3" height="10" rx="1.5" fill="#2d6a1f"/>
+      <ellipse cx="14" cy="11" rx="6" ry="1.8" fill="#4aaa35" transform="rotate(-26 14 11)"/>
+      <ellipse cx="26" cy="11" rx="6" ry="1.8" fill="#3d8a2a" transform="rotate(26 26 11)"/>
+      <!-- left pod: angled left -->
+      <ellipse cx="12" cy="30" rx="3.2" ry="14" fill="#d42010" transform="rotate(-14 12 30)"/>
+      <ellipse cx="12" cy="28" rx="1.8" ry="9" fill="#f04030" opacity="0.48" transform="rotate(-14 12 28)"/>
+      <!-- right pod: angled right -->
+      <ellipse cx="28" cy="32" rx="3.2" ry="14" fill="#c81a08" transform="rotate(12 28 32)"/>
+      <ellipse cx="28" cy="30" rx="1.8" ry="9" fill="#e83020" opacity="0.44" transform="rotate(12 28 30)"/>
+      <!-- center pod: straight down -->
+      <ellipse cx="20" cy="33" rx="3.2" ry="13" fill="#d02010"/>
+      <ellipse cx="19" cy="29" rx="1.6" ry="8" fill="rgba(255,200,180,0.22)"/>
     </symbol>
 
-    <!-- ZUCCHINI: dark green striped cylinder, yellow flower tip -->
+    <!-- ZUCCHINI: HORIZONTAL fruit low to soil + wide fan leaves above (very distinct outline) -->
     <symbol id="sprite-zucchini" viewBox="0 0 40 52">
-      <rect x="18.5" y="1" width="3" height="8" rx="1.5" fill="#2d6a1f"/>
-      <ellipse cx="15" cy="10" rx="6" ry="2" fill="#4aaa35" transform="rotate(-22 15 10)"/>
-      <ellipse cx="25" cy="10" rx="6" ry="2" fill="#3d8a2a" transform="rotate(22 25 10)"/>
-      <rect    x="12" y="8" width="16" height="34" rx="7.5" fill="#256018"/>
-      <rect    x="14.5" y="8" width="3" height="34" rx="1.5" fill="#308028" opacity="0.55"/>
-      <rect    x="19"   y="8" width="2.5" height="34" rx="1.2" fill="#308028" opacity="0.38"/>
-      <rect    x="23"   y="8" width="2.5" height="34" rx="1.2" fill="#308028" opacity="0.28"/>
-      <ellipse cx="13.5" cy="20" rx="1.8" ry="6.5" fill="rgba(255,255,255,0.14)"/>
-      <ellipse cx="20"   cy="45" rx="6.5" ry="4"   fill="#e09800"/>
-      <ellipse cx="20"   cy="44" rx="4.5" ry="3"   fill="#f8c000"/>
+      <!-- central stem short, connects leaves to fruit -->
+      <rect x="18.5" y="12" width="3" height="16" rx="1.5" fill="#2d6a1f"/>
+      <!-- large fan leaves dominating top half -->
+      <ellipse cx="9" cy="22" rx="13" ry="7.5" fill="#3d8028" transform="rotate(-28 9 22)"/>
+      <ellipse cx="31" cy="22" rx="13" ry="7.5" fill="#4a9a30" transform="rotate(28 31 22)"/>
+      <ellipse cx="20" cy="16" rx="10" ry="6.5" fill="#5aaa38"/>
+      <!-- horizontal cylinder fruit spanning nearly full width -->
+      <rect x="2" y="36" width="36" height="13" rx="6.5" fill="#246018"/>
+      <!-- lengthwise stripes = long cylindrical fruit -->
+      <rect x="4"  y="37" width="3"   height="11" rx="1.5" fill="#308028" opacity="0.55"/>
+      <rect x="9"  y="37" width="2.5" height="11" rx="1.2" fill="#308028" opacity="0.42"/>
+      <rect x="14" y="37" width="2.5" height="11" rx="1.2" fill="#308028" opacity="0.35"/>
+      <rect x="19" y="37" width="2.5" height="11" rx="1.2" fill="#308028" opacity="0.28"/>
+      <!-- blossom end: orange-yellow flower -->
+      <ellipse cx="37" cy="42" rx="4" ry="5.5" fill="#e89800"/>
+      <ellipse cx="37" cy="42" rx="2.5" ry="3.5" fill="#f8c000"/>
     </symbol>
 
     <!-- UNKNOWN fallback: simple green sprout -->
@@ -846,6 +966,14 @@
       <ellipse cx="28" cy="26" rx="8.5" ry="3.8" fill="#3d8a2a" transform="rotate(32 28 26)"/>
       <ellipse cx="20" cy="17" rx="5.5" ry="7.5" fill="#5abe40"/>
       <rect    x="18.5" y="10" width="3" height="9" rx="1.5" fill="#3d8a2a"/>
+    </symbol>
+
+    <!-- dormant fallback: small flat leafy mound, no fruit -->
+    <symbol id="sprite-dormant" viewBox="0 0 40 52">
+      <ellipse cx="20" cy="46" rx="16" ry="5"   fill="#3f6b29"/>
+      <ellipse cx="20" cy="41" rx="11" ry="6.5" fill="#4a7a32"/>
+      <ellipse cx="12" cy="40" rx="7"  ry="4.5" fill="#3f6b29"/>
+      <ellipse cx="28" cy="40" rx="7"  ry="4.5" fill="#3f6b29"/>
     </symbol>
 
   </defs>
@@ -911,6 +1039,8 @@
       </span>
     </div>
   </div>
+  <!-- grass horizon strip: stitches sky blue to ground brown -->
+  <div class="garden-horizon" aria-hidden="true"></div>
   <div class="garden-ground" id="garden-beds" aria-live="polite">
     <!-- bed cards injected by JS -->
   </div>
@@ -979,8 +1109,9 @@ const BEDS = [
 
 const WEATHER_KEYS = { temp: 'tempc', humidity: 'humidity', pressure: 'baromrel_hpa' };
 
-/** Mirror thresholds from config.yaml so art agrees with Telegram alerts */
-const G = { dry: 30, battLow: 1.1, staleMin: 30 };
+/** Thresholds from config.yaml -- same values that fire Telegram alerts.
+ *  Injected server-side so the visual wilt/asleep triggers agree with the agent rules. */
+const G = {{ garden_thresholds | safe }};
 
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
@@ -992,6 +1123,20 @@ const SPRITES = new Set([
 function spriteHref(type) {
   return '#sprite-' + (SPRITES.has(type) ? type : 'unknown');
 }
+
+/** Per-plant height/width multipliers -- give each type a distinct silhouette rhythm.
+ *  h: height relative to base ph (tall okra vs squat zucchini)
+ *  w: width relative to base pw (wide tomato vs slim eggplant) */
+const PLANT_META = {
+  tomato:       { h: 0.82, w: 1.05 },   /* short bushy dome */
+  eggplant:     { h: 1.22, w: 0.86 },   /* tall narrow teardrop */
+  okra:         { h: 1.35, w: 0.78 },   /* tallest, very slim */
+  peas:         { h: 1.18, w: 0.88 },   /* tall wispy vine */
+  sweet_pepper: { h: 0.88, w: 1.08 },   /* medium, blocky-wide */
+  hot_pepper:   { h: 1.12, w: 0.82 },   /* medium-tall, slim pod bouquet */
+  zucchini:     { h: 0.65, w: 1.18 },   /* shortest, widest -- horizontal fruit */
+  unknown:      { h: 1.00, w: 1.00 },
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    SEEDED RNG — deterministic jitter (stable across refreshes per bed)
@@ -1021,11 +1166,18 @@ function lerpRgb(a, b, t) {
   return a.map((v, i) => Math.round(v + (b[i] - v) * t));
 }
 
-/** Interpolate soil color: dry (pale sandy) → wet (dark rich brown) */
-function moistColor(pct) {
-  const t = Math.min(1, (pct || 0) / 75);
-  const [r, g, b] = lerpRgb([212, 184, 150], [68, 36, 12], t);
-  return 'rgb(' + r + ',' + g + ',' + b + ')';
+/** Compute gradient stops for the soil based on moisture pct.
+ *  dry (0 %) -> soil-dry top / soil-mid bot
+ *  wet (100%) -> soil-mid top / soil-wet bot
+ *  Returns [topColor, botColor] as rgb() strings. */
+function moistToSoilGradient(pct) {
+  const t = Math.min(1, (pct || 0) / 80);
+  const top = lerpRgb([156,115,80], [107,74,46], t);  /* soil-dry -> soil-mid */
+  const bot = lerpRgb([107,74,46],  [ 63,42,24], t);  /* soil-mid -> soil-wet */
+  return [
+    'rgb(' + top.join(',') + ')',
+    'rgb(' + bot.join(',') + ')',
+  ];
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1045,8 +1197,8 @@ const SKY_PALETTE = {
   night:   ['#08082e', '#181848'],
   dawn:    ['#ff9a3c', '#ffd194'],
   day:     ['#5ba8d8', '#c8e8ff'],
-  dusk:    ['#e85820', '#ffac5e'],
-  evening: ['#2a1858', '#6030a0'],
+  dusk:    ['#c86828', '#f0a858'],   /* warmer amber, less harsh orange */
+  evening: ['#281540', '#7a4878'],   /* desaturated warm plum, not vivid purple */
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1058,6 +1210,7 @@ function renderBeds() {
   if (!container) return;
   container.innerHTML = '';
   _initClouds();
+  _initGroundDressing();
 
   BEDS.forEach(function (bed) {
     const rng = mkRng(strHash(bed.id));
@@ -1081,28 +1234,70 @@ function renderBeds() {
     const soilEl = document.createElement('div');
     soilEl.className = 'g-soil';
     soilEl.id = 'soil-' + bed.id;
-    soilEl.style.setProperty('--crack-op', '1');
+
+    /* Seeded soil noise -- separate RNG so plant positions are unchanged */
+    (function () {
+      var sr = mkRng(strHash(bed.id + '-soil'));
+      var ns = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      ns.setAttribute('aria-hidden', 'true');
+      ns.setAttribute('viewBox', '0 0 100 100');
+      ns.setAttribute('preserveAspectRatio', 'none');
+      ns.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      /* dark clods */
+      var g1 = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g1.setAttribute('fill', '#2e1d10');
+      g1.setAttribute('opacity', '0.55');
+      for (var nc = 0; nc < 14; nc++) {
+        var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', (sr() * 88 + 4).toFixed(1));
+        c.setAttribute('cy', (sr() * 78 + 8).toFixed(1));
+        c.setAttribute('r',  (sr() * 1.8 + 1.0).toFixed(1));
+        g1.appendChild(c);
+      }
+      /* lighter flecks */
+      var g2 = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g2.setAttribute('fill', '#7a5535');
+      g2.setAttribute('opacity', '0.40');
+      for (var nf = 0; nf < 7; nf++) {
+        var f = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        f.setAttribute('cx', (sr() * 88 + 4).toFixed(1));
+        f.setAttribute('cy', (sr() * 78 + 8).toFixed(1));
+        f.setAttribute('r',  (sr() * 1.2 + 0.7).toFixed(1));
+        g2.appendChild(f);
+      }
+      ns.appendChild(g1);
+      ns.appendChild(g2);
+      soilEl.appendChild(ns);
+    }());
 
     /* ── plants ── */
     const plantsEl = document.createElement('div');
     plantsEl.className = 'g-plants';
 
     const n = bed.plants.length;
-    /* scale plant size down as count grows; min 22px wide */
+    /* base plant size scales down with count; min 22px wide */
     const pw = Math.max(22, Math.min(44, Math.floor(130 / n)));
     const ph = Math.round(pw * 1.27);
     bed.plants.forEach(function (type, i) {
       const plantEl = document.createElement('div');
       plantEl.className = 'g-plant';
-      plantEl.style.width  = pw + 'px';
-      plantEl.style.height = ph + 'px';
 
-      /* seeded jitter — scale with plant size */
+      /* seeded jitter */
       const jitterRange = pw * 0.35;
-      const jx  = (rng() - 0.5) * jitterRange;
-      const jy  = (rng() - 0.5) * 6;
-      const rot = (rng() - 0.5) * 7;
+      const jx    = (rng() - 0.5) * jitterRange;
+      const jy    = (rng() - 0.5) * 6;
+      const rot   = (rng() - 0.5) * 7;
       const delay = rng() * 2.8;
+      /* depth: 0=front/near, 1=back/far -- 5th rng call, after jitter */
+      const depth = rng();
+
+      /* depth + per-type meta combine for size: near/far AND species height rhythm */
+      const depthScale = 1 + (0.5 - depth) * 0.22;
+      const meta = PLANT_META[type] || PLANT_META.unknown;
+      const dpw = Math.round(pw * depthScale * meta.w);
+      const dph = Math.round(ph * depthScale * meta.h);
+      plantEl.style.width  = dpw + 'px';
+      plantEl.style.height = dph + 'px';
 
       /* x-position: evenly spaced, capped so plants don't overflow */
       let frac;
@@ -1116,63 +1311,82 @@ function renderBeds() {
       plantEl.style.setProperty('--g-sat',       '1');
       plantEl.style.setProperty('--g-bright',    '1');
 
-      /* position via absolute coords inside .g-plants */
-      plantEl.style.left   = 'calc(' + (frac * 100) + '% + ' + jx + 'px - ' + (pw / 2) + 'px)';
-      plantEl.style.bottom = Math.max(0, 4 + jy * 0.3) + 'px';
+      /* position: near plants sit lower (small bottom), far ones higher */
+      plantEl.style.left   = 'calc(' + (frac * 100) + '% + ' + jx + 'px - ' + (dpw / 2) + 'px)';
+      plantEl.style.bottom = Math.max(0, 4 + jy * 0.3 + depth * 10) + 'px';
+      /* near = higher z so they overlap far plants */
+      plantEl.style.zIndex = Math.round((1 - depth) * 8) + 1;
 
-      /* z-order: lower plants (higher bottom) appear in front */
-      plantEl.style.zIndex = i;
+      /* damp soil patch (sized/faded by moisture in updateGarden) */
+      const dampEl = document.createElement('div');
+      dampEl.className = 'g-damp-patch';
+      dampEl.id = 'damp-' + bed.id + '-' + i;
+      const dBaseW = Math.round(dpw * 0.90);
+      const dBaseH = Math.round(dpw * 0.36);
+      dampEl.dataset.baseW = dBaseW;
+      dampEl.dataset.baseH = dBaseH;
+      dampEl.style.width  = dBaseW + 'px';
+      dampEl.style.height = dBaseH + 'px';
+      plantEl.appendChild(dampEl);
+
+      /* rooted base mound */
+      const baseEl = document.createElement('div');
+      baseEl.className = 'g-plant-base';
+      baseEl.style.width  = Math.round(dpw * 0.56) + 'px';
+      baseEl.style.height = Math.round(dpw * 0.22) + 'px';
+      plantEl.appendChild(baseEl);
 
       const inner = document.createElement('div');
       inner.className = 'g-plant-inner';
       inner.innerHTML =
-        '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="' + pw + '" height="' + ph + '">' +
+        '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="' + dpw + '" height="' + dph + '">' +
         '<use href="' + spriteHref(type) + '"/>' +
         '</svg>';
       plantEl.appendChild(inner);
       plantsEl.appendChild(plantEl);
     });
 
-    /* ── moisture bar (5 segs) ── */
-    const mbar = document.createElement('div');
-    mbar.className = 'g-moist-bar';
-    mbar.id = 'mbar-' + bed.id;
-    for (let s = 0; s < 5; s++) {
-      const seg = document.createElement('div');
-      seg.className = 'g-moist-seg';
-      mbar.appendChild(seg);
-    }
-
     soilEl.appendChild(plantsEl);
     frameEl.appendChild(soilEl);
-    frameEl.appendChild(mbar);
+
+    /* front rail: overlaps the soil's bottom edge, plants appear inside the bed */
+    const railEl = document.createElement('div');
+    railEl.className = 'g-front-rail';
+    frameEl.appendChild(railEl);
+
+    /* wood label nailed to the rail -- same IDs as before so _setText calls work */
+    const labelEl = document.createElement('div');
+    labelEl.className = 'g-label';
+    labelEl.setAttribute('aria-label', bed.name + ' readings');
+    const moistSpan = document.createElement('span');
+    moistSpan.className = 'g-label-moist';
+    moistSpan.id = 'cv-moist-' + bed.id;
+    moistSpan.textContent = '💧 --';
+    const battSpan = document.createElement('span');
+    battSpan.className = 'g-label-batt';
+    battSpan.id = 'cv-batt-' + bed.id;
+    battSpan.textContent = '🔋 --';
+    labelEl.appendChild(moistSpan);
+    labelEl.appendChild(battSpan);
+    frameEl.appendChild(labelEl);
+
+    /* sleep overlay: soft z z Z + quiet nosig line, revealed when g-asleep */
+    const sleepEl = document.createElement('div');
+    sleepEl.className = 'g-sleep-overlay';
+    sleepEl.setAttribute('aria-hidden', 'true');
+    const zzzEl = document.createElement('div');
+    zzzEl.className = 'g-zzz';
+    zzzEl.textContent = 'z z Z';
+    const nosigEl = document.createElement('div');
+    nosigEl.className = 'g-nosig';
+    nosigEl.id = 'nosig-' + bed.id;
+    nosigEl.textContent = 'no signal';
+    sleepEl.appendChild(zzzEl);
+    sleepEl.appendChild(nosigEl);
+    frameEl.appendChild(sleepEl);
+
     bedEl.appendChild(frameEl);
 
-    /* ── value chips ── */
-    const chipsEl = document.createElement('div');
-    chipsEl.className = 'g-chips';
-
-    /* soil moisture chip */
-    const moistChip = document.createElement('span');
-    moistChip.className = 'g-chip';
-    moistChip.id = 'chip-moist-' + bed.id;
-    moistChip.setAttribute('aria-label', bed.name + ' soil moisture');
-    moistChip.innerHTML =
-      '<span class="g-chip-label">Soil</span>' +
-      '<span id="cv-moist-' + bed.id + '">—</span>';
-    chipsEl.appendChild(moistChip);
-
-    /* battery chip */
-    const battChip = document.createElement('span');
-    battChip.className = 'g-chip';
-    battChip.id = 'chip-batt-' + bed.id;
-    battChip.setAttribute('aria-label', bed.name + ' battery');
-    battChip.innerHTML =
-      '<span aria-hidden="true">🔋</span>' +
-      '<span id="cv-batt-' + bed.id + '">—</span>';
-    chipsEl.appendChild(battChip);
-
-    bedEl.appendChild(chipsEl);
     container.appendChild(bedEl);
   });
 }
@@ -1195,6 +1409,42 @@ function _initClouds() {
   });
 }
 
+function _initGroundDressing() {
+  const ground = document.getElementById('garden-beds');
+  if (!ground) return;
+  /* remove any previous layer */
+  const old = ground.querySelector('.g-ground-svg');
+  if (old) old.remove();
+
+  /* fixed-seed RNG: same pebble layout every render regardless of bed config */
+  const rng = mkRng(0x5a7de1);
+  const ns = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  ns.setAttribute('aria-hidden', 'true');
+  ns.setAttribute('viewBox', '0 0 100 100');
+  ns.setAttribute('preserveAspectRatio', 'none');
+  ns.className = 'g-ground-svg';
+  ns.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible;';
+
+  /* earthy pebble/stone colors */
+  var stones = ['#7a6448', '#5e4c38', '#8a7458', '#6e5840'];
+  for (var p = 0; p < 14; p++) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    var cx = (rng() * 92 + 4).toFixed(1);
+    var cy = (rng() * 72 + 8).toFixed(1);
+    el.setAttribute('cx', cx);
+    el.setAttribute('cy', cy);
+    el.setAttribute('rx', (rng() * 2.0 + 1.0).toFixed(1));
+    el.setAttribute('ry', (rng() * 1.2 + 0.6).toFixed(1));
+    el.setAttribute('fill', stones[p % stones.length]);
+    el.setAttribute('opacity', (0.30 + rng() * 0.28).toFixed(2));
+    el.setAttribute('transform',
+      'rotate(' + (rng() * 70 - 35).toFixed(0) + ' ' + cx + ' ' + cy + ')');
+    ns.appendChild(el);
+  }
+  ground.appendChild(ns);
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    GARDEN — DATA HELPERS
    ════════════════════════════════════════════════════════════════════════════ */
@@ -1213,6 +1463,11 @@ function parseLatest(rows) {
 function isStale(isoTs) {
   if (!isoTs) return true;
   return (Date.now() - new Date(isoTs).getTime()) / 60000 > G.staleMin;
+}
+
+function _minutesAgo(isoTs) {
+  if (!isoTs) return null;
+  return Math.round((Date.now() - new Date(isoTs).getTime()) / 60000);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1238,50 +1493,71 @@ function updateGarden(rows) {
     const bedEl = document.querySelector('[data-bed="' + bed.id + '"]');
     if (!bedEl) return;
 
-    /* ── Stale / no-signal state ── */
+    /* ── Stale / sleeping state ── */
     if (stale) {
       bedEl.classList.add('g-asleep');
-      _setText('cv-moist-' + bed.id, '—');
-      _setText('cv-batt-' + bed.id, '—');
-      const bc = document.getElementById('chip-batt-' + bed.id);
+      _setText('cv-moist-' + bed.id, '💧 —');
+      _setText('cv-batt-' + bed.id, '🔋 —');
+      const bc = document.getElementById('cv-batt-' + bed.id);
       if (bc) bc.classList.remove('g-batt-low');
-      bedEl.querySelectorAll('.g-moist-seg').forEach(function (s) {
-        s.classList.remove('filled', 'low');
+      /* dormant plants: swap to leafy mound sprite, remove wilt styling */
+      bedEl.querySelectorAll('.g-plant-inner use').forEach(function (u) {
+        if (!u.hasAttribute('data-dormant')) {
+          u.dataset.originalHref = u.getAttribute('href');
+          u.setAttribute('href', '#sprite-dormant');
+          u.setAttribute('data-dormant', '1');
+        }
       });
       bedEl.querySelectorAll('.g-plant').forEach(function (p) {
-        p.style.setProperty('--g-wilt-rot', '-10deg');
-        p.style.setProperty('--g-sat',      '0.3');
-        p.style.setProperty('--g-bright',   '0.7');
+        p.style.setProperty('--g-wilt-rot', '0deg');
+        p.style.setProperty('--g-sat',      '1');
+        p.style.setProperty('--g-bright',   '1');
       });
+      bedEl.querySelectorAll('.g-damp-patch').forEach(function (d) {
+        d.style.width   = '10px';
+        d.style.height  = '4px';
+        d.style.opacity = '0.12';
+      });
+      /* populate nosig text with time since last reading */
+      const minsAgo = _minutesAgo(moistTs);
+      const nosig = document.getElementById('nosig-' + bed.id);
+      if (nosig) {
+        nosig.textContent = minsAgo != null
+          ? 'no signal · ' + minsAgo + 'm ago'
+          : 'no signal';
+      }
       return;
     }
 
+    /* ── Waking up: restore original plant sprites if bed was asleep ── */
+    bedEl.querySelectorAll('.g-plant-inner use[data-dormant]').forEach(function (u) {
+      u.setAttribute('href', u.dataset.originalHref || '');
+      u.removeAttribute('data-dormant');
+    });
     bedEl.classList.remove('g-asleep');
 
-    /* ── Soil color ── */
+    /* ── Soil gradient (dry = pale/sandy, wet = dark/rich) ── */
     const soilEl = document.getElementById('soil-' + bed.id);
     if (soilEl && moist != null) {
-      soilEl.style.backgroundColor = moistColor(moist);
-      soilEl.style.setProperty('--crack-op', Math.max(0, 1 - moist / 35).toFixed(2));
+      const [topC, botC] = moistToSoilGradient(moist);
+      soilEl.style.background = 'linear-gradient(to bottom,' + topC + ',' + botC + ')';
     }
 
-    /* ── Moisture bar ── */
-    const mbar = bedEl.querySelector('.g-moist-bar');
-    if (mbar && moist != null) {
-      const filled = Math.round((moist / 100) * 5);
-      const isLow  = moist < G.dry;
-      mbar.querySelectorAll('.g-moist-seg').forEach(function (seg, i) {
-        if (i < filled) {
-          seg.classList.add('filled');
-          isLow ? seg.classList.add('low') : seg.classList.remove('low');
-        } else {
-          seg.classList.remove('filled', 'low');
-        }
+    /* ── Damp patches: grow and darken with moisture ── */
+    if (moist != null) {
+      const wetF = Math.min(1, (moist || 0) / 80);
+      bedEl.querySelectorAll('.g-damp-patch').forEach(function (d) {
+        const bw = parseFloat(d.dataset.baseW || 30);
+        const bh = parseFloat(d.dataset.baseH || 12);
+        const s  = 0.45 + wetF * 0.75;  /* 0.45 at dry -> 1.2 at full wet */
+        d.style.width   = Math.round(bw * s) + 'px';
+        d.style.height  = Math.round(bh * s) + 'px';
+        d.style.opacity = (0.2 + wetF * 0.8).toFixed(2);
       });
     }
 
-    /* ── Soil moisture chip ── */
-    _setText('cv-moist-' + bed.id, moist != null ? moist.toFixed(0) + '%' : '—');
+    /* ── Soil moisture label ── */
+    _setText('cv-moist-' + bed.id, moist != null ? '💧 ' + moist.toFixed(0) + '%' : '💧 —');
 
     /* ── Plant wilt (smooth CSS transition via custom props) ── */
     if (moist != null) {
@@ -1301,13 +1577,13 @@ function updateGarden(rows) {
       _prevDry[bed.id] = isDry;
     }
 
-    /* ── Battery chip ── */
-    _setText('cv-batt-' + bed.id, batt != null ? batt.toFixed(1) + 'V' : '—');
-    const battChip = document.getElementById('chip-batt-' + bed.id);
-    if (battChip) {
+    /* ── Battery label ── */
+    _setText('cv-batt-' + bed.id, batt != null ? '🔋 ' + batt.toFixed(1) + 'V' : '🔋 —');
+    const battSpanEl = document.getElementById('cv-batt-' + bed.id);
+    if (battSpanEl) {
       batt != null && batt < G.battLow
-        ? battChip.classList.add('g-batt-low')
-        : battChip.classList.remove('g-batt-low');
+        ? battSpanEl.classList.add('g-batt-low')
+        : battSpanEl.classList.remove('g-batt-low');
     }
   });
 }
