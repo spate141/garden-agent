@@ -173,5 +173,6 @@ async def dashboard(request: Request):
             "last_ts": last_ts,
             "has_data": bool(latest_rows),
             "garden_thresholds": garden_thresholds,
+            "tz_json": json.dumps(cfg.location.get("timezone", "America/Chicago")),
         },
     )

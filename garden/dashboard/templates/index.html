@@ -264,7 +264,7 @@
   <div class="logo">&#127807; Raised Garden Beds Sensors Data</div>
   <div class="meta">
     {% if last_ts %}
-    <span class="last-update" id="last-ts">{{ last_ts[:16].replace("T", " ") }} UTC</span>
+    <span class="last-update" id="last-ts">{{ last_ts[:16].replace("T", " ") }}</span>
     {% else %}
     <span class="last-update" id="last-ts">no data yet</span>
     {% endif %}
@@ -361,7 +361,7 @@
 
 {% endif %}
 
-<footer id="footer-ts"></footer>
+<footer></footer>
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
@@ -370,6 +370,23 @@
 
 const CHARTS = {{ charts_json | safe }};
 const HOURS  = 24;
+const TZ     = {{ tz_json | default('"America/Chicago"') | safe }};
+
+/** Format a UTC ISO timestamp to local time: "HH:MM MM-DD-YYYY" */
+function _fmtLocalTs(isoUtc) {
+  if (!isoUtc) return 'no data yet';
+  const d   = new Date(isoUtc);  /* already has +00:00 offset from DB */
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ, hourCycle: 'h23',
+    hour: '2-digit', minute: '2-digit',
+    month: '2-digit', day: '2-digit', year: 'numeric',
+  });
+  const p = {};
+  fmt.formatToParts(d).forEach(function (part) {
+    if (part.type !== 'literal') p[part.type] = part.value;
+  });
+  return p.hour + ':' + p.minute + ' ' + p.month + '-' + p.day + '-' + p.year;
+}
 
 /** Bed/plant configuration — edit this array to add/change beds or plants.
  *  Plant types: tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini */
@@ -1114,7 +1131,7 @@ function updateStats(rows) {
   if (rows.length) {
     const latest = rows.reduce(function (a, b) { return a.ts > b.ts ? a : b; });
     const el = document.getElementById('last-ts');
-    if (el) el.textContent = latest.ts.slice(0, 16).replace('T', ' ') + ' UTC';
+    try { if (el) el.textContent = _fmtLocalTs(latest.ts); } catch (_) {}
   }
 }
 
@@ -1137,17 +1154,10 @@ async function refresh() {
   if (dot) dot.classList.remove('active');
 }
 
-function tick() {
-  const el = document.getElementById('footer-ts');
-  if (el) el.textContent = new Date().toUTCString().slice(0, 25);
-}
-
 /* ── Boot ── */
 renderBeds();
 refresh();
-tick();
 setInterval(refresh, 60_000);
-setInterval(tick, 1_000);
 </script>
 
 </body>
