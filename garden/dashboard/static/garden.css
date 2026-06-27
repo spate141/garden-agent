@@ -752,6 +752,65 @@ footer {
   100% { opacity: 0;   transform: translateY(-18px) scale(0.85); }
 }
 
+/* ── Garden Robot ───────────────────────────────────────────────────── */
+#garden-robot {
+  position: absolute;
+  width: 40px;
+  /* bottom:22px aligns with the bed front-rail ground line
+     (matches .garden-ground bottom padding); vertical animation is
+     translateY % of the element's own height (52px svg) */
+  bottom: 22px;
+  z-index: 13;
+  pointer-events: none;
+  overflow: visible;
+  transform: translateY(110%);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#garden-robot.g-robot-visible {
+  opacity: 1;
+}
+
+.g-robot-body {
+  display: block;
+  line-height: 0;
+}
+
+.g-robot-bubble {
+  position: absolute;
+  bottom: 58px;   /* floats above the 52px robot body */
+  left: 50%;
+  transform: translateX(-50%) translateY(5px) scale(0.88);
+  background: var(--g-chip-bg);
+  color: var(--g-chip-ink);
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 5px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px var(--g-chip-shadow);
+  opacity: 0;
+  transition: opacity 0.28s, transform 0.28s;
+  pointer-events: none;
+}
+/* Downward triangle tail pointing at robot */
+.g-robot-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--g-chip-bg);
+}
+#garden-robot.g-robot-speak .g-robot-bubble {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
 /* Responsive */
 @media (max-width: 720px) {
   .garden-ground {
@@ -805,5 +864,33 @@ footer {
   @keyframes g-firefly-blink {
     0%, 100% { opacity: 0; transform: translate(0, 0) scale(0.7); }
     50%       { opacity: 0.85; transform: translate(var(--g-fx, 4px), var(--g-fy, -5px)) scale(1.1); }
+  }
+
+  /* Garden robot pop-up
+     translateY % is relative to element's own height (52px).
+     -200% = 104px up from bottom:22px baseline → clears the 158px bed frame top. */
+  #garden-robot.g-robot-rising {
+    animation: g-robot-rise 0.68s cubic-bezier(0.22, 1.3, 0.58, 1) forwards;
+  }
+  #garden-robot.g-robot-sinking {
+    animation: g-robot-sink 0.42s ease-in forwards;
+  }
+  @keyframes g-robot-rise {
+    0%   { transform: translateY(110%); }
+    68%  { transform: translateY(-215%); }  /* bouncy overshoot */
+    84%  { transform: translateY(-192%); }  /* settle back */
+    100% { transform: translateY(-200%); }
+  }
+  @keyframes g-robot-sink {
+    0%   { transform: translateY(-200%); }
+    100% { transform: translateY(110%); }
+  }
+  /* Gentle bob while the speech bubble is showing */
+  #garden-robot.g-robot-speak .g-robot-body {
+    animation: g-robot-bob 2.4s ease-in-out infinite;
+  }
+  @keyframes g-robot-bob {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-4px); }
   }
 }

@@ -256,12 +256,70 @@
       <ellipse cx="20" cy="37" rx="5"  ry="4"   fill="#5a8a3c"/>
     </symbol>
 
+    <!-- ROBOT: friendly little garden-bot that pops up to take readings -->
+    <!-- Gradients prefixed s-robot- to avoid ID collisions -->
+    <!-- Cool steel-blue hull so the robot stands out against warm soil/wood -->
+    <radialGradient id="s-robot-hull" cx="30%" cy="22%" r="72%">
+      <stop offset="0%"   stop-color="#d0e4f0"/>
+      <stop offset="50%"  stop-color="#5a8ab0"/>
+      <stop offset="100%" stop-color="#1e3c58"/>
+    </radialGradient>
+    <radialGradient id="s-robot-eye" cx="38%" cy="30%" r="62%">
+      <stop offset="0%"   stop-color="#fff09a"/>
+      <stop offset="45%"  stop-color="#e09c08"/>
+      <stop offset="100%" stop-color="#7a5000"/>
+    </radialGradient>
+    <linearGradient id="s-robot-visor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0e2038"/>
+      <stop offset="100%" stop-color="#060e1c"/>
+    </linearGradient>
+    <symbol id="sprite-robot" viewBox="0 0 40 52">
+      <!-- Antenna stick -->
+      <rect x="18.5" y="3" width="3" height="9" rx="1.5" fill="#3a6028"/>
+      <!-- Antenna sensor (leaf tip) -->
+      <circle cx="20" cy="3" r="4.5" fill="#5a8a3c"/>
+      <circle cx="18.7" cy="1.8" r="1.7" fill="rgba(255,255,255,0.30)"/>
+      <circle cx="20"   cy="3"   r="1.5" fill="#3a6028"/>
+      <!-- Head -->
+      <rect x="7" y="10" width="26" height="19" rx="5" fill="url(#s-robot-hull)"/>
+      <!-- Visor / face plate -->
+      <rect x="10" y="13" width="20" height="13" rx="3" fill="url(#s-robot-visor)"/>
+      <!-- Left eye -->
+      <circle cx="15.5" cy="19.5" r="3.5" fill="url(#s-robot-eye)"/>
+      <circle cx="14.3" cy="18.3" r="1.3" fill="rgba(255,255,255,0.55)"/>
+      <!-- Right eye -->
+      <circle cx="24.5" cy="19.5" r="3.5" fill="url(#s-robot-eye)"/>
+      <circle cx="23.3" cy="18.3" r="1.3" fill="rgba(255,255,255,0.55)"/>
+      <!-- Smile -->
+      <path d="M15 24 Q20 27.5 25 24" stroke="#a0d080" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- Neck connector -->
+      <rect x="16" y="29" width="8" height="5" rx="2" fill="#2a5070"/>
+      <!-- Body -->
+      <rect x="5" y="33" width="30" height="18" rx="5" fill="url(#s-robot-hull)"/>
+      <!-- Body panel -->
+      <rect x="8.5" y="36" width="23" height="12" rx="2.5" fill="url(#s-robot-visor)"/>
+      <!-- Chest readout bars -->
+      <rect x="11" y="38.5" width="9"   height="2" rx="0.8" fill="#5a8a3c" opacity="0.9"/>
+      <rect x="11" y="42"   width="5.5" height="2" rx="0.8" fill="#5a8a3c" opacity="0.6"/>
+      <!-- Blinking amber indicator -->
+      <circle cx="26.5" cy="42.5" r="2"   fill="#e09c08" opacity="0.85"/>
+      <circle cx="26.5" cy="42.5" r="0.9" fill="#fff090" opacity="0.70"/>
+      <!-- Left arm -->
+      <rect x="0"  y="35" width="6" height="9" rx="3" fill="url(#s-robot-hull)"/>
+      <rect x="1"  y="40" width="4" height="3" rx="1.5" fill="#1e3c58" opacity="0.5"/>
+      <!-- Right arm -->
+      <rect x="34" y="35" width="6" height="9" rx="3" fill="url(#s-robot-hull)"/>
+      <rect x="35" y="40" width="4" height="3" rx="1.5" fill="#1e3c58" opacity="0.5"/>
+      <!-- Ground shadow -->
+      <ellipse cx="20" cy="51.5" rx="13" ry="1.7" fill="rgba(0,0,0,0.18)"/>
+    </symbol>
+
   </defs>
 </svg>
 
 
 <header>
-  <div class="logo">&#127807; Raised Garden Beds Sensors Data</div>
+  <div class="logo">&#127807; Beds &amp; Bots &#129302;</div>
   <div class="meta">
     {% if last_ts %}
     <span class="last-update" id="last-ts">{{ last_ts[:16].replace("T", " ") }}</span>
@@ -1154,8 +1212,119 @@ async function refresh() {
   if (dot) dot.classList.remove('active');
 }
 
+/* ── Garden robot ── */
+var ROBOT_LINES = [
+  'scanning soil… 🌱',
+  'photosynthesis: nominal',
+  'moisture check ✅',
+  'calculating vibes…',
+  'beep boop, all good 🤖',
+  'root depth: adequate',
+  'chlorophyll levels: ☀️',
+  'detecting earthworms…',
+  'soil pH: within range',
+  'garden status: thriving 🌿',
+  'running garden.exe…',
+  'all systems green 🟢',
+  'hydration check 💧',
+  'bloop bloop bloop 🫧',
+  'nutrient scan complete',
+  'pests: none detected 🐛',
+];
+
+function renderRobot() {
+  var container = document.getElementById('garden-beds');
+  if (!container) return;
+
+  var robot = document.createElement('div');
+  robot.id = 'garden-robot';
+  robot.setAttribute('aria-hidden', 'true');
+  robot.dataset.busy = '0';
+
+  var bubble = document.createElement('div');
+  bubble.className = 'g-robot-bubble';
+
+  var body = document.createElement('div');
+  body.className = 'g-robot-body';
+  body.innerHTML =
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 40 52" width="40" height="52">' +
+    '<use href="#sprite-robot"/></svg>';
+
+  robot.appendChild(bubble);
+  robot.appendChild(body);
+  container.appendChild(robot);
+
+  /* first pop after 10–16 s so user notices it quickly */
+  setTimeout(popRobot, 10000 + Math.random() * 6000);
+}
+
+function popRobot() {
+  var robot = document.getElementById('garden-robot');
+  if (!robot || robot.dataset.busy === '1') return;
+
+  var beds = document.querySelectorAll('.g-bed');
+  if (!beds.length) return;
+
+  var bed = beds[Math.floor(Math.random() * beds.length)];
+
+  /* horizontal center over the chosen bed; vertical is fixed by CSS bottom */
+  var cx = bed.offsetLeft + bed.offsetWidth / 2;
+  robot.style.left = (cx - 20) + 'px';   /* 20 = half of 40px sprite width */
+
+  /* pick a flavor line */
+  var line = ROBOT_LINES[Math.floor(Math.random() * ROBOT_LINES.length)];
+  robot.querySelector('.g-robot-bubble').textContent = line;
+
+  robot.dataset.busy = '1';
+  robot.classList.remove('g-robot-speak', 'g-robot-rising', 'g-robot-sinking');
+
+  /* respect prefers-reduced-motion: skip kinetics, just fade in/out */
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion) {
+    robot.style.transform = 'translateY(-200%)';
+    robot.classList.add('g-robot-visible', 'g-robot-speak');
+    setTimeout(function () {
+      robot.classList.remove('g-robot-visible', 'g-robot-speak');
+      robot.style.transform = 'translateY(110%)';
+      robot.dataset.busy = '0';
+      scheduleRobot();
+    }, 3800);
+    return;
+  }
+
+  robot.classList.add('g-robot-visible', 'g-robot-rising');
+
+  function onRise(e) {
+    if (e.animationName !== 'g-robot-rise') return;
+    robot.removeEventListener('animationend', onRise);
+    robot.classList.remove('g-robot-rising');
+    robot.classList.add('g-robot-speak');
+
+    setTimeout(function () {
+      robot.classList.remove('g-robot-speak');
+      robot.classList.add('g-robot-sinking');
+
+      function onSink(e2) {
+        if (e2.animationName !== 'g-robot-sink') return;
+        robot.removeEventListener('animationend', onSink);
+        robot.classList.remove('g-robot-sinking', 'g-robot-visible');
+        robot.dataset.busy = '0';
+        scheduleRobot();
+      }
+      robot.addEventListener('animationend', onSink);
+    }, 3800);
+  }
+  robot.addEventListener('animationend', onRise);
+}
+
+function scheduleRobot() {
+  /* next pop in 28–58 s */
+  setTimeout(popRobot, 28000 + Math.random() * 30000);
+}
+
 /* ── Boot ── */
 renderBeds();
+renderRobot();
 refresh();
 setInterval(refresh, 60_000);
 </script>
