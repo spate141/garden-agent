@@ -57,6 +57,9 @@ sudo systemctl restart garden-agent
 echo "==> Restarting garden-cron.timer..."
 sudo systemctl restart garden-cron.timer
 
+echo "==> Enabling garden-backup.timer..."
+sudo systemctl enable --now garden-backup.timer
+
 # ── 5. Health check ───────────────────────────────────────────────────────────
 echo "==> Waiting for garden-agent to come up..."
 for _ in $(seq 1 10); do
@@ -74,7 +77,8 @@ echo ""
 # ── 6. Status summary ─────────────────────────────────────────────────────────
 echo "==> Service status:"
 sudo systemctl is-active --quiet garden-agent      && echo "    garden-agent      : active" || echo "    garden-agent      : FAILED"
-sudo systemctl is-active --quiet garden-cron.timer && echo "    garden-cron.timer : active" || echo "    garden-cron.timer : FAILED"
+sudo systemctl is-active --quiet garden-cron.timer    && echo "    garden-cron.timer    : active" || echo "    garden-cron.timer    : FAILED"
+sudo systemctl is-active --quiet garden-backup.timer && echo "    garden-backup.timer  : active" || echo "    garden-backup.timer  : FAILED"
 
 echo ""
 echo "==> Deploy complete."
