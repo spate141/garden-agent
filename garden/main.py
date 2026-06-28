@@ -38,36 +38,6 @@ _TEMPLATES = Jinja2Templates(
     directory=Path(__file__).parent / "dashboard" / "templates"
 )
 
-# ── display config ────────────────────────────────────────────────────────────
-
-_SENSOR_ORDER = [
-    "soilmoisture1", "soilmoisture2",
-    "temp_f", "humidity",
-    "baromrel_inhg",
-    "temp_in_f", "humidityin",
-    "soilbatt1", "soilbatt2",
-]
-
-_SENSOR_COLORS: dict[str, str] = {
-    "soilmoisture1": "#4ade80",
-    "soilmoisture2": "#22c55e",
-    "temp_f":        "#fb923c",
-    "humidity":      "#60a5fa",
-    "temp_in_f":     "#fdba74",
-    "humidityin":    "#93c5fd",
-    "baromrel_inhg": "#a78bfa",
-    "soilbatt1":     "#fbbf24",
-    "soilbatt2":     "#f59e0b",
-}
-
-# sensor keys that appear as stats only — no time-series chart
-_STATS_ONLY = {"soilbatt1", "soilbatt2", "humidityin", "temp_in_f"}
-
-
-def _color(key: str) -> str:
-    return _SENSOR_COLORS.get(key, "#888888")
-
-
 # ── lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -130,8 +100,8 @@ async def dashboard(request: Request):
     latest_rows = storage.latest()
     latest_map = {r["sensor_key"]: r for r in latest_rows}
 
-    # ordered keys: priority list first, then anything else seen
-    ordered = [k for k in _SENSOR_ORDER if k in latest_map]
+    # ordered keys: config.yaml order first, then any extra keys seen in the DB
+    ordered = [k for k in cfg.sensors if k in latest_map]
     for r in latest_rows:
         if r["sensor_key"] not in ordered:
             ordered.append(r["sensor_key"])
@@ -142,15 +112,15 @@ async def dashboard(request: Request):
             "label": cfg.sensor_label(k),
             "value": latest_map[k]["value"],
             "unit": latest_map[k]["unit"],
-            "color": _color(k),
+            "color": cfg.sensor_color(k),
         }
         for k in ordered
     ]
 
     charts = [
-        {"key": k, "label": cfg.sensor_label(k), "color": _color(k)}
+        {"key": k, "label": cfg.sensor_label(k), "color": cfg.sensor_color(k)}
         for k in ordered
-        if k not in _STATS_ONLY
+        if cfg.sensors.get(k, {}).get("chart", True)
     ]
 
     last_ts = max((r["ts"] for r in latest_rows), default=None) if latest_rows else None
@@ -174,5 +144,7 @@ async def dashboard(request: Request):
             "has_data": bool(latest_rows),
             "garden_thresholds": garden_thresholds,
             "tz_json": json.dumps(cfg.location.get("timezone", "America/Chicago")),
+            "beds_json": json.dumps(cfg.dashboard.get("beds", [])),
+            "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
         },
     )

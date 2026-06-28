@@ -58,10 +58,10 @@ class _Config:
 
         # ── config.yaml subtrees (accessed as dicts by the rest of the code) ─
         self.sensors: dict[str, Any] = raw.get("sensors", {})
+        self.dashboard: dict[str, Any] = raw.get("dashboard", {})
         self.thresholds: dict[str, Any] = raw.get("thresholds", {})
         self.watchdog: dict[str, Any] = raw.get("watchdog", {})
         self.cooldowns: dict[str, Any] = raw.get("cooldowns", {})
-        self.heartbeat: dict[str, Any] = raw.get("heartbeat", {})   # kept for back-compat
         self.llm: dict[str, Any] = raw.get("llm", {})
         self.weather: dict[str, Any] = raw.get("weather", {})
         self.daily_brief: dict[str, Any] = raw.get("daily_brief", {})
@@ -81,9 +81,9 @@ class _Config:
         """Return the human-readable label for a sensor key, or the key itself."""
         return self.sensors.get(key, {}).get("label", key)
 
-    def sensor_unit(self, key: str) -> str:
-        """Return the unit string for a sensor key."""
-        return self.sensors.get(key, {}).get("unit", "")
+    def sensor_color(self, key: str) -> str:
+        """Return the hex color for a sensor key, or a neutral grey fallback."""
+        return self.sensors.get(key, {}).get("color", "#888888")
 
 
 # Module-level singleton — import and use anywhere:

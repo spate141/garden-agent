@@ -83,15 +83,3 @@ def tg(title: str, body: str, html: bool = False) -> bool:
         _RETRIES, title, datetime.now(timezone.utc).isoformat(),
     )
     return False
-
-
-def heartbeat(sensor_count: int, last_ts: str | None) -> bool:
-    """Daily alive ping — called by the cron tick."""
-    last = last_ts or "no data yet"
-    return tg(
-        "Heartbeat",
-        f"Monitor is alive.\n"
-        f"Sensors reporting: <b>{sensor_count}</b>\n"
-        f"Last reading: <b>{last}</b>",
-        html=True,
-    )

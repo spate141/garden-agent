@@ -446,24 +446,11 @@ function _fmtLocalTs(isoUtc) {
   return p.hour + ':' + p.minute + ' ' + p.month + '-' + p.day + '-' + p.year;
 }
 
-/** Bed/plant configuration — edit this array to add/change beds or plants.
+/** Bed/plant configuration — edit dashboard.beds in config.yaml.
  *  Plant types: tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini */
-const BEDS = [
-  {
-    id: 'bed1',
-    name: 'Bed 1',
-    sensors: { soil_moisture: 'soilmoisture1', soil_battery: 'soilbatt1' },
-    plants: ['tomato', 'tomato', 'tomato'],
-  },
-  {
-    id: 'bed2',
-    name: 'Bed 2',
-    sensors: { soil_moisture: 'soilmoisture2', soil_battery: 'soilbatt2' },
-    plants: ['eggplant', 'eggplant', 'okra', 'okra'],
-  },
-];
+const BEDS = {{ beds_json | safe }};
 
-const WEATHER_KEYS = { temp: 'temp_f', humidity: 'humidity', pressure: 'baromrel_inhg' };
+const WEATHER_KEYS = {{ weather_keys_json | safe }};
 
 /** Thresholds from config.yaml -- same values that fire Telegram alerts.
  *  Injected server-side so the visual wilt/asleep triggers agree with the agent rules. */

@@ -2,36 +2,62 @@
 # All thresholds are versioned here; the LLM and deterministic rules both read from this.
 
 # ── Sensor channel map ────────────────────────────────────────────────────────
-# Maps Ecowitt field names to human-friendly labels and their storage units.
+# Maps storage keys to display config.  Order here drives display order in the dashboard.
+# color: hex used in stat strip and charts.
+# chart: false → stat-strip only (no time-series chart rendered).
 # Add new channels here when new sensors appear — no code changes needed.
 sensors:
   soilmoisture1:
     label: "Bed 1 soil moisture"
-    unit: "%"
+    color: "#4ade80"
+    chart: true
   soilmoisture2:
     label: "Bed 2 soil moisture"
-    unit: "%"
-  soilbatt1:
-    label: "WH51 ch1 battery"
-    unit: "V"
-  soilbatt2:
-    label: "WH51 ch2 battery"
-    unit: "V"
-  temp_f:                        # outdoor temp from station (°F, stored as-is)
+    color: "#22c55e"
+    chart: true
+  temp_f:
     label: "Outdoor temperature"
-    unit: "°F"
+    color: "#fb923c"
+    chart: true
   humidity:
     label: "Outdoor humidity"
-    unit: "%"
-  temp_in_f:                     # indoor temp from station (°F, stored as-is)
+    color: "#60a5fa"
+    chart: true
+  baromrel_inhg:
+    label: "Relative pressure"
+    color: "#a78bfa"
+    chart: true
+  temp_in_f:
     label: "Indoor temperature"
-    unit: "°F"
+    color: "#fdba74"
+    chart: false    # stat-strip only
   humidityin:
     label: "Indoor humidity"
-    unit: "%"
-  baromrel_inhg:                 # relative pressure from station (inHg, stored as-is)
-    label: "Relative pressure"
-    unit: "inHg"
+    color: "#93c5fd"
+    chart: false    # stat-strip only
+  soilbatt1:
+    label: "WH51 ch1 battery"
+    color: "#fbbf24"
+    chart: false    # stat-strip only
+  soilbatt2:
+    label: "WH51 ch2 battery"
+    color: "#f59e0b"
+    chart: false    # stat-strip only
+
+# ── Dashboard layout ──────────────────────────────────────────────────────────
+# Bed definitions and weather key bindings — injected into the browser as JSON.
+# plants: sprite names (tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini)
+dashboard:
+  beds:
+    - id: bed1
+      name: "Bed 1"
+      sensors: {soil_moisture: soilmoisture1, soil_battery: soilbatt1}
+      plants: [tomato, tomato, tomato]
+    - id: bed2
+      name: "Bed 2"
+      sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
+      plants: [eggplant, eggplant, okra, okra]
+  weather_keys: {temp: temp_f, humidity: humidity, pressure: baromrel_inhg}
 
 # ── Alert thresholds (deterministic rules) ────────────────────────────────────
 thresholds:
@@ -88,12 +114,8 @@ weather:
   cache_minutes: 120    # how long to reuse a fetched forecast before refreshing
 
 # ── Daily morning brief ───────────────────────────────────────────────────────
-# Replaces the old heartbeat. Sent once per day around hour_local in your timezone.
+# Sent once per day around hour_local in your timezone.
 # Timezone is set by GARDEN_TIMEZONE in secrets.env.
 daily_brief:
   enabled: true
   hour_local: 7         # send around 7am local time
-
-# ── Heartbeat (kept for back-compat, superseded by daily_brief) ───────────────
-heartbeat:
-  enabled: false
