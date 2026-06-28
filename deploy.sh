@@ -30,7 +30,7 @@ echo "==> Syncing Python deps..."
 cd "$APP_DIR" && uv sync --quiet
 
 # ── 3. Systemd service files (sed placeholder, copy, reload) ─────────────────
-for UNIT in garden-agent.service garden-cron.service garden-cron.timer garden-backup.service garden-backup.timer; do
+for UNIT in garden-agent.service garden-cron.service garden-cron.timer garden-backup.service garden-backup.timer ecowitt-bridge.service; do
     SRC="$APP_DIR/systemd/$UNIT"
     DST="$SYSTEMD_DIR/$UNIT"
     # Substitute YOUR_VM_USER with the actual user running this script
@@ -60,6 +60,9 @@ sudo systemctl restart garden-cron.timer
 echo "==> Enabling garden-backup.timer..."
 sudo systemctl enable --now garden-backup.timer
 
+echo "==> Enabling ecowitt-bridge..."
+sudo systemctl enable --now ecowitt-bridge
+
 # ── 5. Health check ───────────────────────────────────────────────────────────
 echo "==> Waiting for garden-agent to come up..."
 for _ in $(seq 1 10); do
@@ -79,6 +82,7 @@ echo "==> Service status:"
 sudo systemctl is-active --quiet garden-agent      && echo "    garden-agent      : active" || echo "    garden-agent      : FAILED"
 sudo systemctl is-active --quiet garden-cron.timer    && echo "    garden-cron.timer    : active" || echo "    garden-cron.timer    : FAILED"
 sudo systemctl is-active --quiet garden-backup.timer && echo "    garden-backup.timer  : active" || echo "    garden-backup.timer  : FAILED"
+sudo systemctl is-active --quiet ecowitt-bridge       && echo "    ecowitt-bridge       : active" || echo "    ecowitt-bridge       : FAILED"
 
 echo ""
 echo "==> Deploy complete."

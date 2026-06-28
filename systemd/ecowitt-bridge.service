@@ -1,0 +1,16 @@
+[Unit]
+Description=Ecowitt device bridge (TCP 8080 → 8001, bypasses Cloudflare Tunnel)
+After=garden-agent.service
+Requires=garden-agent.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP-LISTEN:8080,fork,reuseaddr TCP:127.0.0.1:8001
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ecowitt-bridge
+
+[Install]
+WantedBy=multi-user.target
