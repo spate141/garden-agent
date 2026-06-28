@@ -205,18 +205,88 @@ sudo cp systemd/journald-garden.conf /etc/systemd/journald.conf.d/garden.conf
 sudo systemctl restart systemd-journald
 ```
 
-## Hardware (GW1200 config)
+## Hardware Setup
 
-In the GW1200 web UI or WSView app → **Customized Server**:
+Tested with: **GW1200** gateway + **WH51** soil moisture sensors + **WN31** multi-channel temp/humidity sensor. Other Ecowitt sensors that use the same HTTP push protocol will also work — add their fields to `_FIELD_MAP` in `garden/ingest.py`.
+
+### What each device sends
+
+| Device | Fields |
+|--------|--------|
+| GW1200 (built-in) | `tempinf`, `humidityin`, `baromrelin`, `baromabsin` |
+| WH51 (per channel) | `soilmoisture1`…`soilmoisture8`, `soilbatt1`…`soilbatt8` |
+| WN31 (per channel) | `temp1f`…`temp8f`, `humidity1`…`humidity8` |
+
+### Step 1 — Connect the GW1200 to WiFi
+
+Download **WSView Plus** (iOS / Android — not the older "WSView"). Open it → **+** → **Add Device** → **GW1200**. Follow the in-app steps to connect the gateway to your **2.4 GHz** WiFi. Once connected, the LED goes solid and the app shows the device with its local IP.
+
+### Step 2 — Pair WH51 soil sensors
+
+Do one at a time so you know which channel maps to which location.
+
+1. WSView Plus → tap your GW1200 → **Sensor List** → **+**.
+2. Hold the button on the WH51 until its LED flashes rapidly (~5 s) to enter pairing mode.
+3. The app assigns the next available channel (ch1, ch2, …). Rename it immediately (e.g. "Bed 1").
+4. Repeat for additional sensors.
+5. Push probes into soil at ~45°, mostly buried, leaving the transmitter above ground (~4–6 inch depth).
+
+Channel → storage key: ch1 → `soilmoisture1` / `soilbatt1`, ch2 → `soilmoisture2` / `soilbatt2`, etc.
+
+### Step 3 — Set WN31 dip switches and pair
+
+The WN31 has 3 dip switches on the back that set which channel (1–8) it broadcasts on. Set them before inserting batteries.
+
+| Channel | SW1 | SW2 | SW3 |
+|---------|-----|-----|-----|
+| 1 | OFF | OFF | OFF |
+| 2 | ON  | OFF | OFF |
+| 3 | OFF | ON  | OFF |
+| 4 | ON  | ON  | OFF |
+
+Set to channel 1 (all OFF) → reports as `temp1f` / `humidity1`. Pair via WSView Plus the same way as WH51. **Note:** the WN31 is not rated for outdoor use — place it in a greenhouse, shed, or indoors.
+
+### Step 4 — Point the GW1200 at your server
+
+In **WSView Plus**: tap your GW1200 → gear icon → **Customized Server**. Fill in:
 
 | Field | Value |
 |-------|-------|
-| Protocol | Ecowitt |
+| Protocol | **Ecowitt** (not Wunderground) |
 | Server IP / Hostname | `your.domain.com` |
 | Path | `/api/ecowitt` |
 | Port | `443` |
-| Upload interval | `60` s |
-| PASSKEY | matches `INGEST_PASSKEY` in `secrets.env` |
+| Upload Interval | `60` seconds |
+| PASSKEY | value of `INGEST_PASSKEY` from `secrets.env` |
+
+Alternatively, use the GW1200's local web UI: `http://<gateway-local-IP>` → **Weather Services** → **Customized**.
+
+### Step 5 — Verify
+
+Wait 60–90 s, then:
+
+```bash
+curl https://your.domain.com/health
+# "sensors_seen" should be > 0 and "last_reading_ts" a real timestamp
+```
+
+Check logs if nothing arrives:
+
+```bash
+sudo journalctl -u garden-agent -n 30
+# Look for: "Parsed snapshot ts=..., N metrics"
+# 401 means PASSKEY mismatch; 400 means unrecognised payload
+```
+
+### Wipe test data before going live
+
+```bash
+sudo systemctl stop garden-agent
+rm ~/apps/garden-agent/garden.sqlite3   # schema auto-recreates on next start
+sudo systemctl start garden-agent
+```
+
+Full step-by-step setup guide (including troubleshooting): [docs/hardware-setup.md](docs/hardware-setup.md)
 
 ## API
 
