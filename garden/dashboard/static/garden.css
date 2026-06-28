@@ -159,15 +159,46 @@ header {
 }
 .stats-strip::-webkit-scrollbar { display: none; }
 
+/* grouped layout */
+.stat-group {
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid var(--border);
+  /* flex value set inline (= sensor count) so every stat gets equal width */
+}
+.stat-group:last-child { border-right: none; }
+
+.stat-group-name {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 8px 20px 0;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.stat-group-body {
+  display: flex;
+  flex: 1;
+}
+
 .stat {
   flex: 1;
-  min-width: 120px;
-  padding: 16px 20px;
+  min-width: 110px;
+  padding: 5px 20px 16px;
   border-right: 1px solid var(--border);
   transition: background 0.12s;
 }
 .stat:last-child { border-right: none; }
 .stat:hover { background: var(--bg-alt); }
+
+/* ungrouped fallback: direct .stat children of .stats-strip */
+.stats-strip > .stat {
+  padding: 16px 20px;
+  min-width: 120px;
+}
 
 .stat-label {
   color: var(--text-muted);
@@ -292,42 +323,39 @@ footer {
 /* ── MOBILE ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
-  /* Stats: wrap into a 3-column grid instead of horizontal scroll */
+  /* Groups stack vertically; their stat rows scroll horizontally inside */
   .stats-strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    flex-direction: column;
     overflow-x: visible;
   }
 
-  .stat {
-    min-width: 0;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+  .stat-group {
+    border-right: none;
+    border-bottom: 2px solid var(--border);
+  }
+  .stat-group:last-child { border-bottom: none; }
+
+  .stat-group-body {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  /* remove right border on every 3rd item (last column) */
-  .stat:nth-child(3n) { border-right: none; }
-
-  /* remove bottom border on last row of items */
-  .stat:nth-last-child(-n+3):nth-child(3n+1),
-  .stat:nth-last-child(-n+3):nth-child(3n+1) ~ .stat { border-bottom: none; }
+  .stat-group-body .stat {
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  /* remove bottom border on last row (last 2 items) */
+  .stat-group-body .stat:nth-last-child(-n+2) { border-bottom: none; }
+  /* remove right border on even items (right column) */
+  .stat-group-body .stat:nth-child(2n) { border-right: none; }
 }
 
 @media (max-width: 480px) {
   header        { padding: 9px 16px; }
   .theme-toggle { width: 32px; height: 32px; border-radius: 7px; }
-  .stat         { padding: 13px 14px; }
+  .stat         { padding: 4px 14px 13px; }
   .stat-value   { font-size: 19px; }
   .last-update  { display: none; }
-}
-
-@media (max-width: 359px) {
-  /* Very small screens: 2 columns */
-  .stats-strip { grid-template-columns: repeat(2, 1fr); }
-  .stat:nth-child(3n)  { border-right: 1px solid var(--border); }
-  .stat:nth-child(2n)  { border-right: none; }
-  .stat:nth-last-child(-n+2):nth-child(2n+1),
-  .stat:nth-last-child(-n+2):nth-child(2n+1) ~ .stat { border-bottom: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

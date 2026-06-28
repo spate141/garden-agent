@@ -117,6 +117,23 @@ async def dashboard(request: Request):
         for k in ordered
     ]
 
+    _stat_groups_raw: list[dict] = cfg.dashboard.get("stat_groups", [])
+    stat_groups: list[dict] = []
+    for grp in _stat_groups_raw:
+        members = [
+            {
+                "key": k,
+                "label": cfg.sensor_label(k),
+                "value": latest_map[k]["value"],
+                "unit": latest_map[k]["unit"],
+                "color": cfg.sensor_color(k),
+            }
+            for k in grp.get("sensors", [])
+            if k in latest_map
+        ]
+        if members:
+            stat_groups.append({"name": grp["name"], "sensors": members})
+
     charts = [
         {"key": k, "label": cfg.sensor_label(k), "color": cfg.sensor_color(k)}
         for k in ordered
@@ -144,6 +161,7 @@ async def dashboard(request: Request):
             "has_data": bool(latest_rows),
             "garden_thresholds": garden_thresholds,
             "tz_json": json.dumps(cfg.location.get("timezone", "America/Chicago")),
+            "stat_groups": stat_groups,
             "beds_json": json.dumps(cfg.dashboard.get("beds", [])),
             "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
         },

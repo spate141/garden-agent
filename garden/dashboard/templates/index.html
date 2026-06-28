@@ -29,47 +29,20 @@
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
 
-    <!-- Sprite gradients — prefixed s- to avoid ID conflicts.
-         Radial cx/cy place the highlight (upper-left light source).
-         Linear x1/y1->x2/y2 in objectBoundingBox fractions. -->
-    <radialGradient id="s-tom"   cx="35%" cy="25%" r="65%">
-      <stop offset="0%"   stop-color="#ff7858"/>
-      <stop offset="50%"  stop-color="#d42018"/>
-      <stop offset="100%" stop-color="#8a0e0e"/>
-    </radialGradient>
-    <radialGradient id="s-tom-b" cx="35%" cy="25%" r="65%">
-      <stop offset="0%"   stop-color="#e05040"/>
-      <stop offset="55%"  stop-color="#b81818"/>
-      <stop offset="100%" stop-color="#780c0c"/>
-    </radialGradient>
-    <radialGradient id="s-ep" cx="32%" cy="24%" r="68%">
-      <stop offset="0%"   stop-color="#9050d0"/>
-      <stop offset="48%"  stop-color="#4a1870"/>
-      <stop offset="100%" stop-color="#25083c"/>
-    </radialGradient>
-    <radialGradient id="s-bp" cx="34%" cy="26%" r="66%">
-      <stop offset="0%"   stop-color="#f0d040"/>
-      <stop offset="52%"  stop-color="#c89010"/>
-      <stop offset="100%" stop-color="#7a5808"/>
-    </radialGradient>
-    <linearGradient id="s-ok" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#5aaa28"/>
-      <stop offset="42%"  stop-color="#3e8020"/>
-      <stop offset="100%" stop-color="#265e10"/>
-    </linearGradient>
-    <linearGradient id="s-zf" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#3a8028"/>
-      <stop offset="50%"  stop-color="#246018"/>
-      <stop offset="100%" stop-color="#16380c"/>
-    </linearGradient>
-    <radialGradient id="s-zl" cx="38%" cy="38%" r="64%">
-      <stop offset="0%"   stop-color="#72c840"/>
-      <stop offset="58%"  stop-color="#4a9a28"/>
-      <stop offset="100%" stop-color="#2c5e14"/>
-    </radialGradient>
-
     <!-- TOMATO: round red fruit cluster with leafy calyx crown -->
     <symbol id="sprite-tomato" viewBox="0 0 40 52">
+      <defs>
+        <radialGradient id="s-tom"   cx="35%" cy="25%" r="65%">
+          <stop offset="0%"   stop-color="#ff7858"/>
+          <stop offset="50%"  stop-color="#d42018"/>
+          <stop offset="100%" stop-color="#8a0e0e"/>
+        </radialGradient>
+        <radialGradient id="s-tom-b" cx="35%" cy="25%" r="65%">
+          <stop offset="0%"   stop-color="#e05040"/>
+          <stop offset="55%"  stop-color="#b81818"/>
+          <stop offset="100%" stop-color="#780c0c"/>
+        </radialGradient>
+      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="12" rx="1.5" fill="#2a6018"/>
       <!-- calyx: 3 ellipses at 0/60/120 deg = proper 6-tip star crown -->
@@ -94,6 +67,13 @@
 
     <!-- EGGPLANT: tall narrow teardrop, deep purple with gradient depth -->
     <symbol id="sprite-eggplant" viewBox="0 0 40 52">
+      <defs>
+        <radialGradient id="s-ep" cx="32%" cy="24%" r="68%">
+          <stop offset="0%"   stop-color="#9050d0"/>
+          <stop offset="48%"  stop-color="#4a1870"/>
+          <stop offset="100%" stop-color="#25083c"/>
+        </radialGradient>
+      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
       <!-- calyx: 5 fanning pointed leaves spread like a crown -->
@@ -113,6 +93,13 @@
 
     <!-- OKRA: slender ribbed pod with leafy crown -->
     <symbol id="sprite-okra" viewBox="0 0 40 52">
+      <defs>
+        <linearGradient id="s-ok" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stop-color="#5aaa28"/>
+          <stop offset="42%"  stop-color="#3e8020"/>
+          <stop offset="100%" stop-color="#265e10"/>
+        </linearGradient>
+      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
       <!-- fan leaves at pod base -->
@@ -157,6 +144,13 @@
 
     <!-- SWEET PEPPER: wide amber bell with three-lobed bottom -->
     <symbol id="sprite-sweet_pepper" viewBox="0 0 40 52">
+      <defs>
+        <radialGradient id="s-bp" cx="34%" cy="26%" r="66%">
+          <stop offset="0%"   stop-color="#f0d040"/>
+          <stop offset="52%"  stop-color="#c89010"/>
+          <stop offset="100%" stop-color="#7a5808"/>
+        </radialGradient>
+      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
       <!-- calyx leaves -->
@@ -202,6 +196,18 @@
 
     <!-- ZUCCHINI: wide fan leaves + horizontal dark-green cylindrical fruit -->
     <symbol id="sprite-zucchini" viewBox="0 0 40 52">
+      <defs>
+        <linearGradient id="s-zf" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#3a8028"/>
+          <stop offset="50%"  stop-color="#246018"/>
+          <stop offset="100%" stop-color="#16380c"/>
+        </linearGradient>
+        <radialGradient id="s-zl" cx="38%" cy="38%" r="64%">
+          <stop offset="0%"   stop-color="#72c840"/>
+          <stop offset="58%"  stop-color="#4a9a28"/>
+          <stop offset="100%" stop-color="#2c5e14"/>
+        </radialGradient>
+      </defs>
       <!-- short central stem -->
       <rect x="18.5" y="12" width="3" height="16" rx="1.5" fill="#2a6018"/>
       <!-- left fan leaf -->
@@ -257,23 +263,23 @@
     </symbol>
 
     <!-- ROBOT: friendly little garden-bot that pops up to take readings -->
-    <!-- Gradients prefixed s-robot- to avoid ID collisions -->
-    <!-- Cool steel-blue hull so the robot stands out against warm soil/wood -->
-    <radialGradient id="s-robot-hull" cx="30%" cy="22%" r="72%">
-      <stop offset="0%"   stop-color="#d0e4f0"/>
-      <stop offset="50%"  stop-color="#5a8ab0"/>
-      <stop offset="100%" stop-color="#1e3c58"/>
-    </radialGradient>
-    <radialGradient id="s-robot-eye" cx="38%" cy="30%" r="62%">
-      <stop offset="0%"   stop-color="#fff09a"/>
-      <stop offset="45%"  stop-color="#e09c08"/>
-      <stop offset="100%" stop-color="#7a5000"/>
-    </radialGradient>
-    <linearGradient id="s-robot-visor" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#0e2038"/>
-      <stop offset="100%" stop-color="#060e1c"/>
-    </linearGradient>
     <symbol id="sprite-robot" viewBox="0 0 40 52">
+      <defs>
+        <radialGradient id="s-robot-hull" cx="30%" cy="22%" r="72%">
+          <stop offset="0%"   stop-color="#d0e4f0"/>
+          <stop offset="50%"  stop-color="#5a8ab0"/>
+          <stop offset="100%" stop-color="#1e3c58"/>
+        </radialGradient>
+        <radialGradient id="s-robot-eye" cx="38%" cy="30%" r="62%">
+          <stop offset="0%"   stop-color="#fff09a"/>
+          <stop offset="45%"  stop-color="#e09c08"/>
+          <stop offset="100%" stop-color="#7a5000"/>
+        </radialGradient>
+        <linearGradient id="s-robot-visor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#0e2038"/>
+          <stop offset="100%" stop-color="#060e1c"/>
+        </linearGradient>
+      </defs>
       <!-- Antenna stick -->
       <rect x="18.5" y="3" width="3" height="9" rx="1.5" fill="#3a6028"/>
       <!-- Antenna sensor (leaf tip) -->
@@ -387,14 +393,32 @@
 
 <!-- current values -->
 <div class="stats-strip" id="stats-strip">
-  {% for s in stats %}
-  <div class="stat">
-    <div class="stat-label">{{ s.label }}</div>
-    <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
-      {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+  {% if stat_groups %}
+    {% for group in stat_groups %}
+    <div class="stat-group" style="flex: {{ group.sensors | length }}">
+      <div class="stat-group-name">{{ group.name }}</div>
+      <div class="stat-group-body">
+        {% for s in group.sensors %}
+        <div class="stat">
+          <div class="stat-label">{{ s.label }}</div>
+          <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
+            {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
-  </div>
-  {% endfor %}
+    {% endfor %}
+  {% else %}
+    {% for s in stats %}
+    <div class="stat">
+      <div class="stat-label">{{ s.label }}</div>
+      <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
+        {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
 </div>
 
 <!-- time-series charts -->

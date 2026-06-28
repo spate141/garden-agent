@@ -8,27 +8,39 @@
 # Add new channels here when new sensors appear — no code changes needed.
 sensors:
   soilmoisture1:
-    label: "Bed 1 soil moisture"
+    label: "Bed 1 moisture"
     color: "#4ade80"
     chart: true
   soilmoisture2:
-    label: "Bed 2 soil moisture"
+    label: "Bed 2 moisture"
     color: "#22c55e"
     chart: true
   temp_f:
-    label: "Outdoor temperature"
+    label: "Outdoor temp"
     color: "#fb923c"
+    chart: true
+  temp1_f:
+    label: "Gazebo temp"
+    color: "#fcd34d"
     chart: true
   humidity:
     label: "Outdoor humidity"
     color: "#60a5fa"
     chart: true
+  humidity1:
+    label: "Gazebo humidity"
+    color: "#67e8f9"
+    chart: true
   baromrel_inhg:
-    label: "Relative pressure"
+    label: "Pressure"
     color: "#a78bfa"
     chart: true
+  baromabs_inhg:
+    label: "Abs. pressure"
+    color: "#8b5cf6"
+    chart: false    # stat-strip only
   temp_in_f:
-    label: "Indoor temperature"
+    label: "Indoor temp"
     color: "#fdba74"
     chart: false    # stat-strip only
   humidityin:
@@ -36,11 +48,11 @@ sensors:
     color: "#93c5fd"
     chart: false    # stat-strip only
   soilbatt1:
-    label: "WH51 ch1 battery"
+    label: "Battery"
     color: "#fbbf24"
     chart: false    # stat-strip only
   soilbatt2:
-    label: "WH51 ch2 battery"
+    label: "Battery"
     color: "#f59e0b"
     chart: false    # stat-strip only
 
@@ -58,6 +70,15 @@ dashboard:
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
       plants: [eggplant, eggplant, okra, okra]
   weather_keys: {temp: temp_f, humidity: humidity, pressure: baromrel_inhg}
+  stat_groups:
+    - name: "Bed 1"
+      sensors: [soilmoisture1, soilbatt1]
+    - name: "Bed 2"
+      sensors: [soilmoisture2, soilbatt2]
+    - name: "Gazebo"
+      sensors: [temp1_f, humidity1]
+    - name: "Station"
+      sensors: [temp_f, humidity, temp_in_f, humidityin, baromrel_inhg, baromabs_inhg]
 
 # ── Alert thresholds (deterministic rules) ────────────────────────────────────
 thresholds:

@@ -11,8 +11,8 @@ def test_config_loads():
 
 
 def test_sensor_labels():
-    assert cfg.sensor_label("soilmoisture1") == "Bed 1 soil moisture"
-    assert cfg.sensor_label("soilmoisture2") == "Bed 2 soil moisture"
+    assert cfg.sensor_label("soilmoisture1") == "Bed 1 moisture"
+    assert cfg.sensor_label("soilmoisture2") == "Bed 2 moisture"
     assert cfg.sensor_label("unknown_key") == "unknown_key"  # falls back to key
 
 
