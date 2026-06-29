@@ -69,7 +69,7 @@ dashboard:
       name: "Bed 2"
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
       plants: [eggplant, eggplant, okra, okra]
-  weather_keys: {temp: temp_f, humidity: humidity, pressure: baromrel_inhg}
+  weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
   stat_groups:
     - name: "Bed 1"
       sensors: [soilmoisture1, soilbatt1]
