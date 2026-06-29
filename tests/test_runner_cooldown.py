@@ -111,8 +111,9 @@ def test_already_sent_today_bad_timezone(monkeypatch):
     from garden import storage
     from garden import config as cfg_mod
 
-    now = _local_now()
-    ts = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    # Fixed noon-UTC so the 1-hour-ago ts never crosses a day boundary on CI
+    now = datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+    ts = (now - timedelta(hours=1)).isoformat()
     monkeypatch.setattr(
         storage, "get_alert_state",
         lambda rule_id: {"last_fired_ts": ts}
