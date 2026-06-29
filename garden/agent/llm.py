@@ -68,6 +68,36 @@ def _weather_context() -> str:
         return ""
 
 
+def _derived_context() -> str:
+    """VPD, dew point, and heat index — plant-stress signals for the LLM."""
+    parts: list[str] = []
+    try:
+        from garden.derived import vpd_status, frost_risk
+        from garden.config import cfg as _cfg
+
+        vpd_vals = storage.recent_values("vpd_kpa", 1)
+        if vpd_vals:
+            v = vpd_vals[0]
+            _status, _label = vpd_status(v, _cfg.derived.get("thresholds", {}))
+            parts.append(f"VPD {v:.2f} kPa ({_label})")
+
+        dp_vals = storage.recent_values("dewpoint_f", 1)
+        if dp_vals:
+            dp = dp_vals[0]
+            is_frost, frost_msg = frost_risk(dp, _cfg.derived.get("frost_dewpoint_f", 35.6))
+            if is_frost:
+                parts.append(frost_msg)
+            else:
+                parts.append(f"Dew point {dp:.1f}°F")
+
+        hi_vals = storage.recent_values("heatindex_f", 1)
+        if hi_vals:
+            parts.append(f"Feels like {hi_vals[0]:.1f}°F")
+    except Exception:
+        log.debug("_derived_context failed", exc_info=True)
+    return ", ".join(parts) if parts else ""
+
+
 # ── Alert prose ───────────────────────────────────────────────────────────────
 
 _ALERT_SYSTEM = """\
@@ -115,6 +145,7 @@ def write_alert(
         context_parts = [c for c in [
             _recent_context(sensor_key),
             _outdoor_temp_context(),
+            _derived_context(),
             _weather_context(),
         ] if c]
 

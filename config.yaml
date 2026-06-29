@@ -55,6 +55,19 @@ sensors:
     label: "Battery"
     color: "#f59e0b"
     chart: false    # stat-strip only
+  # ── derived metrics (computed from temp1_f + humidity1 at ingest time) ────
+  vpd_kpa:
+    label: "VPD"
+    color: "#f97316"
+    chart: true
+  dewpoint_f:
+    label: "Dew point"
+    color: "#38bdf8"
+    chart: true
+  heatindex_f:
+    label: "Feels like"
+    color: "#ef4444"
+    chart: false    # stat-strip only
 
 # ── Dashboard layout ──────────────────────────────────────────────────────────
 # Bed definitions and weather key bindings — injected into the browser as JSON.
@@ -79,6 +92,8 @@ dashboard:
       sensors: [temp1_f, humidity1]
     - name: "Station"
       sensors: [temp_f, humidity, temp_in_f, humidityin, baromrel_inhg, baromabs_inhg]
+    - name: "Air"
+      sensors: [vpd_kpa, dewpoint_f, heatindex_f]
 
 # ── Alert thresholds (deterministic rules) ────────────────────────────────────
 thresholds:
@@ -140,3 +155,31 @@ weather:
 daily_brief:
   enabled: true
   hour_local: 7         # send around 7am local time
+
+# ── Derived metric computation ────────────────────────────────────────────────
+# VPD, dew point, and heat index are computed from a live temp+humidity source
+# at ingest time and stored as regular sensor readings (auto-charts + agent).
+# source.temp / source.humidity must match sensor keys that carry live data.
+derived:
+  enabled: true
+  source:
+    temp:     temp1_f      # gazebo WN31 — confirmed live outdoor air sensor
+    humidity: humidity1    # gazebo WN31
+  thresholds:
+    vpd_low:      0.4      # kPa — below this: humid, slow transpiration, fungal risk
+    vpd_high:     1.2      # kPa — above this: fast transpiration, watch moisture
+    vpd_very_high: 2.0     # kPa — above this: drought/heat stress
+  frost_dewpoint_f: 35.6   # °F — matches temp_frost threshold; dew point ≤ this → frost risk
+
+# ── Per-crop ideal ranges (used by bed stress assessment) ─────────────────────
+# moist: [min%, max%]  soil moisture from WH51
+# temp:  [min°F, max°F] outdoor air temperature
+# Override any value here; falls back to built-in defaults in garden/derived.py.
+crops:
+  tomato:       {moist: [50, 80], temp: [60, 95]}
+  eggplant:     {moist: [50, 75], temp: [65, 95]}
+  okra:         {moist: [40, 70], temp: [70, 100]}
+  peas:         {moist: [60, 85], temp: [45, 75]}
+  sweet_pepper: {moist: [50, 75], temp: [65, 90]}
+  hot_pepper:   {moist: [45, 70], temp: [65, 95]}
+  zucchini:     {moist: [55, 80], temp: [60, 90]}

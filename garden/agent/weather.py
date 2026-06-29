@@ -154,10 +154,11 @@ def get_forecast() -> dict[str, Any] | None:
                 "precipitation_unit": "inch",
                 "daily": (
                     "temperature_2m_max,temperature_2m_min,precipitation_sum,"
-                    "precipitation_probability_max,wind_speed_10m_max,weather_code"
+                    "precipitation_probability_max,wind_speed_10m_max,weather_code,"
+                    "et0_fao_evapotranspiration"
                 ),
                 "hourly": "precipitation_probability,temperature_2m",
-                "forecast_days": 1,
+                "forecast_days": 2,   # day 0 = today, day 1 = tomorrow (frost lookahead)
                 "timezone": tz,
             },
             timeout=10,
@@ -173,15 +174,37 @@ def get_forecast() -> dict[str, Any] | None:
         daily  = raw["daily"]
         hourly = raw["hourly"]
 
+        precip_today = daily["precipitation_sum"][0] or 0.0
+
+        # ET₀ is always returned in mm (Open-Meteo ignores precipitation_unit for ET₀)
+        et0_mm   = daily.get("et0_fao_evapotranspiration", [None])[0]
+        et0_in   = round(et0_mm / 25.4, 3) if et0_mm is not None else None
+
         fc: dict[str, Any] = {
             "today_high_f":    daily["temperature_2m_max"][0],
             "today_low_f":     daily["temperature_2m_min"][0],
-            "precip_in":       daily["precipitation_sum"][0],
+            "precip_in":       precip_today,
             "precip_prob_pct": daily["precipitation_probability_max"][0],
             "wind_max_mph":    daily["wind_speed_10m_max"][0],
             "weather_code":    daily["weather_code"][0],
             "conditions":      _WMO.get(int(daily["weather_code"][0]), "unknown"),
+            # ET₀ / water balance
+            "et0_in":          et0_in,
+            "water_balance_in": (
+                round(precip_today - et0_in, 3) if et0_in is not None else None
+            ),
+            # Tomorrow's forecast (frost lookahead — day index 1)
+            "tomorrow_low_f":  (
+                daily["temperature_2m_min"][1]
+                if len(daily.get("temperature_2m_min", [])) > 1 else None
+            ),
         }
+
+        # Frost risk: tomorrow night's low ≤ configured threshold
+        from garden.config import cfg as _cfg  # deferred — avoid circular at module level
+        frost_thresh = _cfg.derived.get("frost_dewpoint_f", 35.6)
+        tomorrow_low = fc["tomorrow_low_f"]
+        fc["frost_risk"] = bool(tomorrow_low is not None and tomorrow_low <= frost_thresh)
 
         # Find the rainiest window in the next 12h
         current_hour = datetime.now(timezone.utc).astimezone().hour
@@ -211,7 +234,7 @@ def get_forecast() -> dict[str, Any] | None:
 
 
 def forecast_summary(fc: dict[str, Any] | None) -> str:
-    """One-line weather summary for LLM context blocks."""
+    """Compact weather summary for LLM context blocks (watering alerts + daily brief)."""
     if not fc:
         return "Weather: unavailable."
 
@@ -221,8 +244,30 @@ def forecast_summary(fc: dict[str, Any] | None) -> str:
         hrs = fc["next_12h_peak_hour_offset"]
         note = f" Rain likely within ~{hrs + 1}h."
 
-    return (
+    parts = [
         f"Today: {fc['today_high_f']:.1f}°F high / {fc['today_low_f']:.1f}°F low, "
         f"{fc['conditions']}, rain {rain}, "
         f"wind to {fc['wind_max_mph']:.0f} mph.{note}"
-    )
+    ]
+
+    # ET₀ water balance — irrigation guidance for the LLM
+    wb = fc.get("water_balance_in")
+    if wb is not None:
+        if wb < -0.05:
+            parts.append(
+                f"Water balance: -{abs(wb):.2f}\" deficit (ET0 exceeds rain), beds likely need irrigation."
+            )
+        elif wb > 0.05:
+            parts.append(
+                f"Water balance: +{wb:.2f}\" surplus (rain exceeds ET0), skip irrigation today."
+            )
+        else:
+            parts.append("Water balance: roughly even, monitor soil moisture.")
+
+    # Frost lookahead
+    if fc.get("frost_risk"):
+        low = fc.get("tomorrow_low_f")
+        low_str = f" (low {low:.0f}°F)" if low is not None else ""
+        parts.append(f"Frost risk tonight{low_str}, protect tender plants.")
+
+    return " ".join(parts)

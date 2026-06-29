@@ -121,27 +121,59 @@ _BRIEF_RULE_ID = "daily_brief"
 def _sensor_summary() -> str:
     """
     Build a compact sensor summary for the LLM from the latest readings.
-    Focuses on the things a gardener cares about: soil beds, outdoor temp/humidity.
+    Includes raw readings, derived agronomic metrics, and per-bed stress assessment.
     """
     rows = storage.latest()
     if not rows:
         return "No sensor data available yet."
 
     PRIORITY = ["soilmoisture1", "soilmoisture2", "temp_f", "humidity", "soilbatt1", "soilbatt2"]
-    by_key = {r["sensor_key"]: r for r in rows}
+    DERIVED   = ["vpd_kpa", "dewpoint_f", "heatindex_f"]
+    by_key    = {r["sensor_key"]: r for r in rows}
 
-    lines = []
+    lines: list[str] = []
+
+    # Priority raw readings
     for key in PRIORITY:
         if key in by_key:
             r = by_key[key]
-            label = cfg.sensor_label(key)
-            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+            lines.append(f"  {cfg.sensor_label(key)}: {r['value']:.1f}{r['unit']}")
 
-    # Any other sensors not in priority list
+    # Derived agronomic metrics (high interpretive value for the LLM)
+    derived_lines: list[str] = []
+    for key in DERIVED:
+        if key in by_key:
+            r = by_key[key]
+            derived_lines.append(f"  {cfg.sensor_label(key)}: {r['value']:.2f}{r['unit']}")
+    if derived_lines:
+        lines.append("  --- derived ---")
+        lines.extend(derived_lines)
+
+    # Per-bed stress assessment
+    try:
+        from garden import derived as drv
+        src_temp_key = cfg.derived.get("source", {}).get("temp", "temp1_f")
+        air_temp_row = by_key.get(src_temp_key)
+        air_temp_f   = air_temp_row["value"] if air_temp_row else None
+        if air_temp_f is not None:
+            lines.append("  --- bed stress ---")
+            for bed in cfg.dashboard.get("beds", []):
+                moist_key = bed.get("sensors", {}).get("soil_moisture")
+                moist_row = by_key.get(moist_key) if moist_key else None
+                soil_moist = moist_row["value"] if moist_row else None
+                if soil_moist is not None:
+                    stress = drv.bed_stress(
+                        bed.get("plants", []), soil_moist, air_temp_f, cfg.crops
+                    )
+                    lines.append(f"  {bed.get('name', bed.get('id'))}: {stress['reason']}")
+    except Exception:
+        log.debug("Bed stress assessment skipped", exc_info=True)
+
+    # Remaining sensors (not in priority or derived lists)
+    skip = set(PRIORITY) | set(DERIVED)
     for key, r in by_key.items():
-        if key not in PRIORITY:
-            label = cfg.sensor_label(key)
-            lines.append(f"  {label}: {r['value']:.1f}{r['unit']}")
+        if key not in skip:
+            lines.append(f"  {cfg.sensor_label(key)}: {r['value']:.1f}{r['unit']}")
 
     return "\n".join(lines) if lines else "No sensor data available."
 

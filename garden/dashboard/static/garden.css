@@ -230,6 +230,48 @@ header {
   letter-spacing: 0;
 }
 
+/* ── INSIGHT PANEL ──────────────────────────────────────────────────── */
+/* Shares the stats-strip visual language: same background, border, and
+   stat-group / stat-group-body / stat structure. Only two additions:
+   .insight-val (numeric value) and .insight-note (interpretation line). */
+
+.insights-panel {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--bg);
+  min-height: 0; /* collapses cleanly when JS hasn't populated it yet */
+}
+.insights-panel::-webkit-scrollbar { display: none; }
+
+/* numeric value — same weight/face as .stat-value, slightly smaller to
+   leave room for the .insight-note line below it */
+.insight-val {
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* interpretation line below the value */
+.insight-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+/* status colours applied to the numeric value */
+.insight-ok-val    { color: var(--color-success); }
+.insight-warn-val  { color: #d97706; }
+.insight-alert-val { color: #dc2626; }
+[data-theme="dark"] .insight-warn-val  { color: #f59e0b; }
+[data-theme="dark"] .insight-alert-val { color: #f87171; }
+
 /* ── CHARTS GRID ────────────────────────────────────────────────────── */
 
 .charts {

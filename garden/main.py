@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from garden import derived as drv
 from garden import storage
 from garden.agent import runner as agent_runner
 from garden.config import cfg
@@ -91,6 +92,90 @@ async def api_series(
     hours: int = Query(24, ge=1, le=168),
 ) -> JSONResponse:
     return JSONResponse(storage.series(sensor, hours))
+
+
+# ── GET /api/insights ────────────────────────────────────────────────────────
+
+@app.get("/api/insights")
+async def api_insights() -> JSONResponse:
+    """
+    Derived agronomic insights: VPD status, dew point / frost risk, heat index,
+    ET₀ water balance, and per-bed crop stress.  Polled by the dashboard insight
+    panel on the same 60 s refresh tick as /api/latest.
+    """
+    from garden.agent.weather import get_forecast
+
+    latest_map: dict[str, Any] = {r["sensor_key"]: r for r in storage.latest()}
+    derived_cfg = cfg.derived
+    thresholds  = derived_cfg.get("thresholds", {})
+    frost_thresh = derived_cfg.get("frost_dewpoint_f", 35.6)
+
+    insights: dict[str, Any] = {}
+
+    # ── VPD ──────────────────────────────────────────────────────────────────
+    vpd_row = latest_map.get("vpd_kpa")
+    if vpd_row:
+        status, label = drv.vpd_status(vpd_row["value"], thresholds)
+        insights["vpd"] = {
+            "value": round(vpd_row["value"], 3),
+            "status": status,
+            "label": label,
+        }
+
+    # ── Dew point + frost risk ────────────────────────────────────────────────
+    dp_row = latest_map.get("dewpoint_f")
+    if dp_row:
+        is_frost, frost_msg = drv.frost_risk(dp_row["value"], frost_thresh)
+        insights["dewpoint"] = {
+            "value": round(dp_row["value"], 1),
+            "frost_risk": is_frost,
+            "message": frost_msg,
+        }
+
+    # ── Heat index ───────────────────────────────────────────────────────────
+    hi_row = latest_map.get("heatindex_f")
+    if hi_row:
+        insights["heat_index"] = {"value": round(hi_row["value"], 1)}
+
+    # ── Weather / ET₀ water balance + frost lookahead ─────────────────────────
+    fc = get_forecast()
+    if fc:
+        insights["forecast"] = {
+            "et0_in":          fc.get("et0_in"),
+            "water_balance_in": fc.get("water_balance_in"),
+            "frost_risk":      fc.get("frost_risk", False),
+            "tomorrow_low_f":  fc.get("tomorrow_low_f"),
+        }
+
+    # ── Per-bed stress ────────────────────────────────────────────────────────
+    src_temp_key = derived_cfg.get("source", {}).get("temp", "temp1_f")
+    air_temp_row = latest_map.get(src_temp_key)
+    air_temp_f   = air_temp_row["value"] if air_temp_row else None
+
+    bed_results: list[dict[str, Any]] = []
+    for bed in cfg.dashboard.get("beds", []):
+        moist_key = bed.get("sensors", {}).get("soil_moisture")
+        moist_row = latest_map.get(moist_key) if moist_key else None
+        soil_moist = moist_row["value"] if moist_row else None
+
+        if soil_moist is not None and air_temp_f is not None:
+            stress = drv.bed_stress(
+                bed.get("plants", []),
+                soil_moist,
+                air_temp_f,
+                cfg.crops,
+            )
+        else:
+            stress = {"status": "unknown", "reason": "Sensor data unavailable", "crops": []}
+
+        bed_results.append({
+            "id":   bed.get("id"),
+            "name": bed.get("name"),
+            **stress,
+        })
+
+    insights["beds"] = bed_results
+    return JSONResponse(insights)
 
 
 # ── GET / (dashboard) ─────────────────────────────────────────────────────────

@@ -65,6 +65,8 @@ class _Config:
         self.llm: dict[str, Any] = raw.get("llm", {})
         self.weather: dict[str, Any] = raw.get("weather", {})
         self.daily_brief: dict[str, Any] = raw.get("daily_brief", {})
+        self.derived: dict[str, Any] = raw.get("derived", {})
+        self.crops: dict[str, Any] = raw.get("crops", {})
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

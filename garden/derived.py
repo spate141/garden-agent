@@ -1,0 +1,256 @@
+"""
+derived.py — Derived agronomic metrics computed from raw sensor readings.
+
+All functions are pure (no I/O, no config imports) for easy unit testing.
+
+Public API:
+  dew_point_f(temp_f, rh)          → float (°F)
+  vpd_kpa(temp_f, rh)              → float (kPa)
+  heat_index_f(temp_f, rh)         → float (°F) — same as temp_f below 80°F/40%RH
+  et0_water_balance(precip, et0)   → float (inches, positive = surplus)
+  vpd_status(vpd, thresholds)      → (status_code, human_label)
+  frost_risk(dewpoint_f, threshold) → (bool, message)
+  bed_stress(plants, moist, temp)  → {status, reason, crops}
+
+CROP_RANGES — default ideal soil-moisture/temp ranges per vegetable type.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Any
+
+
+# ── Unit helpers ──────────────────────────────────────────────────────────────
+
+def _tc(temp_f: float) -> float:
+    """Fahrenheit → Celsius."""
+    return (temp_f - 32.0) * 5.0 / 9.0
+
+
+def _tf(temp_c: float) -> float:
+    """Celsius → Fahrenheit."""
+    return temp_c * 9.0 / 5.0 + 32.0
+
+
+# ── Atmospheric formulas ──────────────────────────────────────────────────────
+
+def dew_point_f(temp_f: float, rh: float) -> float:
+    """
+    Magnus-formula dew point in °F.
+
+    rh: relative humidity 0-100.
+    Accurate to ±0.4°C over 0-60°C / 1-100% RH.
+    """
+    a, b = 17.27, 237.3
+    Tc = _tc(temp_f)
+    # Clamp RH to avoid log(0); real sensors never hit 0% RH
+    gamma = (a * Tc) / (b + Tc) + math.log(max(rh, 0.1) / 100.0)
+    Td_c = (b * gamma) / (a - gamma)
+    return _tf(Td_c)
+
+
+def vpd_kpa(temp_f: float, rh: float) -> float:
+    """
+    Vapour Pressure Deficit in kPa.
+
+    VPD = es × (1 − rh/100)
+    Saturation vapour pressure (Tetens / Magnus):
+      es = 0.6108 × exp(17.27 × Tc / (Tc + 237.3))
+
+    Healthy plant range: ~0.4–1.2 kPa.
+    Above 1.6 kPa plants begin to close stomata; above 2.0 kPa heat stress.
+    """
+    Tc = _tc(temp_f)
+    es = 0.6108 * math.exp((17.27 * Tc) / (Tc + 237.3))
+    return es * max(1.0 - rh / 100.0, 0.0)
+
+
+def heat_index_f(temp_f: float, rh: float) -> float:
+    """
+    NWS Rothfusz regression apparent temperature in °F.
+
+    Returns temp_f unchanged below 80 °F or below 40 % RH — the regression
+    is only defined and meaningful in the hot-humid regime.
+    """
+    if temp_f < 80.0 or rh < 40.0:
+        return temp_f
+    T, R = temp_f, rh
+    hi = (
+        -42.379
+        + 2.04901523 * T
+        + 10.14333127 * R
+        - 0.22475541 * T * R
+        - 0.00683783 * T * T
+        - 0.05481717 * R * R
+        + 0.00122874 * T * T * R
+        + 0.00085282 * T * R * R
+        - 0.00000199 * T * T * R * R
+    )
+    # NWS low-humidity adjustment (RH<13, 80≤T≤112)
+    if rh < 13.0 and 80.0 <= temp_f <= 112.0:
+        adj = ((13.0 - rh) / 4.0) * math.sqrt((17.0 - abs(temp_f - 95.0)) / 17.0)
+        hi -= adj
+    # NWS high-humidity adjustment (RH>85, 80≤T≤87)
+    elif rh > 85.0 and 80.0 <= temp_f <= 87.0:
+        adj = ((rh - 85.0) / 10.0) * ((87.0 - temp_f) / 5.0)
+        hi += adj
+    return hi
+
+
+def et0_water_balance(precip_in: float, et0_in: float) -> float:
+    """
+    Net daily water balance in inches.
+
+    Positive = moisture surplus (rain > ET₀, skip irrigation).
+    Negative = moisture deficit (ET₀ > rain, plants need water).
+
+    et0_in: reference evapotranspiration; from Open-Meteo field
+            et0_fao_evapotranspiration (returned in mm — convert: mm / 25.4).
+    """
+    return precip_in - et0_in
+
+
+# ── Interpretation helpers ────────────────────────────────────────────────────
+
+def vpd_status(vpd: float, thresholds: dict[str, float] | None = None) -> tuple[str, str]:
+    """
+    Classify a VPD value into a status code + human label.
+
+    status codes: 'low' | 'ok' | 'high' | 'very_high'
+
+    Default band edges (configurable via config.yaml derived.thresholds):
+      < 0.4  kPa → low      (high humidity, slow transpiration, fungal risk)
+      0.4–1.2 kPa → ok       (healthy transpiration)
+      1.2–2.0 kPa → high     (transpiring fast, watch moisture)
+      > 2.0  kPa → very_high (heat/drought stress)
+    """
+    t = thresholds or {}
+    vpd_low      = t.get("vpd_low", 0.4)
+    vpd_high     = t.get("vpd_high", 1.2)
+    vpd_very_high = t.get("vpd_very_high", 2.0)
+
+    if vpd < vpd_low:
+        return "low", "Humid air, slow transpiration, watch for fungal disease"
+    if vpd <= vpd_high:
+        return "ok", "Plants transpiring at a healthy rate"
+    if vpd <= vpd_very_high:
+        return "high", "Plants transpiring fast, keep moisture up"
+    return "very_high", "Heat/drought stress risk, water soon"
+
+
+def frost_risk(dewpoint_f_val: float, frost_threshold_f: float = 35.6) -> tuple[bool, str]:
+    """
+    Dew point ≤ frost_threshold_f is the strongest predictor of a killing frost.
+    Air temperature rarely drops below the dew point, so this method reliably
+    flags nights when frost is possible before temps have actually reached freezing.
+
+    Returns (is_risk: bool, message: str).
+    """
+    if dewpoint_f_val <= frost_threshold_f:
+        return (
+            True,
+            f"Frost risk: dew point {dewpoint_f_val:.1f}°F, protect tender plants",
+        )
+    return False, ""
+
+
+# ── Crop ranges + bed stress ──────────────────────────────────────────────────
+
+# Default ideal ranges per crop.
+# moist: (min%, max%) soil moisture from WH51; temp: (min°F, max°F) air temperature.
+# Values are conservative growing-season averages; override via config.yaml crops: block.
+CROP_RANGES: dict[str, dict[str, Any]] = {
+    "tomato":       {"moist": (50, 80), "temp": (60, 95),  "label": "Tomato"},
+    "eggplant":     {"moist": (50, 75), "temp": (65, 95),  "label": "Eggplant"},
+    "okra":         {"moist": (40, 70), "temp": (70, 100), "label": "Okra"},
+    "peas":         {"moist": (60, 85), "temp": (45, 75),  "label": "Peas"},
+    "sweet_pepper": {"moist": (50, 75), "temp": (65, 90),  "label": "Sweet Pepper"},
+    "hot_pepper":   {"moist": (45, 70), "temp": (65, 95),  "label": "Hot Pepper"},
+    "zucchini":     {"moist": (55, 80), "temp": (60, 90),  "label": "Zucchini"},
+}
+
+
+def bed_stress(
+    plants: list[str],
+    soil_moist: float,
+    air_temp_f: float,
+    custom_ranges: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Assess the stress state of a raised bed.
+
+    plants:        crop keys (e.g. ['tomato', 'tomato', 'tomato']).
+    soil_moist:    current soil moisture % from the bed's WH51 sensor.
+    air_temp_f:    outdoor air temperature °F.
+    custom_ranges: optional per-crop overrides from config.yaml crops: block
+                   (each value may contain 'moist' and/or 'temp' lists).
+
+    When a bed holds multiple crop types, we use the intersection of their ideal
+    ranges (most conservative), since they share one soil sensor.
+
+    Returns:
+      {
+        "status":  "ok" | "dry" | "wet" | "cold" | "heat" | "unknown",
+        "reason":  human-readable string,
+        "crops":   list of unique crop label strings in this bed,
+      }
+    """
+    # Merge custom ranges on top of defaults
+    ranges: dict[str, dict[str, Any]] = {}
+    for key, defaults in CROP_RANGES.items():
+        ranges[key] = dict(defaults)
+    if custom_ranges:
+        for crop, overrides in custom_ranges.items():
+            if crop in ranges and isinstance(overrides, dict):
+                ranges[crop] = {**ranges[crop], **overrides}
+
+    # Unique recognised plants (preserve order)
+    seen: set[str] = set()
+    unique = []
+    for p in plants:
+        if p in ranges and p not in seen:
+            unique.append(p)
+            seen.add(p)
+
+    if not unique:
+        return {"status": "unknown", "reason": "No recognised crop types in bed", "crops": []}
+
+    # Aggregate range: intersection (strictest min and max across crops)
+    moist_min = max(ranges[p]["moist"][0] for p in unique)
+    moist_max = min(ranges[p]["moist"][1] for p in unique)
+    temp_min  = max(ranges[p]["temp"][0] for p in unique)
+    temp_max  = min(ranges[p]["temp"][1] for p in unique)
+    labels    = [ranges[p]["label"] for p in unique]
+    label_str = ", ".join(labels)
+
+    # Temperature stress takes priority over moisture stress
+    if air_temp_f < temp_min:
+        return {
+            "status": "cold",
+            "reason": f"Too cold for {label_str}: {air_temp_f:.0f}°F, min {temp_min:.0f}°F",
+            "crops": labels,
+        }
+    if air_temp_f > temp_max:
+        return {
+            "status": "heat",
+            "reason": f"Heat stress for {label_str}: {air_temp_f:.0f}°F, max {temp_max:.0f}°F",
+            "crops": labels,
+        }
+    if soil_moist < moist_min:
+        return {
+            "status": "dry",
+            "reason": f"Soil too dry for {label_str}: {soil_moist:.0f}%, min {moist_min:.0f}%",
+            "crops": labels,
+        }
+    if soil_moist > moist_max:
+        return {
+            "status": "wet",
+            "reason": f"Soil too wet for {label_str}: {soil_moist:.0f}%, max {moist_max:.0f}%",
+            "crops": labels,
+        }
+    return {
+        "status": "ok",
+        "reason": f"{label_str}: moisture {soil_moist:.0f}%, temp {air_temp_f:.0f}°F, all good",
+        "crops": labels,
+    }

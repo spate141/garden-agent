@@ -313,6 +313,11 @@
   </div>
 </section>
 
+<!-- derived insight panel -->
+<div class="insights-panel" id="insights-panel" aria-live="polite" aria-label="Garden insights">
+  <!-- populated by loadInsights() on page load and each refresh tick -->
+</div>
+
 <!-- current values -->
 <div class="stats-strip" id="stats-strip">
   {% if stat_groups %}
@@ -1126,6 +1131,127 @@ function updateStats(rows) {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   INSIGHT PANEL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+async function loadInsights() {
+  var resp;
+  try { resp = await fetch('/api/insights'); } catch (_) { return; }
+  if (!resp.ok) return;
+  var data = await resp.json();
+
+  var panel = document.getElementById('insights-panel');
+  if (!panel) return;
+
+  /* Each item: { label, value, unit, note, status }
+     status → '' | 'ok' | 'warn' | 'alert'  (used to colour the value) */
+  var items = [];
+
+  /* ── VPD ── */
+  if (data.vpd) {
+    var VS = { ok: 'ok', low: 'warn', high: 'warn', very_high: 'alert' };
+    items.push({
+      label: 'VPD',
+      value: data.vpd.value.toFixed(2),
+      unit:  'kPa',
+      note:  data.vpd.label,
+      status: VS[data.vpd.status] || '',
+    });
+  }
+
+  /* ── Dew point ── */
+  if (data.dewpoint) {
+    items.push({
+      label:  'Dew point',
+      value:  data.dewpoint.value.toFixed(1),
+      unit:   '°F',
+      note:   data.dewpoint.frost_risk ? data.dewpoint.message : 'No frost risk',
+      status: data.dewpoint.frost_risk ? 'alert' : 'ok',
+    });
+  }
+
+  /* ── Feels like ── */
+  if (data.heat_index) {
+    var hv = data.heat_index.value;
+    items.push({
+      label:  'Feels like',
+      value:  hv.toFixed(1),
+      unit:   '°F',
+      note:   '',
+      status: hv >= 103 ? 'alert' : (hv >= 90 ? 'warn' : ''),
+    });
+  }
+
+  /* ── Water balance ── */
+  if (data.forecast && data.forecast.water_balance_in != null) {
+    var wb    = data.forecast.water_balance_in;
+    var wbnote = wb < -0.05 ? 'Deficit, beds need water'
+               : wb > 0.05  ? 'Surplus, skip irrigation'
+               :               'Even, monitor beds';
+    items.push({
+      label:  'Water balance',
+      value:  (wb > 0 ? '+' : '') + wb.toFixed(2),
+      unit:   '"',
+      note:   wbnote,
+      status: wb < -0.05 ? 'warn' : (wb > 0.05 ? 'ok' : ''),
+    });
+  }
+
+  /* ── Frost lookahead (only shown when risk is real) ── */
+  if (data.forecast && data.forecast.frost_risk) {
+    var fl = data.forecast.tomorrow_low_f;
+    items.push({
+      label:  'Frost tonight',
+      value:  fl != null ? Math.round(fl) : '?',
+      unit:   '°F low',
+      note:   'Cover tender plants',
+      status: 'alert',
+    });
+  }
+
+  /* ── Per-bed stress ── */
+  var BED_STATUS = { ok: 'ok', dry: 'warn', wet: 'warn', cold: 'warn', heat: 'alert', unknown: '' };
+  var BED_LABEL  = { ok: 'OK', dry: 'Dry', wet: 'Wet', cold: 'Cold', heat: 'Hot', unknown: '?' };
+  if (data.beds) {
+    data.beds.forEach(function (bed) {
+      items.push({
+        label:  bed.name,
+        value:  BED_LABEL[bed.status] || bed.status,
+        unit:   '',
+        note:   bed.reason,
+        status: BED_STATUS[bed.status] || '',
+      });
+    });
+  }
+
+  if (!items.length) { panel.innerHTML = ''; return; }
+
+  /* Build a single stat-group that matches the stats-strip visual language */
+  var statCols = items.map(function (item) {
+    var valCls = 'insight-val' + (item.status ? ' insight-' + item.status + '-val' : '');
+    var noteHtml = item.note
+      ? '<div class="insight-note">' + item.note + '</div>'
+      : '';
+    return (
+      '<div class="stat">' +
+        '<div class="stat-label">' + item.label + '</div>' +
+        '<div class="' + valCls + '">' +
+          item.value +
+          (item.unit ? '<span class="stat-unit">' + item.unit + '</span>' : '') +
+        '</div>' +
+        noteHtml +
+      '</div>'
+    );
+  }).join('');
+
+  panel.innerHTML =
+    '<div class="stat-group" style="flex:' + items.length + '">' +
+      '<div class="stat-group-name">Insights</div>' +
+      '<div class="stat-group-body">' + statCols + '</div>' +
+    '</div>';
+}
+
 /** Single fetch feeds both the stat strip and the garden */
 async function refresh() {
   const dot = document.getElementById('dot');
@@ -1138,6 +1264,9 @@ async function refresh() {
     updateStats(rows);
     updateGarden(rows);
   }
+
+  /* Insight panel — derived metrics + forecast interpretation */
+  loadInsights();
 
   /* Charts fetch independently (need /api/series per sensor) */
   await Promise.all(CHARTS.map(function (c) { return loadChart(c.key, c.color); }));
