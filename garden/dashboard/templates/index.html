@@ -29,207 +29,129 @@
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
 
-    <!-- TOMATO: round red fruit cluster with leafy calyx crown -->
+    <!-- TOMATO: bold red sphere with green calyx — clear at small sizes -->
     <symbol id="sprite-tomato" viewBox="0 0 40 52">
-      <defs>
-        <radialGradient id="s-tom"   cx="35%" cy="25%" r="65%">
-          <stop offset="0%"   stop-color="#ff7858"/>
-          <stop offset="50%"  stop-color="#d42018"/>
-          <stop offset="100%" stop-color="#8a0e0e"/>
-        </radialGradient>
-        <radialGradient id="s-tom-b" cx="35%" cy="25%" r="65%">
-          <stop offset="0%"   stop-color="#e05040"/>
-          <stop offset="55%"  stop-color="#b81818"/>
-          <stop offset="100%" stop-color="#780c0c"/>
-        </radialGradient>
-      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="12" rx="1.5" fill="#2a6018"/>
-      <!-- calyx: 3 ellipses at 0/60/120 deg = proper 6-tip star crown -->
+      <!-- calyx: 3 bold ellipses -->
       <g transform="translate(20,14)">
-        <ellipse rx="9.5" ry="2.8" fill="#4aaa35"/>
-        <ellipse rx="9.5" ry="2.8" fill="#3a9028" transform="rotate(60)"/>
-        <ellipse rx="9.5" ry="2.8" fill="#4aaa35" transform="rotate(120)"/>
+        <ellipse rx="10" ry="3.5" fill="#4aaa35"/>
+        <ellipse rx="10" ry="3.5" fill="#3a9028" transform="rotate(60)"/>
+        <ellipse rx="10" ry="3.5" fill="#4aaa35" transform="rotate(120)"/>
       </g>
-      <circle cx="20" cy="14" r="5" fill="#3a8028"/>
-      <!-- back fruits (darker) -->
-      <circle cx="11" cy="33" r="10" fill="url(#s-tom-b)"/>
-      <circle cx="29" cy="33" r="10" fill="url(#s-tom-b)"/>
-      <!-- front fruit (brighter, slightly lower) -->
-      <circle cx="20" cy="38" r="12" fill="url(#s-tom)"/>
-      <!-- subtle rib lines -->
-      <path d="M20,26 Q20.5,38 20,50"  stroke="rgba(0,0,0,0.10)" stroke-width="1.2" fill="none"/>
-      <path d="M15,28 Q13.5,38 16,49"  stroke="rgba(0,0,0,0.07)" stroke-width="1"   fill="none"/>
-      <path d="M25,28 Q26.5,38 24,49"  stroke="rgba(0,0,0,0.07)" stroke-width="1"   fill="none"/>
-      <!-- specular highlight upper-left -->
-      <ellipse cx="14" cy="30" rx="4.5" ry="3.5" fill="rgba(255,255,255,0.28)" transform="rotate(-18 14 30)"/>
+      <circle cx="20" cy="14" r="5.5" fill="#3a8028"/>
+      <!-- single bold fruit -->
+      <circle cx="20" cy="36" r="15" fill="#d42018"/>
+      <!-- highlight -->
+      <ellipse cx="13" cy="28" rx="5" ry="4" fill="rgba(255,255,255,0.28)" transform="rotate(-20 13 28)"/>
     </symbol>
 
-    <!-- EGGPLANT: tall narrow teardrop, deep purple with gradient depth -->
+    <!-- EGGPLANT: purple egg with green calyx — clear at small sizes -->
     <symbol id="sprite-eggplant" viewBox="0 0 40 52">
-      <defs>
-        <radialGradient id="s-ep" cx="32%" cy="24%" r="68%">
-          <stop offset="0%"   stop-color="#9050d0"/>
-          <stop offset="48%"  stop-color="#4a1870"/>
-          <stop offset="100%" stop-color="#25083c"/>
-        </radialGradient>
-      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
-      <!-- calyx: 5 fanning pointed leaves spread like a crown -->
-      <path d="M20,10 Q27,4  31,8  Q26,10 20,11 Z" fill="#4aaa35"/>
-      <path d="M20,10 Q13,4   9,8  Q14,10 20,11 Z" fill="#3a9028"/>
-      <path d="M20,10 Q23,2  20,0  Q17,2  20,11 Z" fill="#58c040"/>
-      <path d="M20,10 Q29,7  31,13 Q26,11 20,11 Z" fill="#4aaa35"/>
-      <path d="M20,10 Q11,7   9,13 Q14,11 20,11 Z" fill="#3a9028"/>
-      <circle cx="20" cy="11" r="4" fill="#3a8028"/>
-      <!-- teardrop body -->
-      <path d="M20,11 Q31,18 32,32 Q33,46 20,51 Q7,46 8,32 Q9,18 20,11 Z" fill="url(#s-ep)"/>
-      <!-- left-face sheen -->
-      <ellipse cx="13" cy="28" rx="4" ry="10" fill="rgba(180,100,255,0.22)" transform="rotate(-6 13 28)"/>
-      <!-- specular highlight -->
-      <ellipse cx="13" cy="20" rx="3.5" ry="2.5" fill="rgba(255,255,255,0.20)" transform="rotate(-15 13 20)"/>
+      <!-- calyx: 3 bold ellipses -->
+      <g transform="translate(20,11)">
+        <ellipse rx="10" ry="3" fill="#4aaa35"/>
+        <ellipse rx="10" ry="3" fill="#3a9028" transform="rotate(60)"/>
+        <ellipse rx="10" ry="3" fill="#4aaa35" transform="rotate(120)"/>
+      </g>
+      <circle cx="20" cy="11" r="5" fill="#3a8028"/>
+      <!-- egg body -->
+      <ellipse cx="20" cy="34" rx="14" ry="18" fill="#6a30c8"/>
+      <!-- highlight -->
+      <ellipse cx="12" cy="24" rx="4.5" ry="8" fill="rgba(200,150,255,0.32)" transform="rotate(-8 12 24)"/>
     </symbol>
 
-    <!-- OKRA: slender ribbed pod with leafy crown -->
+    <!-- OKRA: bright green pod tapering to a point -->
     <symbol id="sprite-okra" viewBox="0 0 40 52">
-      <defs>
-        <linearGradient id="s-ok" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%"   stop-color="#5aaa28"/>
-          <stop offset="42%"  stop-color="#3e8020"/>
-          <stop offset="100%" stop-color="#265e10"/>
-        </linearGradient>
-      </defs>
-      <!-- stem -->
-      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
-      <!-- fan leaves at pod base -->
-      <path d="M20,11 Q30,5 33,11 Q27,11 20,12 Z" fill="#4aaa35"/>
-      <path d="M20,11 Q10,5  7,11 Q13,11 20,12 Z" fill="#3a9028"/>
-      <ellipse cx="20" cy="10" rx="6" ry="2.5" fill="#58c040"/>
-      <!-- pod body: 8px wide at crown, tapers to point at tip -->
-      <path d="M16,12 Q15,25 15.5,38 Q17,45 20,50 Q23,45 24.5,38 Q25,25 24,12 Z" fill="url(#s-ok)"/>
-      <!-- 4 rib lines -->
-      <line x1="16.5" y1="13" x2="17"   y2="48" stroke="rgba(0,0,0,0.20)" stroke-width="0.8"/>
-      <line x1="19"   y1="12" x2="19"   y2="50" stroke="rgba(0,0,0,0.12)" stroke-width="0.8"/>
-      <line x1="21"   y1="12" x2="21"   y2="50" stroke="rgba(0,0,0,0.12)" stroke-width="0.8"/>
-      <line x1="23.5" y1="13" x2="23"   y2="48" stroke="rgba(0,0,0,0.20)" stroke-width="0.8"/>
-      <!-- left-edge highlight stripe -->
-      <path d="M15.5,14 Q15,26 15.5,38 Q16,44 18,49" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <!-- two side leaves -->
+      <path d="M20,11 Q31,4 34,11 Q27,12 20,12 Z" fill="#4aaa35"/>
+      <path d="M20,11 Q9,4  6,11 Q13,12 20,12 Z" fill="#3a9028"/>
+      <!-- pod body -->
+      <path d="M14,11 Q13,27 13.5,40 Q16,50 20,51 Q24,50 26.5,40 Q27,27 26,11 Z" fill="#52aa22"/>
+      <!-- 2 bold ribs -->
+      <line x1="17.5" y1="13" x2="18"   y2="48" stroke="rgba(0,60,0,0.35)" stroke-width="2"/>
+      <line x1="22.5" y1="13" x2="22"   y2="48" stroke="rgba(0,60,0,0.35)" stroke-width="2"/>
+      <!-- edge highlight -->
+      <path d="M14,14 Q13,27 13.5,40 Q15,47 18,50" stroke="rgba(180,255,120,0.35)" stroke-width="2" fill="none" stroke-linecap="round"/>
     </symbol>
 
-    <!-- PEAS: climbing vine with plump pods and curly tendrils -->
+    <!-- PEAS: two fat plump pods on a vine -->
     <symbol id="sprite-peas" viewBox="0 0 40 52">
-      <!-- tendril upper-right -->
-      <path d="M22,9 Q31,4 29,12 Q27,18 33,17" stroke="#4aaa35" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-      <!-- central vine -->
-      <path d="M20,51 Q22,41 20,31 Q18,21 21,7" stroke="#3d8a2a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-      <!-- leaf pair mid-vine -->
-      <ellipse cx="16" cy="24" rx="6" ry="2.5" fill="#4aaa35" transform="rotate(-28 16 24)"/>
-      <ellipse cx="24" cy="24" rx="6" ry="2.5" fill="#3a9028" transform="rotate(28 24 24)"/>
-      <!-- upper pod (right) -->
-      <ellipse cx="30" cy="17" rx="5.5" ry="9"   fill="#4aaa28" transform="rotate(-14 30 17)"/>
-      <ellipse cx="27" cy="15" rx="2"   ry="5.5"  fill="rgba(255,255,255,0.22)" transform="rotate(-14 27 15)"/>
-      <circle cx="29"   cy="11" r="2.8" fill="rgba(255,255,255,0.20)"/>
-      <circle cx="31"   cy="17" r="2.8" fill="rgba(255,255,255,0.17)"/>
-      <circle cx="29"   cy="23" r="2.8" fill="rgba(255,255,255,0.20)"/>
-      <!-- lower pod (left) -->
-      <ellipse cx="10" cy="36" rx="5.5" ry="9"   fill="#4aaa28" transform="rotate(12 10 36)"/>
-      <ellipse cx="8"  cy="34" rx="2"   ry="5.5"  fill="rgba(255,255,255,0.22)" transform="rotate(12 8 34)"/>
-      <circle cx="11"  cy="30" r="2.8" fill="rgba(255,255,255,0.20)"/>
-      <circle cx="9.5" cy="36" r="2.8" fill="rgba(255,255,255,0.17)"/>
-      <circle cx="11"  cy="42" r="2.8" fill="rgba(255,255,255,0.20)"/>
-      <!-- tendril lower-left -->
-      <path d="M18,33 Q9,28 11,35 Q13,41 7,39" stroke="#3d8a2a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <!-- vine -->
+      <line x1="20" y1="2" x2="20" y2="51" stroke="#3d8a2a" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- upper pod -->
+      <ellipse cx="20" cy="16" rx="10" ry="7" fill="#5aaa28" transform="rotate(-12 20 16)"/>
+      <!-- peas inside upper pod -->
+      <circle cx="14" cy="14" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="20" cy="15" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="26" cy="17" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <!-- lower pod -->
+      <ellipse cx="20" cy="38" rx="10" ry="7" fill="#4a9a22" transform="rotate(12 20 38)"/>
+      <!-- peas inside lower pod -->
+      <circle cx="14" cy="39" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="20" cy="38" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="26" cy="37" r="3.5" fill="rgba(255,255,255,0.22)"/>
     </symbol>
 
-    <!-- SWEET PEPPER: wide amber bell with three-lobed bottom -->
+    <!-- SWEET PEPPER: bold amber bell shape -->
     <symbol id="sprite-sweet_pepper" viewBox="0 0 40 52">
-      <defs>
-        <radialGradient id="s-bp" cx="34%" cy="26%" r="66%">
-          <stop offset="0%"   stop-color="#f0d040"/>
-          <stop offset="52%"  stop-color="#c89010"/>
-          <stop offset="100%" stop-color="#7a5808"/>
-        </radialGradient>
-      </defs>
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
-      <!-- calyx leaves -->
-      <path d="M20,10 Q28,5 31,9  Q25,10 20,11 Z" fill="#4aaa35"/>
-      <path d="M20,10 Q12,5  9,9  Q15,10 20,11 Z" fill="#3a9028"/>
-      <ellipse cx="20" cy="9" rx="6" ry="2.2" fill="#58c040"/>
-      <!-- shoulder cap -->
-      <ellipse cx="20" cy="13" rx="13" ry="4" fill="url(#s-bp)"/>
+      <!-- calyx -->
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
       <!-- bell body -->
-      <path d="M10,13 Q8,23 9,32 Q10,39 14,43 L26,43 Q30,39 31,32 Q32,23 30,13 Z" fill="url(#s-bp)"/>
-      <!-- three bottom lobes -->
-      <ellipse cx="14" cy="44" rx="6.5" ry="5.5" fill="#9a6508"/>
-      <ellipse cx="20" cy="45" rx="6.5" ry="5.5" fill="#8a5806"/>
-      <ellipse cx="26" cy="44" rx="6.5" ry="5.5" fill="#9a6508"/>
-      <!-- body dividers -->
-      <line x1="18" y1="13" x2="18" y2="44" stroke="rgba(80,48,0,0.25)" stroke-width="1"/>
-      <line x1="22" y1="13" x2="22" y2="44" stroke="rgba(80,48,0,0.25)" stroke-width="1"/>
-      <!-- specular highlight -->
-      <ellipse cx="12" cy="21" rx="4" ry="8" fill="rgba(255,255,255,0.26)" transform="rotate(-10 12 21)"/>
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#d4980e"/>
+      <!-- shoulder cap -->
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#e8b020"/>
+      <!-- center divider -->
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(100,60,0,0.30)" stroke-width="2"/>
+      <!-- highlight -->
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-8 11 23)"/>
     </symbol>
 
-    <!-- HOT PEPPER: trio of slim curved cayenne pods -->
+    <!-- HOT PEPPER: three bold red cayenne pods -->
     <symbol id="sprite-hot_pepper" viewBox="0 0 40 52">
       <!-- stem -->
       <rect x="18.5" y="1" width="3" height="10" rx="1.5" fill="#2a6018"/>
       <!-- calyx -->
-      <path d="M20,11 Q27,6 30,10 Q25,11 20,12 Z" fill="#4aaa35"/>
-      <path d="M20,11 Q13,6 10,10 Q15,11 20,12 Z" fill="#3a9028"/>
-      <!-- left pod: bezier curves left as it descends -->
-      <path d="M18,12 C15,18 13,28 12,37 C11,43 13,47 14,46 C15,46 15,42 16,36 C17,27 18,17 20,12 Z" fill="#d02010"/>
-      <path d="M16.5,14 C14.5,20 13.5,30 13,38" stroke="rgba(255,200,160,0.32)" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-      <!-- right pod: mirrors left -->
-      <path d="M22,12 C25,18 27,28 28,37 C29,43 27,47 26,46 C25,46 25,42 24,36 C23,27 22,17 20,12 Z" fill="#d02010"/>
-      <path d="M23.5,14 C25.5,20 26.5,30 27,38" stroke="rgba(255,200,160,0.28)" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-      <!-- center pod: straight, slightly shorter -->
-      <path d="M18,12 Q17.5,24 17.5,36 Q18,44 20,48 Q22,44 22.5,36 Q22.5,24 22,12 Z" fill="#e82818"/>
-      <path d="M18.5,13 Q18,25 18.5,37" stroke="rgba(255,200,160,0.24)" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-      <!-- tip gleams -->
-      <circle cx="13.5" cy="45" r="1.5" fill="rgba(255,210,80,0.65)"/>
-      <circle cx="26.5" cy="45" r="1.5" fill="rgba(255,210,80,0.60)"/>
-      <circle cx="20"   cy="47" r="1.5" fill="rgba(255,210,80,0.65)"/>
+      <g transform="translate(20,12)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="12" r="4.5" fill="#3a8028"/>
+      <!-- left pod -->
+      <path d="M17,13 C13,20 11,30 10,40 C9.5,46 11,49 13,48 C14.5,47 14.5,43 15,36 C16,27 17,18 19,13 Z" fill="#c81c0c"/>
+      <!-- right pod -->
+      <path d="M23,13 C27,20 29,30 30,40 C30.5,46 29,49 27,48 C25.5,47 25.5,43 25,36 C24,27 23,18 21,13 Z" fill="#c81c0c"/>
+      <!-- center pod (on top, slightly brighter) -->
+      <path d="M17,13 Q17,26 17.5,38 Q18.5,46 20,49 Q21.5,46 22.5,38 Q23,26 23,13 Z" fill="#e02016"/>
     </symbol>
 
-    <!-- ZUCCHINI: wide fan leaves + horizontal dark-green cylindrical fruit -->
+    <!-- ZUCCHINI: bold fan leaves + thick dark-green cylinder fruit -->
     <symbol id="sprite-zucchini" viewBox="0 0 40 52">
-      <defs>
-        <linearGradient id="s-zf" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="#3a8028"/>
-          <stop offset="50%"  stop-color="#246018"/>
-          <stop offset="100%" stop-color="#16380c"/>
-        </linearGradient>
-        <radialGradient id="s-zl" cx="38%" cy="38%" r="64%">
-          <stop offset="0%"   stop-color="#72c840"/>
-          <stop offset="58%"  stop-color="#4a9a28"/>
-          <stop offset="100%" stop-color="#2c5e14"/>
-        </radialGradient>
-      </defs>
-      <!-- short central stem -->
-      <rect x="18.5" y="12" width="3" height="16" rx="1.5" fill="#2a6018"/>
+      <!-- center stem -->
+      <rect x="18.5" y="10" width="3" height="18" rx="1.5" fill="#2a6018"/>
       <!-- left fan leaf -->
-      <path d="M20,22 Q12,13 3,16 Q1,22 7,27 Q13,29 20,23 Z" fill="url(#s-zl)"/>
-      <path d="M20,23 Q11,20 4,17" stroke="rgba(0,70,0,0.25)" stroke-width="1" fill="none" stroke-linecap="round"/>
+      <path d="M20,22 Q10,11 2,15 Q0,22 7,27 Q14,28 20,22 Z" fill="#5aaa38"/>
       <!-- right fan leaf -->
-      <path d="M20,22 Q28,13 37,16 Q39,22 33,27 Q27,29 20,23 Z" fill="url(#s-zl)"/>
-      <path d="M20,23 Q29,20 36,17" stroke="rgba(0,70,0,0.25)" stroke-width="1" fill="none" stroke-linecap="round"/>
-      <!-- top center leaf -->
-      <ellipse cx="20" cy="13" rx="5" ry="8" fill="#5aaa38"/>
-      <line x1="20" y1="7" x2="20" y2="21" stroke="rgba(0,70,0,0.25)" stroke-width="0.8"/>
-      <!-- zucchini fruit — cx+rx kept within viewBox (x=1..35) -->
-      <rect x="1" y="36" width="34" height="12" rx="6" fill="url(#s-zf)"/>
-      <!-- lengthwise stripe highlights -->
-      <path d="M5,37 L5,48"   stroke="rgba(120,220,90,0.28)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-      <path d="M10,36 L10,48" stroke="rgba(120,220,90,0.20)" stroke-width="2"   stroke-linecap="round" fill="none"/>
-      <path d="M15,36 L15,48" stroke="rgba(120,220,90,0.14)" stroke-width="2"   stroke-linecap="round" fill="none"/>
-      <!-- blossom at right tip -->
-      <ellipse cx="34" cy="42" rx="4"   ry="5.5" fill="#e89800"/>
-      <ellipse cx="34" cy="42" rx="2.5" ry="3.5" fill="#f8c000"/>
-      <!-- stem scar at left end -->
-      <circle cx="2" cy="42" r="2.2" fill="rgba(0,0,0,0.28)"/>
+      <path d="M20,22 Q30,11 38,15 Q40,22 33,27 Q26,28 20,22 Z" fill="#4a9a28"/>
+      <!-- top leaf -->
+      <ellipse cx="20" cy="12" rx="5.5" ry="9" fill="#68bb44"/>
+      <!-- zucchini fruit -->
+      <rect x="2" y="34" width="36" height="14" rx="7" fill="#2e7018"/>
+      <!-- bold stripes -->
+      <line x1="8"  y1="34" x2="8"  y2="48" stroke="rgba(120,220,80,0.45)" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="16" y1="34" x2="16" y2="48" stroke="rgba(120,220,80,0.30)" stroke-width="3"   stroke-linecap="round"/>
+      <line x1="24" y1="34" x2="24" y2="48" stroke="rgba(120,220,80,0.20)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- blossom end -->
+      <ellipse cx="36" cy="41" rx="4" ry="5.5" fill="#e89800"/>
+      <ellipse cx="36" cy="41" rx="2.5" ry="3.5" fill="#f8c000"/>
     </symbol>
 
     <!-- UNKNOWN: simple two-leaf seedling sprout -->
