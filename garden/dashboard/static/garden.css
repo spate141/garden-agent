@@ -914,27 +914,12 @@ footer {
 
 /* ── BULLET BARS (§2) ───────────────────────────────────────────────────── */
 
-.bullet-bars-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 24px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-}
-
-.bullet-bar-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bullet-bar-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
+/* Bed columns inside the insight strip need extra padding to accommodate the
+   SVG bar height (44px) without making the whole strip too tall. */
+.bed-bar-col {
+  min-width: 280px;
+  padding-top: 8px;
+  padding-bottom: 10px;
 }
 
 /* The SVG itself (.bullet-bar) needs no extra CSS; size is set via attributes. */

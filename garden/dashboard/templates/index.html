@@ -257,13 +257,13 @@
   </div>
 </section>
 
-<!-- derived insight panel -->
+<!-- insight + bed-status strip (two independently-updated sub-groups in one row) -->
 <div class="insights-panel" id="insights-panel" aria-live="polite" aria-label="Garden insights">
-  <!-- populated by loadInsights() on page load and each refresh tick -->
+  <!-- beds sub-group: populated by updateBulletBars() via updateStats() -->
+  <div id="beds-bar-group"></div>
+  <!-- insight items: populated by loadInsights() -->
+  <div id="insight-items-group"></div>
 </div>
-
-<!-- bed bullet bars (populated by updateBulletBars() on each refresh) -->
-<div class="bullet-bars-row" id="bullet-bars" aria-label="Bed moisture status"></div>
 
 <!-- current values -->
 <div class="stats-strip" id="stats-strip">
@@ -1423,19 +1423,28 @@ function buildBulletBar(sensorKey, value) {
 }
 
 function updateBulletBars(latestMap) {
-  var container = document.getElementById('bullet-bars');
+  var container = document.getElementById('beds-bar-group');
   if (!container || !BANDS || !BANDS.moistureBands) return;
-  var html = '';
-  Object.keys(BANDS.moistureBands).forEach(function(sensorKey) {
-    var row = latestMap[sensorKey];
-    if (!row) return;
+  var keys = Object.keys(BANDS.moistureBands);
+  if (!keys.length) return;
+
+  var cols = keys.map(function(sensorKey) {
+    var row  = latestMap[sensorKey];
     var band = BANDS.moistureBands[sensorKey];
-    html += '<div class="bullet-bar-item">';
-    html += '<div class="bullet-bar-label">' + band.label + '</div>';
-    html += buildBulletBar(sensorKey, parseFloat(row.value));
-    html += '</div>';
-  });
-  container.innerHTML = html;
+    var barHtml = row ? buildBulletBar(sensorKey, parseFloat(row.value)) : '';
+    return (
+      '<div class="stat bed-bar-col">' +
+        '<div class="stat-label">' + band.label + '</div>' +
+        barHtml +
+      '</div>'
+    );
+  }).join('');
+
+  container.innerHTML =
+    '<div class="stat-group" style="flex:' + keys.length + '">' +
+      '<div class="stat-group-name">Beds</div>' +
+      '<div class="stat-group-body">' + cols + '</div>' +
+    '</div>';
 }
 
 /* ── Battery badge (§4) ─────────────────────────────────────────────────────
@@ -1547,7 +1556,7 @@ async function loadInsights() {
     };
   }
 
-  var panel = document.getElementById('insights-panel');
+  var panel = document.getElementById('insight-items-group');
   if (!panel) return;
 
   /* Each item: { label, value, unit, note, status }
