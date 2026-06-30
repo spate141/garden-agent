@@ -1033,6 +1033,24 @@ document.getElementById('theme-toggle').addEventListener('click', function () {
    CHART FACTORY
    ════════════════════════════════════════════════════════════════════════════ */
 
+Chart.register({
+  id: 'wateringEmoji',
+  afterDraw(chart) {
+    const indices = chart._wateringIndices;
+    if (!indices || !indices.length) return;
+    const meta = chart.getDatasetMeta(0);
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = '14px serif';
+    ctx.textAlign = 'center';
+    indices.forEach(function(idx) {
+      const pt = meta.data[idx];
+      if (pt) ctx.fillText('💦', pt.x, pt.y - 10);
+    });
+    ctx.restore();
+  }
+});
+
 const instances = {};
 
 function makeChartOpts(color) {
@@ -1097,9 +1115,17 @@ async function loadChart(key, color) {
   const labels = rows.map(function (r) { return fmtTime(r.ts); });
   const data   = rows.map(function (r) { return r.value; });
 
+  var wateringIndices = [];
+  if (key.startsWith('soilmoisture') && data.length > 1) {
+    for (var i = 1; i < data.length; i++) {
+      if (data[i] - data[i - 1] >= 10) wateringIndices.push(i);
+    }
+  }
+
   if (instances[key]) {
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
+    instances[key]._wateringIndices       = wateringIndices;
     instances[key].update('none');
   } else {
     const canvas = document.getElementById('chart-' + key);
@@ -1107,6 +1133,7 @@ async function loadChart(key, color) {
     instances[key] = new Chart(canvas, makeChartOpts(color));
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
+    instances[key]._wateringIndices       = wateringIndices;
     instances[key].update();
   }
 }
