@@ -506,7 +506,7 @@ function tod() {
  * @param {number} setSec   – set time, UTC epoch seconds
  * @param {number} skyH     – sky strip height in px (from clientHeight)
  * @param {number} bodyH    – body element height in px (used to keep it inside the strip)
- * @returns {{ left_pct: number, top_px: number, up: boolean }}
+ * @returns {object} left_pct, top_px, up
  */
 function celestialPos(nowSec, riseSec, setSec, skyH, bodyH) {
   var up   = (nowSec >= riseSec && nowSec < setSec);
@@ -529,10 +529,7 @@ function celestialPos(nowSec, riseSec, setSec, skyH, bodyH) {
  * Reference new moon: 2000-01-06 18:14 UT.
  *
  * @param {Date} date
- * @returns {{ frac: number, illum: number, waxing: boolean }}
- *   frac   – 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
- *   illum  – illuminated fraction 0..1
- *   waxing – true while frac < 0.5 (right side lit in northern hemisphere)
+ * @returns {object} frac (0=new, 0.25=Q1, 0.5=full, 0.75=Q3), illum (0..1), waxing (bool)
  */
 function moonPhase(date) {
   var REF_MS   = Date.UTC(2000, 0, 6, 18, 14);   /* reference new moon */
@@ -553,7 +550,7 @@ function moonPhase(date) {
  *   - Sweep direction flips to choose crescent vs gibbous and waxing vs waning.
  *
  * @param {HTMLElement} moonEl
- * @param {{ frac: number, waxing: boolean }} phase
+ * @param {object} phase  – moonPhase() result: frac, waxing
  */
 function _setMoonPhase(moonEl, phase) {
   var r = 14, cx = 15, cy = 15;
