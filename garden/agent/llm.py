@@ -119,6 +119,17 @@ watering threshold. Write a short, plain-English Telegram message (2-4 sentences
 Do not use markdown, bullet points, or headers. Be specific and practical.\
 """
 
+_WATERED_SYSTEM = """\
+You are a concise garden monitoring assistant. A soil-moisture sensor just recorded a
+significant upward spike, meaning the garden bed was watered. Write a short, plain-English
+Telegram message (2-3 sentences) that:
+1. Confirms the bed was watered and shows the before/after moisture reading from Facts.
+2. Notes whether the current level looks well-watered for the plants.
+3. If weather context suggests watering wasn't needed (rain expected, high water balance),
+   mention that briefly without being scolding.
+Do not use markdown, bullet points, or headers. Be friendly and specific.\
+"""
+
 
 def write_alert(
     rule_id: str,
@@ -133,15 +144,21 @@ def write_alert(
     if not cfg.anthropic_api_key:
         return fallback_body
 
-    is_watering = rule_id.startswith("soil_moisture_")
-    system = _WATERING_SYSTEM if is_watering else _ALERT_SYSTEM
+    is_needs_water  = rule_id.startswith("soil_moisture_low") or rule_id.startswith("soil_moisture_rapid_drop")
+    is_just_watered = rule_id.startswith("soil_moisture_rapid_rise")
+    if is_needs_water:
+        system = _WATERING_SYSTEM
+    elif is_just_watered:
+        system = _WATERED_SYSTEM
+    else:
+        system = _ALERT_SYSTEM
 
     label = cfg.sensor_label(sensor_key) if sensor_key else ""
 
     # Weather + temp context and sensor history are only useful for watering decisions.
     # Battery and temperature alerts have everything they need in fallback_body already.
     context_parts: list[str] = []
-    if is_watering:
+    if is_needs_water or is_just_watered:
         context_parts = [c for c in [
             _recent_context(sensor_key),
             _outdoor_temp_context(),

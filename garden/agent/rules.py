@@ -111,6 +111,55 @@ def check_soil_moisture_rapid_drop() -> list[RuleResult]:
     return results
 
 
+# ── soil moisture rapid rise (watering event) ─────────────────────────────────
+
+def check_soil_moisture_rapid_rise() -> list[RuleResult]:
+    t = cfg.thresholds.get("soil_moisture_rapid_rise", {})
+    keys = t.get("sensor_keys", [])
+    rise_pct = t.get("rise_pct", 10)
+    window_minutes = t.get("window_minutes", 30)
+
+    results = []
+    for key in keys:
+        label = cfg.sensor_label(key)
+        rows = storage.series(key, hours=2)
+
+        cutoff = _now_utc().timestamp() - window_minutes * 60
+        window_rows = [
+            r for r in rows
+            if datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp() >= cutoff
+        ]
+
+        if len(window_rows) < 2:
+            results.append(RuleResult(
+                rule_id=f"soil_moisture_rapid_rise:{key}",
+                sensor_key=key,
+                fired=False,
+                title=f"Bed watered: {label}",
+                body="",
+            ))
+            continue
+
+        oldest_val = window_rows[0]["value"]
+        newest_val = window_rows[-1]["value"]
+        rise = newest_val - oldest_val
+        fired = rise >= rise_pct
+
+        body = (
+            f"{label} rose {rise:.1f}% in {window_minutes} min "
+            f"({oldest_val:.0f}% → {newest_val:.0f}%). Bed was watered."
+        ) if fired else ""
+
+        results.append(RuleResult(
+            rule_id=f"soil_moisture_rapid_rise:{key}",
+            sensor_key=key,
+            fired=fired,
+            title=f"Bed watered: {label}",
+            body=body,
+        ))
+    return results
+
+
 # ── battery low ───────────────────────────────────────────────────────────────
 
 def check_battery_low() -> list[RuleResult]:
@@ -256,6 +305,7 @@ def run_instant() -> list[RuleResult]:
     results: list[RuleResult] = []
     results.extend(check_soil_moisture_low())
     results.extend(check_soil_moisture_rapid_drop())
+    results.extend(check_soil_moisture_rapid_rise())
     results.extend(check_battery_low())
     results.extend(check_temp_frost())
     results.extend(check_temp_heat())

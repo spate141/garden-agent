@@ -28,6 +28,7 @@ log = logging.getLogger("garden.runner")
 _COOLDOWN_KEY: dict[str, str] = {
     "soil_moisture_low":          "soil_moisture_low_minutes",
     "soil_moisture_rapid_drop":   "soil_moisture_rapid_drop_minutes",
+    "soil_moisture_rapid_rise":   "soil_moisture_rapid_rise_minutes",
     "battery_low":                "battery_low_minutes",
     "temp_frost":                 "temp_frost_minutes",
     "temp_heat":                  "temp_heat_minutes",
