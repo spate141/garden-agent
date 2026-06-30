@@ -880,3 +880,92 @@ footer {
   }
 
 }
+
+/* ── LIGHT-MODE PANEL POLISH (§8) ───────────────────────────────────────── */
+/* In light mode the .chart-card and insights/stats panels use a cream card-bg
+   that blends into the page background. Override to white with a clear border
+   and a soft shadow so panels separate visually the way dark-mode cards do. */
+
+[data-theme="light"] .chart-card {
+  background:    #ffffff;
+  border:        1px solid #e5e7eb;
+  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .chart-card:hover {
+  box-shadow:    0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .insights-panel {
+  background:    #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .stats-strip {
+  background:    #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .sky-banner {
+  filter: saturate(0.92) brightness(1.02);
+}
+
+/* ── BULLET BARS (§2) ───────────────────────────────────────────────────── */
+
+.bullet-bars-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 24px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.bullet-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bullet-bar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* The SVG itself (.bullet-bar) needs no extra CSS; size is set via attributes. */
+
+/* ── BATTERY BADGE (§4) ─────────────────────────────────────────────────── */
+
+.battery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+/* ── KPI SPARKLINE + DELTA (§3) ─────────────────────────────────────────── */
+
+.kpi-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.kpi-delta {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.kpi-spark {
+  display: block;
+  overflow: visible;
+}

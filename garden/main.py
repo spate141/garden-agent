@@ -239,6 +239,56 @@ async def dashboard(request: Request):
         "staleMin": cfg.watchdog.get("sensor_timeout_minutes", 30),
     })
 
+    # Band data for the upgraded charts and UI components.
+    # moistureBands: per-bed optimal moisture range, derived by intersecting the
+    #   ideal ranges of each bed's crops (same logic as drv.bed_stress). The
+    #   too-wet marker is the band max.
+    _moisture_bands: dict[str, Any] = {}
+    for _bed in cfg.dashboard.get("beds", []):
+        _sensor_key = _bed.get("sensors", {}).get("soil_moisture")
+        if not _sensor_key:
+            continue
+        _plants = _bed.get("plants", [])
+        _ranges: dict[str, Any] = {k: dict(v) for k, v in drv.CROP_RANGES.items()}
+        for _crop, _overrides in cfg.crops.items():
+            if _crop in _ranges and isinstance(_overrides, dict):
+                _ranges[_crop] = {**_ranges[_crop], **_overrides}
+        _unique = list(dict.fromkeys(p for p in _plants if p in _ranges))
+        if not _unique:
+            continue
+        _moist_min = max(_ranges[p]["moist"][0] for p in _unique)
+        _moist_max = min(_ranges[p]["moist"][1] for p in _unique)
+        _crop_labels = [_ranges[p]["label"] for p in _unique]
+        _moisture_bands[_sensor_key] = {
+            "min":   _moist_min,
+            "max":   _moist_max,
+            "label": _bed.get("name", _sensor_key),
+            "crops": ", ".join(_crop_labels),
+        }
+
+    # vpdBands: four zones from derived.thresholds, keyed upTo breakpoints.
+    _vpd_t = cfg.derived.get("thresholds", {})
+    _vpd_bands = [
+        {"upTo": _vpd_t.get("vpd_low",       0.4), "label": "Too low"},
+        {"upTo": _vpd_t.get("vpd_high",       1.2), "label": "Healthy"},
+        {"upTo": _vpd_t.get("vpd_very_high",  2.0), "label": "High stress"},
+        {"upTo": 99,                                  "label": "Very high stress"},
+    ]
+
+    # battery: WH51 nominal ~1.5V; warn from alert threshold; critical is 85% of warn.
+    _batt_warn = cfg.thresholds.get("battery_low", {}).get("below", 1.1)
+    _batt_config: dict[str, Any] = {
+        "nominal":  1.5,
+        "warn":     _batt_warn,
+        "critical": round(_batt_warn * 0.85, 2),
+    }
+
+    bands_json = json.dumps({
+        "moistureBands": _moisture_bands,
+        "vpdBands":      _vpd_bands,
+        "battery":       _batt_config,
+    })
+
     # Sky animation: pass sunrise/sunset UTC epochs so the sun arc is correct on first paint.
     # Reuses the cached Open-Meteo forecast — no extra network call.
     from garden.agent.weather import get_forecast as _get_fc
@@ -266,5 +316,6 @@ async def dashboard(request: Request):
             "beds_json": json.dumps(cfg.dashboard.get("beds", [])),
             "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
             "sky_json": json.dumps(_sky),
+            "bands_json": bands_json,
         },
     )

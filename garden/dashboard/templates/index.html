@@ -262,6 +262,9 @@
   <!-- populated by loadInsights() on page load and each refresh tick -->
 </div>
 
+<!-- bed bullet bars (populated by updateBulletBars() on each refresh) -->
+<div class="bullet-bars-row" id="bullet-bars" aria-label="Bed moisture status"></div>
+
 <!-- current values -->
 <div class="stats-strip" id="stats-strip">
   {% if stat_groups %}
@@ -357,6 +360,12 @@ const G = {{ garden_thresholds | safe }};
  *  sunrise_ts / sunset_ts : today's times
  *  sunrise_ts_tomorrow    : tomorrow's sunrise (bounds the post-sunset moon arc) */
 let SKY = {{ sky_json | safe }};
+
+/** Chart band/zone data, derived server-side from config.yaml (single source of truth).
+ *  moistureBands: {[sensorKey]: {min, max, label, crops}} per-bed optimal range.
+ *  vpdBands:      [{upTo, label}] VPD zone breakpoints.
+ *  battery:       {nominal, warn, critical} voltage thresholds. */
+const BANDS = {{ bands_json | safe }};
 
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
@@ -1174,7 +1183,81 @@ Chart.register({
   }
 });
 
+/* thresholdBands plugin: draws filled zone boxes and dashed threshold lines behind
+   the chart series. Charts set chart._bands and chart._lines before rendering.
+   chart._bands : [{yMin, yMax, color}]   -- filled horizontal bands
+   chart._lines : [{y, color, label}]     -- dashed horizontal lines with optional label */
+Chart.register({
+  id: 'thresholdBands',
+  beforeDraw(chart) {
+    const bands = chart._bands;
+    const lines = chart._lines;
+    if ((!bands || !bands.length) && (!lines || !lines.length)) return;
+
+    const yScale = chart.scales.y;
+    const xScale = chart.scales.x;
+    if (!yScale || !xScale) return;
+
+    const ctx    = chart.ctx;
+    const left   = xScale.left;
+    const right  = xScale.right;
+    ctx.save();
+
+    /* filled bands */
+    if (bands && bands.length) {
+      bands.forEach(function(b) {
+        var top    = yScale.getPixelForValue(b.yMax);
+        var bottom = yScale.getPixelForValue(b.yMin);
+        /* clamp to chart area */
+        top    = Math.max(top,    yScale.top);
+        bottom = Math.min(bottom, yScale.bottom);
+        if (bottom <= top) return;
+        ctx.fillStyle = b.color;
+        ctx.fillRect(left, top, right - left, bottom - top);
+      });
+    }
+
+    /* dashed lines */
+    if (lines && lines.length) {
+      lines.forEach(function(l) {
+        var py = yScale.getPixelForValue(l.y);
+        if (py < yScale.top || py > yScale.bottom) return;
+        ctx.beginPath();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = l.color || '#ef4444';
+        ctx.lineWidth   = 1.5;
+        ctx.moveTo(left,  py);
+        ctx.lineTo(right, py);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        /* small label at right edge */
+        if (l.label) {
+          ctx.fillStyle  = l.color || '#ef4444';
+          ctx.font       = '10px sans-serif';
+          ctx.textAlign  = 'right';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(l.label, right - 2, py - 2);
+        }
+      });
+    }
+
+    ctx.restore();
+  }
+});
+
 const instances = {};
+
+/* Cache of latest series rows keyed by sensor key.
+   Populated by loadChart(); consumed by updateStats() for sparklines + deltas. */
+const seriesCache = {};
+
+/* VPD zone colors (fixed semantic; do not need to react to light/dark theme). */
+var _VPD_COLORS = [
+  'rgba(59,130,246,0.09)',   /* too low   -- blue   */
+  'rgba(34,197,94,0.09)',    /* healthy   -- green  */
+  'rgba(245,158,11,0.09)',   /* high      -- amber  */
+  'rgba(239,68,68,0.09)',    /* very high -- red    */
+];
 
 function makeChartOpts(color) {
   const c = chartThemeColors();
@@ -1238,6 +1321,9 @@ async function loadChart(key, color) {
   const labels = rows.map(function (r) { return fmtTime(r.ts); });
   const data   = rows.map(function (r) { return r.value; });
 
+  /* Cache rows for KPI sparklines and delta computation. */
+  seriesCache[key] = rows;
+
   var wateringIndices = [];
   if (key.startsWith('soilmoisture') && data.length > 1) {
     for (var i = 1; i < data.length; i++) {
@@ -1245,10 +1331,32 @@ async function loadChart(key, color) {
     }
   }
 
+  /* Build threshold bands and lines for moisture and VPD charts. */
+  var bands = [];
+  var lines = [];
+
+  var moistBand = BANDS && BANDS.moistureBands && BANDS.moistureBands[key];
+  if (moistBand) {
+    /* Green optimal band */
+    bands.push({ yMin: moistBand.min, yMax: moistBand.max, color: 'rgba(34,197,94,0.10)' });
+    /* Red dashed too-wet line at band max */
+    lines.push({ y: moistBand.max, color: '#ef4444', label: 'Too wet (' + moistBand.max + '%)' });
+  }
+
+  if (key === 'vpd_kpa' && BANDS && BANDS.vpdBands && BANDS.vpdBands.length) {
+    var lower = 0;
+    BANDS.vpdBands.forEach(function(b, i) {
+      bands.push({ yMin: lower, yMax: b.upTo, color: _VPD_COLORS[i] || 'rgba(128,128,128,0.07)' });
+      lower = b.upTo;
+    });
+  }
+
   if (instances[key]) {
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
     instances[key]._wateringIndices       = wateringIndices;
+    instances[key]._bands                 = bands;
+    instances[key]._lines                 = lines;
     instances[key].update('none');
   } else {
     const canvas = document.getElementById('chart-' + key);
@@ -1257,8 +1365,103 @@ async function loadChart(key, color) {
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
     instances[key]._wateringIndices       = wateringIndices;
+    instances[key]._bands                 = bands;
+    instances[key]._lines                 = lines;
     instances[key].update();
   }
+}
+
+/* ── Sparkline helper (§3) ──────────────────────────────────────────────────
+   Builds a <polyline> SVG path from a series rows array [{ts, value}].
+   Returns the inner SVG markup (caller wraps in <svg>). */
+function _sparkPath(rows) {
+  if (!rows || rows.length < 2) return '';
+  var ys  = rows.map(function(r) { return parseFloat(r.value); });
+  var min = Math.min.apply(null, ys);
+  var max = Math.max.apply(null, ys);
+  var range = max - min || 1;
+  var W = 100, H = 24;
+  var pts = rows.map(function(r, i) {
+    var x = (i / (rows.length - 1)) * W;
+    var y = H - ((parseFloat(r.value) - min) / range) * (H - 2) - 1;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  });
+  return '<polyline fill="none" stroke="var(--accent)" stroke-width="1.5" points="' + pts.join(' ') + '"/>';
+}
+
+/* ── Bullet bars (§2) ───────────────────────────────────────────────────────
+   SVG bar showing current moisture vs the optimal band from BANDS.moistureBands.
+   Fill color: green (ok), amber (too dry), red (too wet). */
+function buildBulletBar(sensorKey, value) {
+  var band = BANDS && BANDS.moistureBands && BANDS.moistureBands[sensorKey];
+  if (!band) return '';
+  var W = 260, H = 44, pad = 8, maxV = 100;
+  function px(v) { return pad + (Math.min(Math.max(v, 0), maxV) / maxV) * (W - 2 * pad); }
+  var status = value > band.max ? 'too wet' : value < band.min ? 'too dry' : 'ok';
+  var fill   = status === 'ok' ? '#22c55e' : status === 'too wet' ? '#ef4444' : '#f59e0b';
+  var valPx  = px(value);
+  return (
+    '<svg class="bullet-bar" width="' + W + '" height="' + H + '" role="img"' +
+    ' aria-label="' + band.label + ' moisture ' + value.toFixed(0) + '% (' + status + ')">' +
+      /* track */
+      '<rect x="' + pad + '" y="15" width="' + (W - 2 * pad) + '" height="14" rx="7" fill="var(--bg-alt)"/>' +
+      /* optimal band */
+      '<rect x="' + px(band.min) + '" y="15" width="' + (px(band.max) - px(band.min)) + '" height="14"' +
+      ' fill="rgba(34,197,94,0.20)" rx="0"/>' +
+      /* too-wet marker */
+      '<line x1="' + px(band.max) + '" y1="11" x2="' + px(band.max) + '" y2="33"' +
+      ' stroke="#ef4444" stroke-width="2" stroke-dasharray="3,3"/>' +
+      /* value fill */
+      '<rect x="' + pad + '" y="18" width="' + Math.max(0, valPx - pad) + '" height="8" rx="4"' +
+      ' fill="' + fill + '"/>' +
+      /* label */
+      '<text x="' + pad + '" y="' + (H - 2) + '" font-size="11" fill="var(--text-muted)">' +
+        band.crops + ' ' + value.toFixed(0) + '% (' + status + ')' +
+      '</text>' +
+    '</svg>'
+  );
+}
+
+function updateBulletBars(latestMap) {
+  var container = document.getElementById('bullet-bars');
+  if (!container || !BANDS || !BANDS.moistureBands) return;
+  var html = '';
+  Object.keys(BANDS.moistureBands).forEach(function(sensorKey) {
+    var row = latestMap[sensorKey];
+    if (!row) return;
+    var band = BANDS.moistureBands[sensorKey];
+    html += '<div class="bullet-bar-item">';
+    html += '<div class="bullet-bar-label">' + band.label + '</div>';
+    html += buildBulletBar(sensorKey, parseFloat(row.value));
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+/* ── Battery badge (§4) ─────────────────────────────────────────────────────
+   SVG icon with proportional fill and ok/low/critical color from BANDS.battery. */
+function buildBatteryBadge(volts) {
+  var bc = BANDS && BANDS.battery;
+  var nominal  = bc ? bc.nominal  : 1.5;
+  var warn     = bc ? bc.warn     : 1.1;
+  var critical = bc ? bc.critical : 0.94;
+  var state = volts <= critical
+    ? { color: '#ef4444', label: 'critical' }
+    : volts <= warn
+    ? { color: '#f59e0b', label: 'low' }
+    : { color: '#22c55e', label: 'ok' };
+  var pct = Math.max(0, Math.min(100, ((volts - critical) / (nominal - critical)) * 100));
+  var fillW = Math.round((18 * pct) / 100);
+  return (
+    '<span class="battery-badge" title="' + volts.toFixed(2) + 'V (' + state.label + ')">' +
+      '<svg width="26" height="14" style="vertical-align:middle">' +
+        '<rect x="0" y="1" width="22" height="12" rx="2" fill="none" stroke="' + state.color + '" stroke-width="1.5"/>' +
+        '<rect x="22" y="4" width="3" height="6" fill="' + state.color + '"/>' +
+        '<rect x="2" y="3" width="' + fillW + '" height="8" fill="' + state.color + '"/>' +
+      '</svg>' +
+      '<span style="color:' + state.color + ';font-size:11px;margin-left:3px">' + volts.toFixed(2) + 'V</span>' +
+    '</span>'
+  );
 }
 
 /** Update the stat-strip values from a latest-rows array */
@@ -1266,12 +1469,56 @@ function updateStats(rows) {
   const map = {};
   rows.forEach(function (r) { map[r.sensor_key] = r; });
 
+  /* Bullet bars for each bed */
+  updateBulletBars(map);
+
   document.querySelectorAll('.stat-value[data-key]').forEach(function (el) {
-    const key = el.dataset.key;
+    var key = el.dataset.key;
     if (!map[key]) return;
-    const unit    = el.querySelector('.stat-unit');
-    const unitHTML = unit ? unit.outerHTML : '';
-    el.innerHTML  = parseFloat(map[key].value).toFixed(1) + unitHTML;
+
+    /* Battery sensor keys: render as SVG badge instead of plain number */
+    if (key.startsWith('soilbatt')) {
+      el.innerHTML = buildBatteryBadge(parseFloat(map[key].value));
+      return;
+    }
+
+    /* Plain numeric value update */
+    var unit     = el.querySelector('.stat-unit');
+    var unitHTML = unit ? unit.outerHTML : '';
+    el.innerHTML = parseFloat(map[key].value).toFixed(1) + unitHTML;
+
+    /* Sparkline + delta (appended to parent .stat if present; skip battery) */
+    var statEl = el.closest ? el.closest('.stat') : el.parentElement;
+    if (!statEl) return;
+    var cached = seriesCache[key];
+    if (!cached || cached.length < 2) return;
+
+    /* Remove previously injected extras so they don't stack on repeat polls */
+    var prev = statEl.querySelector('.kpi-extras');
+    if (prev) prev.remove();
+
+    var current  = parseFloat(map[key].value);
+    /* Reading closest to 1 hour ago */
+    var nowMs    = new Date(map[key].ts).getTime();
+    var targetMs = nowMs - 3600000;
+    var best     = cached[0];
+    cached.forEach(function(r) {
+      if (Math.abs(new Date(r.ts).getTime() - targetMs) <
+          Math.abs(new Date(best.ts).getTime() - targetMs)) { best = r; }
+    });
+    var delta  = current - parseFloat(best.value);
+    var arrow  = delta > 0.05 ? '▲' : delta < -0.05 ? '▼' : '■';
+    var dcolor = delta > 0.05 ? '#22c55e' : delta < -0.05 ? '#ef4444' : '#9ca3af';
+    var unit2  = map[key].unit || '';
+
+    var extrasDiv = document.createElement('div');
+    extrasDiv.className = 'kpi-extras';
+    extrasDiv.innerHTML =
+      '<div class="kpi-delta" style="color:' + dcolor + '">' +
+        arrow + ' ' + Math.abs(delta).toFixed(1) + unit2 + '/hr' +
+      '</div>' +
+      '<svg class="kpi-spark" width="100" height="24">' + _sparkPath(cached) + '</svg>';
+    statEl.appendChild(extrasDiv);
   });
 
   if (rows.length) {
@@ -1416,19 +1663,20 @@ async function refresh() {
   const dot = document.getElementById('dot');
   if (dot) dot.classList.add('active');
 
-  /* One /api/latest call, shared by stat strip + garden */
-  const latestResp = await fetch('/api/latest');
+  /* Fetch /api/latest and all chart series in parallel so seriesCache is
+     populated before updateStats() tries to render sparklines. */
+  var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
+  var results    = await Promise.all([fetch('/api/latest')].concat(chartLoads));
+  var latestResp = results[0];
+
   if (latestResp.ok) {
     const rows = await latestResp.json();
-    updateStats(rows);
+    updateStats(rows);    /* seriesCache is now populated — sparklines render */
     updateGarden(rows);
   }
 
   /* Insight panel — derived metrics + forecast interpretation */
   loadInsights();
-
-  /* Charts fetch independently (need /api/series per sensor) */
-  await Promise.all(CHARTS.map(function (c) { return loadChart(c.key, c.color); }));
 
   if (dot) dot.classList.remove('active');
 }
