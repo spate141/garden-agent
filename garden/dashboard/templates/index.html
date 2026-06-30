@@ -1401,7 +1401,8 @@ function buildBulletBar(sensorKey, value) {
   var fill   = status === 'ok' ? '#22c55e' : status === 'too wet' ? '#ef4444' : '#f59e0b';
   var valPx  = px(value);
   return (
-    '<svg class="bullet-bar" width="' + W + '" height="' + H + '" role="img"' +
+    '<svg class="bullet-bar" viewBox="0 0 ' + W + ' ' + H + '"' +
+    ' width="100%" height="' + H + '" preserveAspectRatio="xMidYMid meet" role="img"' +
     ' aria-label="' + band.label + ' moisture ' + value.toFixed(0) + '% (' + status + ')">' +
       /* track */
       '<rect x="' + pad + '" y="15" width="' + (W - 2 * pad) + '" height="14" rx="7" fill="var(--bg-alt)"/>' +

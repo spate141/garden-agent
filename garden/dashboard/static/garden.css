@@ -914,15 +914,51 @@ footer {
 
 /* ── BULLET BARS (§2) ───────────────────────────────────────────────────── */
 
-/* Bed columns inside the insight strip need extra padding to accommodate the
-   SVG bar height (44px) without making the whole strip too tall. */
+/* Bed columns inside the insight strip. min-width keeps them from collapsing
+   on desktop; mobile overrides this below. */
 .bed-bar-col {
-  min-width: 280px;
+  min-width: 160px;
   padding-top: 8px;
   padding-bottom: 10px;
 }
 
-/* The SVG itself (.bullet-bar) needs no extra CSS; size is set via attributes. */
+/* SVG bullet bar scales to column width via width="100%" on the element. */
+.bullet-bar { display: block; max-width: 260px; }
+
+/* ── INSIGHTS PANEL MOBILE (responsive) ─────────────────────────────────── */
+
+@media (max-width: 720px) {
+  /* Stack bed bars above insight items instead of side-by-side */
+  .insights-panel {
+    flex-direction: column;
+  }
+
+  /* Bed columns: each takes 50% of the row, no fixed min-width */
+  .bed-bar-col {
+    min-width: 0;
+    flex: 1;
+  }
+  .bullet-bar { max-width: 100%; }
+
+  /* Insight items: wrap into a 2-column grid */
+  #insight-items-group .stat-group-body {
+    flex-wrap: wrap;
+  }
+  #insight-items-group .stat {
+    flex: 0 0 50%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+  #insight-items-group .stat:nth-child(odd) {
+    border-right: 1px solid var(--border);
+  }
+  #insight-items-group .stat:last-child,
+  #insight-items-group .stat:nth-last-child(2):nth-child(odd) {
+    border-bottom: none;
+  }
+}
 
 /* ── BATTERY BADGE (§4) ─────────────────────────────────────────────────── */
 
