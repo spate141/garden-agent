@@ -407,6 +407,13 @@ const WEATHER_KEYS = {{ weather_keys_json | safe }};
  *  Injected server-side so the visual wilt/asleep triggers agree with the agent rules. */
 const G = {{ garden_thresholds | safe }};
 
+/** Sun/moon times from Open-Meteo (UTC epoch seconds).
+ *  null when location is unavailable or weather is disabled — sky falls back to
+ *  the tod() clock-hour estimate in that case.
+ *  sunrise_ts / sunset_ts : today's times
+ *  sunrise_ts_tomorrow    : tomorrow's sunrise (bounds the post-sunset moon arc) */
+let SKY = {{ sky_json | safe }};
+
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
    ════════════════════════════════════════════════════════════════════════════ */
@@ -485,6 +492,122 @@ function tod() {
   if (h < 17)           return 'day';
   if (h < 19)           return 'dusk';
   return 'evening';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CELESTIAL POSITION — arc math for sun & moon
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Returns the position of a celestial body along a parabolic arc over the sky strip.
+ *
+ * @param {number} nowSec   – current time, UTC epoch seconds
+ * @param {number} riseSec  – rise time, UTC epoch seconds
+ * @param {number} setSec   – set time, UTC epoch seconds
+ * @param {number} skyH     – sky strip height in px (from clientHeight)
+ * @param {number} bodyH    – body element height in px (used to keep it inside the strip)
+ * @returns {{ left_pct: number, top_px: number, up: boolean }}
+ */
+function celestialPos(nowSec, riseSec, setSec, skyH, bodyH) {
+  var up   = (nowSec >= riseSec && nowSec < setSec);
+  var frac = up ? Math.max(0, Math.min(1, (nowSec - riseSec) / (setSec - riseSec))) : 0;
+
+  /* horizontal: 4 % inset on each side so the body doesn't clip the edge */
+  var left_pct = 4 + frac * 92;
+
+  /* vertical parabola: body sits near the horizon at rise/set, peaks near the top */
+  var MARGIN  = 4;
+  var peakTop = MARGIN;
+  var lowTop  = Math.max(MARGIN + bodyH, skyH - bodyH - MARGIN);
+  var top_px  = lowTop - 4 * frac * (1 - frac) * (lowTop - peakTop);
+
+  return { left_pct: left_pct, top_px: top_px, up: up };
+}
+
+/**
+ * Compute current moon phase from date arithmetic (no API, no library).
+ * Reference new moon: 2000-01-06 18:14 UT.
+ *
+ * @param {Date} date
+ * @returns {{ frac: number, illum: number, waxing: boolean }}
+ *   frac   – 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
+ *   illum  – illuminated fraction 0..1
+ *   waxing – true while frac < 0.5 (right side lit in northern hemisphere)
+ */
+function moonPhase(date) {
+  var REF_MS   = Date.UTC(2000, 0, 6, 18, 14);   /* reference new moon */
+  var SYNODIC  = 29.5305882;                      /* mean synodic month, days */
+  var elapsed  = (date.getTime() - REF_MS) / 86400000;
+  var cycleFrac = ((elapsed % SYNODIC) + SYNODIC) % SYNODIC / SYNODIC;
+  var illum     = (1 - Math.cos(2 * Math.PI * cycleFrac)) / 2;
+  return { frac: cycleFrac, illum: illum, waxing: cycleFrac < 0.5 };
+}
+
+/**
+ * Render the correct phase shape into moonEl's innerHTML using an inline SVG.
+ *
+ * The algorithm:
+ *   - Always draw a dark circle (the unlit side).
+ *   - Overlay a lit path bounded by one semicircle + the terminator ellipse.
+ *   - Terminator rx = R·|cos(frac·2π)| (ranges from R at new/full to 0 at quarters).
+ *   - Sweep direction flips to choose crescent vs gibbous and waxing vs waning.
+ *
+ * @param {HTMLElement} moonEl
+ * @param {{ frac: number, waxing: boolean }} phase
+ */
+function _setMoonPhase(moonEl, phase) {
+  var r = 14, cx = 15, cy = 15;
+  var f = phase.frac;
+
+  /* special cases */
+  var isNew  = (f < 0.02 || f > 0.98);
+  var isFull = (f > 0.48 && f < 0.52);
+
+  /* terminator ellipse x-radius (0 at quarters, r at new/full) */
+  var ex    = r * Math.cos(f * 2 * Math.PI);   /* +r → -r → +r as f goes 0→0.5→1 */
+  var exAbs = Math.abs(ex).toFixed(1);
+  var top   = (cy - r), bot = (cy + r);
+
+  var litPath;
+  if (!isNew && !isFull) {
+    var sw;
+    if (phase.waxing) {
+      /* right side lit: right semicircle (CW), then terminator back to top */
+      sw = (ex > 0) ? '0' : '1';    /* CCW = crescent; CW = gibbous */
+      litPath = 'M ' + cx + ' ' + top +
+                ' A ' + r + ' ' + r + ' 0 0 1 ' + cx + ' ' + bot +
+                ' A ' + exAbs + ' ' + r + ' 0 0 ' + sw + ' ' + cx + ' ' + top;
+    } else {
+      /* left side lit: left semicircle (CCW), then terminator back to top */
+      sw = (ex < 0) ? '1' : '0';    /* CW = gibbous; CCW = crescent */
+      litPath = 'M ' + cx + ' ' + top +
+                ' A ' + r + ' ' + r + ' 0 0 0 ' + cx + ' ' + bot +
+                ' A ' + exAbs + ' ' + r + ' 0 0 ' + sw + ' ' + cx + ' ' + top;
+    }
+  }
+
+  /* subtle craters */
+  var craters = (phase.illum > 0.25)
+    ? '<circle cx="11" cy="11" r="1.5" fill="rgba(180,175,150,0.3)"/>' +
+      '<circle cx="19" cy="18" r="1"   fill="rgba(180,175,150,0.25)"/>'
+    : '';
+
+  var svg = '<svg width="30" height="30" viewBox="0 0 30 30"' +
+            ' xmlns="http://www.w3.org/2000/svg">';
+  if (isNew) {
+    /* new moon: dark disc with faint halo so it's vaguely visible at night */
+    svg += '<circle cx="15" cy="15" r="14" fill="#0e0e28" opacity="0.7"/>';
+  } else if (isFull) {
+    /* full moon: all lit */
+    svg += '<circle cx="15" cy="15" r="14" fill="#e8e4c8"/>' + craters;
+  } else {
+    svg += '<circle cx="15" cy="15" r="14" fill="#0e0e28"/>';
+    svg += '<path d="' + litPath + '" fill="#e8e4c8"/>';
+    svg += craters;
+  }
+  svg += '</svg>';
+
+  moonEl.innerHTML = svg;
 }
 
 const SKY_PALETTE = {
@@ -889,24 +1012,83 @@ function _updateSky(readings, ts, timeOfDay) {
   const moon = document.getElementById('sky-moon');
   if (!sky) return;
 
-  /* sky gradient */
-  const [top, bot] = SKY_PALETTE[timeOfDay] || SKY_PALETTE.day;
-  sky.style.background = 'linear-gradient(180deg,' + top + ' 0%,' + bot + ' 100%)';
+  const skyH   = sky.clientHeight || 86;
+  const nowSec = Date.now() / 1000;
+  let sunUp = false, moonUp = false;
 
-  /* sun vs moon */
-  const showSun = (timeOfDay === 'day' || timeOfDay === 'dawn' || timeOfDay === 'dusk');
-  if (sun)  sun.style.opacity  = showSun ? '1' : '0';
-  if (moon) moon.style.opacity = showSun ? '0' : '1';
+  if (SKY && SKY.sunrise_ts && SKY.sunset_ts) {
+    /* ── Real sun position from Open-Meteo sunrise/sunset ── */
+    const sunPos = celestialPos(nowSec, SKY.sunrise_ts, SKY.sunset_ts, skyH, 38);
+    sunUp = sunPos.up;
 
-  /* warm sun at dawn/dusk */
-  if (sun) {
-    if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
-      sun.style.background  = '#ff9040';
-      sun.style.boxShadow   = '0 0 22px 8px rgba(255,140,40,0.6)';
-    } else {
-      sun.style.background  = '#ffd94a';
-      sun.style.boxShadow   = '0 0 22px 7px rgba(255,220,50,0.55)';
+    if (sun) {
+      sun.style.left = sunPos.left_pct.toFixed(1) + '%';
+      sun.style.top  = sunPos.top_px.toFixed(0)   + 'px';
     }
+
+    /* ── Real moon position: arc across the opposite night window ── */
+    let moonRise, moonSet;
+    if (SKY.sunrise_ts_tomorrow) {
+      /* night length ≈ tomorrow's sunrise minus today's sunset */
+      const nightLen = SKY.sunrise_ts_tomorrow - SKY.sunset_ts;
+      if (nowSec < SKY.sunrise_ts) {
+        /* pre-dawn window: approximate yesterday's sunset by subtracting nightLen */
+        moonRise = SKY.sunrise_ts - nightLen;
+        moonSet  = SKY.sunrise_ts;
+      } else {
+        /* post-sunset window: tonight */
+        moonRise = SKY.sunset_ts;
+        moonSet  = SKY.sunrise_ts_tomorrow;
+      }
+      const moonPos = celestialPos(nowSec, moonRise, moonSet, skyH, 30);
+      moonUp = moonPos.up && !sunUp;
+      if (moon) {
+        moon.style.left = moonPos.left_pct.toFixed(1) + '%';
+        moon.style.top  = moonPos.top_px.toFixed(0)   + 'px';
+      }
+    } else {
+      moonUp = !sunUp;
+    }
+
+    /* Derive a fine-grained timeOfDay from real sun fraction */
+    if (sunUp) {
+      const frac = (nowSec - SKY.sunrise_ts) / (SKY.sunset_ts - SKY.sunrise_ts);
+      timeOfDay = (frac < 0.08 || frac > 0.92) ? (frac < 0.5 ? 'dawn' : 'dusk') : 'day';
+    } else {
+      const secsToRise  = SKY.sunrise_ts - nowSec;
+      const secsFromSet = nowSec - SKY.sunset_ts;
+      if (secsToRise  > 0 && secsToRise  < 3600) timeOfDay = 'dawn';
+      else if (secsFromSet > 0 && secsFromSet < 3600) timeOfDay = 'dusk';
+      else timeOfDay = (nowSec > SKY.sunset_ts) ? 'evening' : 'night';
+    }
+  } else {
+    /* ── Fallback: tod() clock-hour buckets (no location data) ── */
+    const showSun = (timeOfDay === 'day' || timeOfDay === 'dawn' || timeOfDay === 'dusk');
+    sunUp  = showSun;
+    moonUp = !showSun;
+    /* leave left/top at CSS defaults */
+  }
+
+  /* sky gradient */
+  const [gradTop, gradBot] = SKY_PALETTE[timeOfDay] || SKY_PALETTE.day;
+  sky.style.background = 'linear-gradient(180deg,' + gradTop + ' 0%,' + gradBot + ' 100%)';
+
+  /* sun: show/hide and warm tint at dawn/dusk */
+  if (sun) {
+    sun.style.opacity = sunUp ? '1' : '0';
+    if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
+      sun.style.background = '#ff9040';
+      sun.style.boxShadow  = '0 0 22px 8px rgba(255,140,40,0.6)';
+    } else {
+      sun.style.background = '#ffd94a';
+      sun.style.boxShadow  = '0 0 22px 7px rgba(255,220,50,0.55)';
+    }
+  }
+
+  /* moon: show/hide and render real phase shape */
+  if (moon) {
+    moon.style.opacity = moonUp ? '1' : '0';
+    _setMoonPhase(moon, moonPhase(new Date()));
   }
 
   /* clouds: opacity driven by humidity + pressure */
@@ -1167,6 +1349,15 @@ async function loadInsights() {
   try { resp = await fetch('/api/insights'); } catch (_) { return; }
   if (!resp.ok) return;
   var data = await resp.json();
+
+  /* Refresh sky animation data from the forecast — self-heals across midnight */
+  if (data.forecast && data.forecast.sunrise_ts && data.forecast.sunset_ts) {
+    SKY = {
+      sunrise_ts:          data.forecast.sunrise_ts,
+      sunset_ts:           data.forecast.sunset_ts,
+      sunrise_ts_tomorrow: data.forecast.sunrise_ts_tomorrow || null,
+    };
+  }
 
   var panel = document.getElementById('insights-panel');
   if (!panel) return;

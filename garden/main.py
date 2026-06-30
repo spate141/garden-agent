@@ -141,10 +141,14 @@ async def api_insights() -> JSONResponse:
     fc = get_forecast()
     if fc:
         insights["forecast"] = {
-            "et0_in":          fc.get("et0_in"),
-            "water_balance_in": fc.get("water_balance_in"),
-            "frost_risk":      fc.get("frost_risk", False),
-            "tomorrow_low_f":  fc.get("tomorrow_low_f"),
+            "et0_in":              fc.get("et0_in"),
+            "water_balance_in":    fc.get("water_balance_in"),
+            "frost_risk":          fc.get("frost_risk", False),
+            "tomorrow_low_f":      fc.get("tomorrow_low_f"),
+            # Sun times for sky animation — UTC epoch seconds; absent when location unavailable
+            "sunrise_ts":          fc.get("sunrise_ts"),
+            "sunset_ts":           fc.get("sunset_ts"),
+            "sunrise_ts_tomorrow": fc.get("sunrise_ts_tomorrow"),
         }
 
     # ── Per-bed stress ────────────────────────────────────────────────────────
@@ -235,6 +239,18 @@ async def dashboard(request: Request):
         "staleMin": cfg.watchdog.get("sensor_timeout_minutes", 30),
     })
 
+    # Sky animation: pass sunrise/sunset UTC epochs so the sun arc is correct on first paint.
+    # Reuses the cached Open-Meteo forecast — no extra network call.
+    from garden.agent.weather import get_forecast as _get_fc
+    _fc = _get_fc()
+    _sky: dict | None = None
+    if _fc and _fc.get("sunrise_ts") and _fc.get("sunset_ts"):
+        _sky = {
+            "sunrise_ts":          _fc["sunrise_ts"],
+            "sunset_ts":           _fc["sunset_ts"],
+            "sunrise_ts_tomorrow": _fc.get("sunrise_ts_tomorrow"),
+        }
+
     return _TEMPLATES.TemplateResponse(
         request,
         "index.html",
@@ -249,5 +265,6 @@ async def dashboard(request: Request):
             "stat_groups": stat_groups,
             "beds_json": json.dumps(cfg.dashboard.get("beds", [])),
             "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
+            "sky_json": json.dumps(_sky),
         },
     )

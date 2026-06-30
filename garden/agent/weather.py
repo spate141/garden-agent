@@ -155,7 +155,7 @@ def get_forecast() -> dict[str, Any] | None:
                 "daily": (
                     "temperature_2m_max,temperature_2m_min,precipitation_sum,"
                     "precipitation_probability_max,wind_speed_10m_max,weather_code,"
-                    "et0_fao_evapotranspiration"
+                    "et0_fao_evapotranspiration,sunrise,sunset"
                 ),
                 "hourly": "precipitation_probability,temperature_2m",
                 "forecast_days": 2,   # day 0 = today, day 1 = tomorrow (frost lookahead)
@@ -217,6 +217,24 @@ def get_forecast() -> dict[str, Any] | None:
         else:
             fc["next_12h_peak_rain_pct"]      = 0
             fc["next_12h_peak_hour_offset"]   = 0
+
+        # Sun rise/set as UTC epoch seconds (for dashboard sky animation).
+        # Open-Meteo returns naive local ISO strings; utc_offset_seconds converts them to UTC.
+        # Formula: treat string as UTC, then subtract the offset to arrive at true UTC.
+        utc_offset = raw.get("utc_offset_seconds", 0)
+
+        def _sun_epoch(s: str) -> int:
+            return int(datetime.fromisoformat(s).replace(tzinfo=timezone.utc).timestamp()) - utc_offset
+
+        try:
+            sr = daily.get("sunrise", [])
+            ss = daily.get("sunset",  [])
+            if sr and ss:
+                fc["sunrise_ts"]          = _sun_epoch(sr[0])
+                fc["sunset_ts"]           = _sun_epoch(ss[0])
+                fc["sunrise_ts_tomorrow"] = _sun_epoch(sr[1]) if len(sr) > 1 else None
+        except Exception as _exc:
+            log.debug("Sun time parse error: %s", _exc)
 
         _cache    = fc
         _cache_ts = now_mono

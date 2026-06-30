@@ -60,6 +60,22 @@ flowchart TD
     class GW,Timer,Browser,TG,ANT,OM ext;
 ```
 
+## Screenshots
+
+<details>
+<summary>Light mode</summary>
+
+![Dashboard – light mode](docs/light.png)
+
+</details>
+
+<details>
+<summary>Night mode</summary>
+
+![Dashboard – night mode](docs/night.png)
+
+</details>
+
 ## Requirements
 
 - Python 3.11+
