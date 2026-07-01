@@ -157,7 +157,8 @@ def _sensor_summary() -> str:
     if not rows:
         return "No sensor data available yet."
 
-    PRIORITY = ["soilmoisture1", "soilmoisture2", "temp_f", "humidity", "soilbatt1", "soilbatt2"]
+    PRIORITY = ["soilmoisture1", "soilmoisture2", "soilmoisture3", "soilmoisture4",
+                "temp_f", "humidity", "soilbatt1", "soilbatt2", "soilbatt3", "soilbatt4"]
     DERIVED   = ["vpd_kpa", "dewpoint_f", "heatindex_f"]
     by_key    = {r["sensor_key"]: r for r in rows}
 

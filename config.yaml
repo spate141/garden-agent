@@ -15,6 +15,14 @@ sensors:
     label: "Bed 2 moisture"
     color: "#22c55e"
     chart: true
+  soilmoisture3:
+    label: "Bed 3 moisture"
+    color: "#16a34a"
+    chart: true
+  soilmoisture4:
+    label: "Bed 4 moisture"
+    color: "#15803d"
+    chart: true
   temp_f:
     label: "Outdoor temp"
     color: "#fb923c"
@@ -55,6 +63,14 @@ sensors:
     label: "Battery"
     color: "#f59e0b"
     chart: false    # stat-strip only
+  soilbatt3:
+    label: "Battery"
+    color: "#d97706"
+    chart: false    # stat-strip only
+  soilbatt4:
+    label: "Battery"
+    color: "#b45309"
+    chart: false    # stat-strip only
   # ── derived metrics (computed from temp1_f + humidity1 at ingest time) ────
   vpd_kpa:
     label: "VPD"
@@ -82,12 +98,24 @@ dashboard:
       name: "Bed 2"
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
       plants: [eggplant, eggplant, okra, okra]
+    - id: bed3
+      name: "Bed 3"
+      sensors: {soil_moisture: soilmoisture3, soil_battery: soilbatt3}
+      plants: [sweet_pepper, sweet_pepper, sweet_pepper, sweet_pepper]
+    - id: bed4
+      name: "Bed 4"
+      sensors: {soil_moisture: soilmoisture4, soil_battery: soilbatt4}
+      plants: [zucchini, eggplant]
   weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
   stat_groups:
     - name: "Bed 1"
       sensors: [soilmoisture1, soilbatt1]
     - name: "Bed 2"
       sensors: [soilmoisture2, soilbatt2]
+    - name: "Bed 3"
+      sensors: [soilmoisture3, soilbatt3]
+    - name: "Bed 4"
+      sensors: [soilmoisture4, soilbatt4]
     - name: "Gazebo"
       sensors: [temp1_f, humidity1]
     - name: "Station"
@@ -98,22 +126,22 @@ dashboard:
 # ── Alert thresholds (deterministic rules) ────────────────────────────────────
 thresholds:
   soil_moisture_low:
-    sensor_keys: [soilmoisture1, soilmoisture2]
+    sensor_keys: [soilmoisture1, soilmoisture2, soilmoisture3, soilmoisture4]
     below: 30          # alert when moisture drops below this %
     consecutive: 3     # must see N consecutive readings below threshold
 
   soil_moisture_rapid_drop:
-    sensor_keys: [soilmoisture1, soilmoisture2]
+    sensor_keys: [soilmoisture1, soilmoisture2, soilmoisture3, soilmoisture4]
     drop_pct: 15       # alert if moisture drops this many % points in window_minutes
     window_minutes: 60
 
   soil_moisture_rapid_rise:
-    sensor_keys: [soilmoisture1, soilmoisture2]
+    sensor_keys: [soilmoisture1, soilmoisture2, soilmoisture3, soilmoisture4]
     rise_pct: 10       # alert if moisture rises this many % points in window_minutes (= watering event)
     window_minutes: 30
 
   battery_low:
-    sensor_keys: [soilbatt1, soilbatt2]
+    sensor_keys: [soilbatt1, soilbatt2, soilbatt3, soilbatt4]
     below: 1.1         # WH51 battery ~1.5V nominal; warn below 1.1V
 
   temp_frost:

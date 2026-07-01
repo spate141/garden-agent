@@ -159,6 +159,18 @@ header {
 }
 .stats-strip::-webkit-scrollbar { display: none; }
 
+/* desktop: wrap whole groups onto additional rows instead of scrolling
+   horizontally once there are more groups than fit the window width */
+@media (min-width: 721px) {
+  .stats-strip {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .stats-strip .stat-group {
+    flex: 0 0 auto !important;
+  }
+}
+
 /* grouped layout */
 .stat-group {
   display: flex;
@@ -244,6 +256,17 @@ header {
   min-height: 0; /* collapses cleanly when JS hasn't populated it yet */
 }
 .insights-panel::-webkit-scrollbar { display: none; }
+
+/* desktop: same wrap-instead-of-scroll behavior as .stats-strip */
+@media (min-width: 721px) {
+  .insights-panel {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .insights-panel .stat-group {
+    flex: 0 0 auto !important;
+  }
+}
 
 /* numeric value — same weight/face as .stat-value, slightly smaller to
    leave room for the .insight-note line below it */
@@ -827,10 +850,16 @@ footer {
 /* Responsive */
 @media (max-width: 720px) {
   .garden-ground {
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    justify-items: center;
+    align-items: start;
     padding: 12px 16px 18px;
+    overflow-x: hidden;
   }
+  .g-bed { width: 100%; }
+  .g-bed-frame { width: 100%; max-width: 210px; }
   .garden-sky { height: 72px; }
   .sky-chips  { gap: 5px; }
   .sky-chip   { font-size: 11px; padding: 4px 9px; }

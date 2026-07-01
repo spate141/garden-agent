@@ -1,0 +1,240 @@
+<svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <!-- Sky gradient: dawn over the garden -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a5a78"/>
+      <stop offset="45%" stop-color="#5c7f92"/>
+      <stop offset="100%" stop-color="#7fa87c"/>
+    </linearGradient>
+    <!-- Soil strip -->
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8a5a2b"/>
+      <stop offset="100%" stop-color="#5e3d1c"/>
+    </linearGradient>
+
+    <!-- Node fills -->
+    <linearGradient id="ext" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdf6e3"/><stop offset="100%" stop-color="#f0e4c4"/>
+    </linearGradient>
+    <linearGradient id="data" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cfe8d4"/><stop offset="100%" stop-color="#a9d3ae"/>
+    </linearGradient>
+    <linearGradient id="ctrl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8dcc0"/><stop offset="100%" stop-color="#d4c090"/>
+    </linearGradient>
+    <linearGradient id="store" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6d9a8"/><stop offset="100%" stop-color="#e6b566"/>
+    </linearGradient>
+
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="0" flood-color="#3a2b16" flood-opacity="0.55"/>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#1c2a1c" flood-opacity="0.35"/>
+    </filter>
+
+    <!-- Sprout icon -->
+    <g id="sprout">
+      <rect x="-3" y="0" width="6" height="16" fill="#6b4a24"/>
+      <path d="M0 6 C -14 6 -16 -8 -2 -6 C -2 4 0 6 0 6 Z" fill="#5bbf5b" stroke="#2f7d2f" stroke-width="1.5"/>
+      <path d="M0 3 C 14 3 16 -11 2 -9 C 2 1 0 3 0 3 Z" fill="#78d478" stroke="#2f7d2f" stroke-width="1.5"/>
+    </g>
+
+    <!-- Sun -->
+    <g id="sun">
+      <circle r="20" fill="#ffe08a"/>
+      <circle r="14" fill="#ffd24d"/>
+    </g>
+  </defs>
+
+  <!-- ===== BACKGROUND ===== -->
+  <rect width="1000" height="720" fill="url(#sky)"/>
+  <use href="#sun" x="905" y="70"/>
+  <!-- clouds -->
+  <g fill="#ffffff" opacity="0.35">
+    <ellipse cx="180" cy="70" rx="46" ry="16"/>
+    <ellipse cx="215" cy="62" rx="34" ry="14"/>
+    <ellipse cx="560" cy="48" rx="40" ry="14"/>
+  </g>
+  <!-- soil ground -->
+  <rect x="0" y="640" width="1000" height="80" fill="url(#soil)"/>
+  <g fill="#4a3016" opacity="0.5">
+    <rect x="40" y="656" width="10" height="10"/><rect x="120" y="672" width="8" height="8"/>
+    <rect x="300" y="660" width="10" height="10"/><rect x="480" y="676" width="8" height="8"/>
+    <rect x="640" y="658" width="10" height="10"/><rect x="820" y="672" width="8" height="8"/>
+    <rect x="920" y="660" width="10" height="10"/>
+  </g>
+  <!-- decorative sprouts along soil -->
+  <use href="#sprout" x="70" y="622" transform="scale(0.9)"/>
+  <use href="#sprout" x="255" y="628"/>
+  <use href="#sprout" x="500" y="624" transform="scale(1.1)"/>
+  <use href="#sprout" x="745" y="628"/>
+  <use href="#sprout" x="930" y="624" transform="scale(0.9)"/>
+
+  <!-- Title banner -->
+  <g filter="url(#soft)">
+    <rect x="316" y="24" width="368" height="60" rx="10" fill="#f0e4c4" stroke="#7a5a2b" stroke-width="3"/>
+    <use href="#sprout" x="352" y="36" transform="scale(1.05)"/>
+    <text x="512" y="52" text-anchor="middle" font-size="26" font-weight="800" fill="#3d2a12" letter-spacing="0.5">garden-agent</text>
+    <text x="512" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#6b4a24">Sprout &amp; Circuit · self-hosted sensor pipeline</text>
+  </g>
+
+  <!-- ===== EDGES (drawn first, under nodes) ===== -->
+  <g stroke-width="2.5" fill="none" stroke-linecap="round">
+    <!-- GW -> INGEST -->
+    <path d="M615 175 L615 214" stroke="#3f7d46"/>
+    <!-- Timer -> RUNNER -->
+    <path d="M235 210 C235 340 300 360 348 388" stroke="#8a6d2c"/>
+    <!-- INGEST -> DB -->
+    <path d="M660 260 C740 300 760 430 762 512" stroke="#c98a2b"/>
+    <!-- INGEST -> RUNNER (evaluate_instant) -->
+    <path d="M560 250 C440 300 430 350 432 388" stroke="#8a6d2c"/>
+    <!-- RUNNER -> RULES -->
+    <path d="M348 424 C300 450 270 460 250 486" stroke="#8a6d2c"/>
+    <!-- RULES -> DB (reads history) -->
+    <path d="M300 520 C520 560 660 560 726 552" stroke="#c98a2b" stroke-dasharray="6 5"/>
+    <!-- RULES -> RUNNER (results) -->
+    <path d="M300 500 C350 470 380 450 400 428" stroke="#8a6d2c" stroke-dasharray="6 5"/>
+    <!-- RUNNER -> LLM -->
+    <path d="M470 410 C560 430 600 460 618 486" stroke="#8a6d2c"/>
+    <!-- LLM -> WEATHER -->
+    <path d="M618 520 C450 560 300 580 250 588" stroke="#8a6d2c" stroke-dasharray="6 5"/>
+    <!-- WEATHER -> OM -->
+    <path d="M180 624 L180 656" stroke="#5f5e5a"/>
+    <!-- LLM -> ANT -->
+    <path d="M700 512 C800 540 850 560 878 574" stroke="#5f5e5a"/>
+    <!-- RUNNER -> TG -->
+    <path d="M470 400 C640 430 760 440 828 448" stroke="#3f7d46"/>
+    <!-- Browser -> SERVE -->
+    <path d="M840 175 L840 214" stroke="#3f7d46"/>
+    <!-- SERVE -> DB -->
+    <path d="M840 260 C840 380 800 460 786 512" stroke="#c98a2b"/>
+  </g>
+
+  <!-- Edge labels -->
+  <g font-size="10.5" font-weight="700">
+    <g><rect x="576" y="188" width="86" height="16" rx="4" fill="#2f4a34"/><text x="619" y="200" text-anchor="middle" fill="#dff2e0">snapshot + readings</text></g>
+    <g><rect x="452" y="300" width="86" height="16" rx="4" fill="#5c4718"/><text x="495" y="312" text-anchor="middle" fill="#f4e8c8">evaluate_instant</text></g>
+    <g><rect x="188" y="292" width="82" height="16" rx="4" fill="#5c4718"/><text x="229" y="304" text-anchor="middle" fill="#f4e8c8">run_cron_tick</text></g>
+    <g><rect x="266" y="452" width="94" height="16" rx="4" fill="#5c4718"/><text x="313" y="464" text-anchor="middle" fill="#f4e8c8">run_instant / cron</text></g>
+    <g><rect x="470" y="530" width="74" height="16" rx="4" fill="#5c4718"/><text x="507" y="542" text-anchor="middle" fill="#f4e8c8">get_forecast</text></g>
+    <g><rect x="500" y="546" width="82" height="16" rx="4" fill="#5c3d10"/><text x="541" y="558" text-anchor="middle" fill="#f6d9a8">reads history</text></g>
+    <g><rect x="782" y="546" width="84" height="16" rx="4" fill="#4a3a12"/><text x="824" y="558" text-anchor="middle" fill="#f6e2be">messages.create</text></g>
+    <g><rect x="600" y="426" width="76" height="16" rx="4" fill="#2f4a34"/><text x="638" y="438" text-anchor="middle" fill="#dff2e0">tg title, body</text></g>
+    <g><rect x="792" y="392" width="60" height="16" rx="4" fill="#5c3d10"/><text x="822" y="404" text-anchor="middle" fill="#f6d9a8">latest / series</text></g>
+  </g>
+
+  <!-- ===== NODES ===== -->
+  <!-- external node helper look via inline groups -->
+
+  <!-- GW1200 gateway -->
+  <g filter="url(#drop)">
+    <rect x="540" y="132" width="150" height="44" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="615" y="152" text-anchor="middle" font-size="13" font-weight="800" fill="#3d2a12">GW1200 gateway</text>
+    <text x="615" y="167" text-anchor="middle" font-size="10" fill="#6b4a24">HTTPS POST · every ~5 min</text>
+  </g>
+
+  <!-- Browser dashboard -->
+  <g filter="url(#drop)">
+    <rect x="770" y="132" width="140" height="44" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="840" y="152" text-anchor="middle" font-size="13" font-weight="800" fill="#3d2a12">Browser</text>
+    <text x="840" y="167" text-anchor="middle" font-size="10" fill="#6b4a24">dashboard UI</text>
+  </g>
+
+  <!-- systemd timer -->
+  <g filter="url(#drop)">
+    <rect x="150" y="166" width="170" height="44" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="235" y="186" text-anchor="middle" font-size="13" font-weight="800" fill="#3d2a12">systemd timer</text>
+    <text x="235" y="201" text-anchor="middle" font-size="10" fill="#6b4a24">cron tick · every 15 min</text>
+  </g>
+
+  <!-- FastAPI cluster -->
+  <g filter="url(#soft)">
+    <rect x="490" y="214" width="420" height="98" rx="12" fill="#2f4a34" fill-opacity="0.45" stroke="#3f7d46" stroke-width="2" stroke-dasharray="7 5"/>
+  </g>
+  <use href="#sprout" x="512" y="220" transform="scale(0.62)"/>
+  <text x="524" y="234" font-size="12" font-weight="800" fill="#eafbec">FastAPI · localhost:8001</text>
+  <g filter="url(#drop)">
+    <rect x="510" y="242" width="200" height="58" rx="8" fill="url(#data)" stroke="#2f7d3a" stroke-width="2.5"/>
+    <text x="610" y="263" text-anchor="middle" font-size="13" font-weight="800" fill="#1c4a24">POST /api/ecowitt</text>
+    <text x="610" y="279" text-anchor="middle" font-size="9.5" fill="#2c5c34">parse · normalize · store</text>
+    <text x="610" y="291" text-anchor="middle" font-size="9.5" fill="#2c5c34">evaluate</text>
+  </g>
+  <g filter="url(#drop)">
+    <rect x="730" y="242" width="160" height="58" rx="8" fill="url(#data)" stroke="#2f7d3a" stroke-width="2.5"/>
+    <text x="810" y="266" text-anchor="middle" font-size="13" font-weight="800" fill="#1c4a24">GET endpoints</text>
+    <text x="810" y="283" text-anchor="middle" font-size="9" fill="#2c5c34">/ · /api/latest · /api/series</text>
+  </g>
+
+  <!-- garden.agent cluster -->
+  <g filter="url(#soft)">
+    <rect x="180" y="372" width="470" height="256" rx="12" fill="#5c4718" fill-opacity="0.35" stroke="#8a6d2c" stroke-width="2" stroke-dasharray="7 5"/>
+  </g>
+  <use href="#sprout" x="200" y="378" transform="scale(0.62)"/>
+  <text x="214" y="392" font-size="12" font-weight="800" fill="#f6ead0">garden.agent</text>
+
+  <!-- runner.py -->
+  <g filter="url(#drop)">
+    <rect x="348" y="388" width="124" height="40" rx="8" fill="url(#ctrl)" stroke="#8a6d2c" stroke-width="2.5"/>
+    <text x="410" y="405" text-anchor="middle" font-size="12.5" font-weight="800" fill="#4a3512">runner.py</text>
+    <text x="410" y="419" text-anchor="middle" font-size="8.5" fill="#6b5220">cooldown · alert-once · brief</text>
+  </g>
+  <!-- rules.py -->
+  <g filter="url(#drop)">
+    <rect x="140" y="486" width="160" height="46" rx="8" fill="url(#ctrl)" stroke="#8a6d2c" stroke-width="2.5"/>
+    <text x="220" y="507" text-anchor="middle" font-size="12.5" font-weight="800" fill="#4a3512">rules.py</text>
+    <text x="220" y="522" text-anchor="middle" font-size="9" fill="#6b5220">deterministic thresholds</text>
+  </g>
+  <!-- llm.py -->
+  <g filter="url(#drop)">
+    <rect x="540" y="486" width="160" height="46" rx="8" fill="url(#ctrl)" stroke="#8a6d2c" stroke-width="2.5"/>
+    <text x="620" y="507" text-anchor="middle" font-size="12.5" font-weight="800" fill="#4a3512">llm.py</text>
+    <text x="620" y="522" text-anchor="middle" font-size="9" fill="#6b5220">alert prose · morning brief</text>
+  </g>
+  <!-- weather.py -->
+  <g filter="url(#drop)">
+    <rect x="100" y="588" width="160" height="46" rx="8" fill="url(#ctrl)" stroke="#8a6d2c" stroke-width="2.5"/>
+    <text x="180" y="609" text-anchor="middle" font-size="12.5" font-weight="800" fill="#4a3512">weather.py</text>
+    <text x="180" y="624" text-anchor="middle" font-size="9" fill="#6b5220">Open-Meteo · 120 min cache</text>
+  </g>
+
+  <!-- SQLite barrel -->
+  <g filter="url(#drop)">
+    <ellipse cx="762" cy="516" rx="80" ry="12" fill="#f0c078" stroke="#b07518" stroke-width="2.5"/>
+    <path d="M682 516 L682 556 A80 12 0 0 0 842 556 L842 516" fill="url(#store)" stroke="#b07518" stroke-width="2.5"/>
+    <ellipse cx="762" cy="516" rx="80" ry="12" fill="#f6d9a8" stroke="#b07518" stroke-width="2.5"/>
+    <text x="762" y="512" text-anchor="middle" font-size="13" font-weight="800" fill="#633806">SQLite</text>
+    <text x="762" y="536" text-anchor="middle" font-size="8.5" fill="#7a4a10">snapshots · readings</text>
+    <text x="762" y="548" text-anchor="middle" font-size="8.5" fill="#7a4a10">alert_state</text>
+  </g>
+
+  <!-- Telegram -->
+  <g filter="url(#drop)">
+    <rect x="828" y="426" width="150" height="46" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="903" y="447" text-anchor="middle" font-size="13" font-weight="800" fill="#3d2a12">Telegram</text>
+    <text x="903" y="462" text-anchor="middle" font-size="9" fill="#6b4a24">alerts + daily brief</text>
+  </g>
+
+  <!-- Anthropic -->
+  <g filter="url(#drop)">
+    <rect x="828" y="552" width="150" height="46" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="903" y="573" text-anchor="middle" font-size="13" font-weight="800" fill="#3d2a12">Anthropic API</text>
+    <text x="903" y="588" text-anchor="middle" font-size="9" fill="#6b4a24">Claude Sonnet 4.6</text>
+  </g>
+
+  <!-- Open-Meteo -->
+  <g filter="url(#drop)">
+    <rect x="100" y="656" width="160" height="40" rx="8" fill="url(#ext)" stroke="#7a5a2b" stroke-width="2.5"/>
+    <text x="180" y="674" text-anchor="middle" font-size="12.5" font-weight="800" fill="#3d2a12">Open-Meteo</text>
+    <text x="180" y="688" text-anchor="middle" font-size="9" fill="#6b4a24">no API key required</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(24,132)" font-size="10.5" font-weight="700">
+    <rect x="0" y="0" width="112" height="96" rx="8" fill="#f0e4c4" stroke="#7a5a2b" stroke-width="2"/>
+    <rect x="10" y="12" width="16" height="12" rx="3" fill="url(#data)" stroke="#2f7d3a"/><text x="34" y="22" fill="#3d2a12">FastAPI</text>
+    <rect x="10" y="32" width="16" height="12" rx="3" fill="url(#ctrl)" stroke="#8a6d2c"/><text x="34" y="42" fill="#3d2a12">agent</text>
+    <rect x="10" y="52" width="16" height="12" rx="3" fill="url(#store)" stroke="#b07518"/><text x="34" y="62" fill="#3d2a12">storage</text>
+    <rect x="10" y="72" width="16" height="12" rx="3" fill="url(#ext)" stroke="#7a5a2b"/><text x="34" y="82" fill="#3d2a12">external</text>
+  </g>
+</svg>
