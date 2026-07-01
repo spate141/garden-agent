@@ -47,7 +47,7 @@ def _cooldown_minutes(rule_id: str) -> int:
 
 
 def _in_cooldown(state: dict, rule_id: str) -> bool:
-    """True if the rule fired recently and is still within its cooldown window."""
+    """True if this rule fired within its cooldown window (time-based, regardless of active state)."""
     last_fired = state.get("last_fired_ts", "")
     if not last_fired:
         return False
@@ -56,6 +56,32 @@ def _in_cooldown(state: dict, rule_id: str) -> bool:
         last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
         elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
         return elapsed < cooldown
+    except ValueError:
+        return False
+
+
+# rapid_drop is inhibited for N minutes after a watering event (rapid_rise) on the same bed.
+# This prevents sensor-spike settling from being misread as a drainage/leak event.
+_INHIBIT_AFTER: dict[str, str] = {
+    "soil_moisture_rapid_drop": "soil_moisture_rapid_rise",
+}
+
+
+def _inhibited_by_watering(result: RuleResult) -> bool:
+    prefix = result.rule_id.split(":")[0]
+    inhibitor_prefix = _INHIBIT_AFTER.get(prefix)
+    if not inhibitor_prefix:
+        return False
+    inhibitor_id = f"{inhibitor_prefix}:{result.sensor_key}"
+    inh_state = storage.get_alert_state(inhibitor_id)
+    last_fired = inh_state.get("last_fired_ts", "")
+    if not last_fired:
+        return False
+    inhibit_minutes = cfg.cooldowns.get("rapid_drop_after_watering_minutes", 120)
+    try:
+        last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
+        elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
+        return elapsed < inhibit_minutes
     except ValueError:
         return False
 
@@ -78,8 +104,11 @@ def _evaluate(results: list[RuleResult]) -> None:
         was_active = bool(state.get("active", 0))
 
         if result.fired:
-            if was_active and _in_cooldown(state, result.rule_id):
+            if _in_cooldown(state, result.rule_id):
                 log.debug("Suppressed (cooldown): %s", result.rule_id)
+                continue
+            if _inhibited_by_watering(result):
+                log.debug("Suppressed (post-watering inhibit): %s", result.rule_id)
                 continue
             _dispatch(result)
         else:

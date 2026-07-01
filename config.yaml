@@ -131,8 +131,7 @@ watchdog:
 
 # ── Alert cooldowns & de-dup ──────────────────────────────────────────────────
 cooldowns:
-  # After an alert fires, suppress re-alerts for this many minutes
-  # (alert-once-until-cleared: re-alerts only after the condition clears then re-trips)
+  # After an alert fires, suppress re-alerts for this many minutes (time-based).
   soil_moisture_low_minutes: 120
   soil_moisture_rapid_drop_minutes: 60
   soil_moisture_rapid_rise_minutes: 60
@@ -140,6 +139,9 @@ cooldowns:
   temp_frost_minutes: 60
   temp_heat_minutes: 60
   watchdog_minutes: 360
+  # After a watering event (rapid rise), suppress rapid-drop alerts for this long.
+  # Prevents sensor-spike settling from being misread as a leak/drainage event.
+  rapid_drop_after_watering_minutes: 120
 
 # ── LLM model selection ───────────────────────────────────────────────────────
 # Any Anthropic model ID works. Change here; no code edits needed.
