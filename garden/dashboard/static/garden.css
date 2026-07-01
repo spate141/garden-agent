@@ -167,7 +167,7 @@ header {
     overflow-x: visible;
   }
   .stats-strip .stat-group {
-    flex: 0 0 auto !important;
+    flex: 1 0 auto !important;
   }
 }
 
@@ -264,7 +264,7 @@ header {
     overflow-x: visible;
   }
   .insights-panel .stat-group {
-    flex: 0 0 auto !important;
+    flex: 1 0 auto !important;
   }
 }
 
