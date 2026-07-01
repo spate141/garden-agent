@@ -159,15 +159,15 @@ header {
 }
 .stats-strip::-webkit-scrollbar { display: none; }
 
-/* desktop: wrap whole groups onto additional rows instead of scrolling
-   horizontally once there are more groups than fit the window width */
+/* desktop: keep this to a single row — let stats shrink to fit the window
+   width (proportionally, via the existing flex-grow) instead of forcing a
+   horizontal scrollbar or wrapping onto extra rows */
 @media (min-width: 721px) {
   .stats-strip {
-    flex-wrap: wrap;
-    overflow-x: visible;
+    overflow-x: hidden;
   }
-  .stats-strip .stat-group {
-    flex: 1 0 auto !important;
+  .stats-strip .stat {
+    min-width: 0;
   }
 }
 
@@ -257,14 +257,17 @@ header {
 }
 .insights-panel::-webkit-scrollbar { display: none; }
 
-/* desktop: same wrap-instead-of-scroll behavior as .stats-strip */
+/* desktop: same shrink-to-fit behavior as .stats-strip — Beds and Insights
+   stay on this one row, no wrapping onto a second row */
 @media (min-width: 721px) {
   .insights-panel {
-    flex-wrap: wrap;
-    overflow-x: visible;
+    overflow-x: hidden;
   }
-  .insights-panel .stat-group {
-    flex: 1 0 auto !important;
+  .insights-panel .bed-bar-col {
+    min-width: 0;
+  }
+  .insights-panel .stat {
+    min-width: 0;
   }
 }
 

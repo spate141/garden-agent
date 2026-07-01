@@ -79,49 +79,61 @@
     <text x="512" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#6b4a24">Sprout &amp; Circuit · self-hosted sensor pipeline</text>
   </g>
 
-  <!-- ===== EDGES (drawn first, under nodes) ===== -->
-  <g stroke-width="2.5" fill="none" stroke-linecap="round">
-    <!-- GW -> INGEST -->
-    <path d="M615 175 L615 214" stroke="#3f7d46"/>
-    <!-- Timer -> RUNNER -->
-    <path d="M235 210 C235 340 300 360 348 388" stroke="#8a6d2c"/>
-    <!-- INGEST -> DB -->
-    <path d="M660 260 C740 300 760 430 762 512" stroke="#c98a2b"/>
-    <!-- INGEST -> RUNNER (evaluate_instant) -->
-    <path d="M560 250 C440 300 430 350 432 388" stroke="#8a6d2c"/>
-    <!-- RUNNER -> RULES -->
-    <path d="M348 424 C300 450 270 460 250 486" stroke="#8a6d2c"/>
-    <!-- RULES -> DB (reads history) -->
-    <path d="M300 520 C520 560 660 560 726 552" stroke="#c98a2b" stroke-dasharray="6 5"/>
-    <!-- RULES -> RUNNER (results) -->
-    <path d="M300 500 C350 470 380 450 400 428" stroke="#8a6d2c" stroke-dasharray="6 5"/>
-    <!-- RUNNER -> LLM -->
-    <path d="M470 410 C560 430 600 460 618 486" stroke="#8a6d2c"/>
-    <!-- LLM -> WEATHER -->
-    <path d="M618 520 C450 560 300 580 250 588" stroke="#8a6d2c" stroke-dasharray="6 5"/>
-    <!-- WEATHER -> OM -->
-    <path d="M180 624 L180 656" stroke="#5f5e5a"/>
-    <!-- LLM -> ANT -->
-    <path d="M700 512 C800 540 850 560 878 574" stroke="#5f5e5a"/>
-    <!-- RUNNER -> TG -->
-    <path d="M470 400 C640 430 760 440 828 448" stroke="#3f7d46"/>
-    <!-- Browser -> SERVE -->
-    <path d="M840 175 L840 214" stroke="#3f7d46"/>
-    <!-- SERVE -> DB -->
-    <path d="M840 260 C840 380 800 460 786 512" stroke="#c98a2b"/>
+  <!-- ===== EDGES: orthogonal right-angle routing ===== -->
+  <g stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- GW -> INGEST (straight down) -->
+    <path d="M615 176 L615 242" stroke="#3f7d46"/>
+    <!-- Browser -> SERVE (straight down) -->
+    <path d="M840 176 L840 242" stroke="#3f7d46"/>
+
+    <!-- Timer -> RUNNER: down, then right into runner top -->
+    <path d="M235 210 L235 358 Q235 350 243 350 L402 350 Q410 350 410 358 L410 388" stroke="#8a6d2c"/>
+
+    <!-- INGEST -> RUNNER (evaluate_instant): down from ingest-left, into runner top-right -->
+    <path d="M560 300 L560 350 Q560 358 552 358 L456 358 L456 388" stroke="#8a6d2c"/>
+
+    <!-- INGEST -> DB: down the right side then into barrel top -->
+    <path d="M690 288 L740 288 Q748 288 748 296 L748 506" stroke="#c98a2b"/>
+
+    <!-- SERVE -> DB: down, elbow into barrel top -->
+    <path d="M840 300 L840 400 Q840 408 832 408 L788 408 Q780 408 780 416 L780 506" stroke="#c98a2b"/>
+
+    <!-- RUNNER -> RULES: down-left elbow -->
+    <path d="M380 428 L380 452 Q380 460 372 460 L228 460 Q220 460 220 468 L220 486" stroke="#8a6d2c"/>
+
+    <!-- RUNNER -> LLM: down-right elbow -->
+    <path d="M440 428 L440 452 Q440 460 448 460 L612 460 Q620 460 620 468 L620 486" stroke="#8a6d2c"/>
+
+    <!-- RULES -> RUNNER (results, dashed): up-right along inner path -->
+    <path d="M260 486 L260 472 Q260 464 268 464 L398 464 Q406 464 406 456 L406 428" stroke="#8a6d2c" stroke-dasharray="6 5"/>
+
+    <!-- RULES -> DB (reads history, dashed): down then right along base into barrel -->
+    <path d="M220 532 L220 606 Q220 614 228 614 L692 614 Q700 614 700 606 L700 556" stroke="#c98a2b" stroke-dasharray="6 5"/>
+
+    <!-- LLM -> WEATHER (get_forecast, dashed): down-left elbow -->
+    <path d="M580 532 L580 566 Q580 574 572 574 L188 574 Q180 574 180 582 L180 588" stroke="#8a6d2c" stroke-dasharray="6 5"/>
+
+    <!-- WEATHER -> OM: straight down -->
+    <path d="M180 634 L180 656" stroke="#5f5e5a"/>
+
+    <!-- LLM -> ANT (messages.create): right then down into anthropic -->
+    <path d="M700 520 L864 520 Q872 520 872 528 L872 552" stroke="#5f5e5a"/>
+
+    <!-- RUNNER -> TG (tg title, body): up out of runner, across the gap, down into telegram -->
+    <path d="M472 400 L484 400 Q492 400 492 392 L492 342 Q492 334 500 334 L804 334 Q812 334 812 342 L812 468 Q812 476 820 476 L828 476" stroke="#3f7d46"/>
   </g>
 
   <!-- Edge labels -->
   <g font-size="10.5" font-weight="700">
     <g><rect x="576" y="188" width="86" height="16" rx="4" fill="#2f4a34"/><text x="619" y="200" text-anchor="middle" fill="#dff2e0">snapshot + readings</text></g>
-    <g><rect x="452" y="300" width="86" height="16" rx="4" fill="#5c4718"/><text x="495" y="312" text-anchor="middle" fill="#f4e8c8">evaluate_instant</text></g>
-    <g><rect x="188" y="292" width="82" height="16" rx="4" fill="#5c4718"/><text x="229" y="304" text-anchor="middle" fill="#f4e8c8">run_cron_tick</text></g>
-    <g><rect x="266" y="452" width="94" height="16" rx="4" fill="#5c4718"/><text x="313" y="464" text-anchor="middle" fill="#f4e8c8">run_instant / cron</text></g>
-    <g><rect x="470" y="530" width="74" height="16" rx="4" fill="#5c4718"/><text x="507" y="542" text-anchor="middle" fill="#f4e8c8">get_forecast</text></g>
-    <g><rect x="500" y="546" width="82" height="16" rx="4" fill="#5c3d10"/><text x="541" y="558" text-anchor="middle" fill="#f6d9a8">reads history</text></g>
-    <g><rect x="782" y="546" width="84" height="16" rx="4" fill="#4a3a12"/><text x="824" y="558" text-anchor="middle" fill="#f6e2be">messages.create</text></g>
-    <g><rect x="600" y="426" width="76" height="16" rx="4" fill="#2f4a34"/><text x="638" y="438" text-anchor="middle" fill="#dff2e0">tg title, body</text></g>
-    <g><rect x="792" y="392" width="60" height="16" rx="4" fill="#5c3d10"/><text x="822" y="404" text-anchor="middle" fill="#f6d9a8">latest / series</text></g>
+    <g><rect x="466" y="350" width="86" height="16" rx="4" fill="#5c4718"/><text x="509" y="362" text-anchor="middle" fill="#f4e8c8">evaluate_instant</text></g>
+    <g><rect x="194" y="272" width="82" height="16" rx="4" fill="#5c4718"/><text x="235" y="284" text-anchor="middle" fill="#f4e8c8">run_cron_tick</text></g>
+    <g><rect x="270" y="452" width="94" height="16" rx="4" fill="#5c4718"/><text x="317" y="464" text-anchor="middle" fill="#f4e8c8">run_instant / cron</text></g>
+    <g><rect x="300" y="566" width="74" height="16" rx="4" fill="#5c4718"/><text x="337" y="578" text-anchor="middle" fill="#f4e8c8">get_forecast</text></g>
+    <g><rect x="330" y="606" width="82" height="16" rx="4" fill="#5c3d10"/><text x="371" y="618" text-anchor="middle" fill="#f6d9a8">reads history</text></g>
+    <g><rect x="748" y="512" width="84" height="16" rx="4" fill="#4a3a12"/><text x="790" y="524" text-anchor="middle" fill="#f6e2be">messages.create</text></g>
+    <g><rect x="600" y="326" width="76" height="16" rx="4" fill="#2f4a34"/><text x="638" y="338" text-anchor="middle" fill="#dff2e0">tg title, body</text></g>
+    <g><rect x="810" y="352" width="60" height="16" rx="4" fill="#5c3d10"/><text x="840" y="364" text-anchor="middle" fill="#f6d9a8">latest / series</text></g>
   </g>
 
   <!-- ===== NODES ===== -->
