@@ -148,21 +148,10 @@ header {
 [data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
-/* ── STATS STRIP ────────────────────────────────────────────────────── */
-
-.stats-strip {
-  display: flex;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--bg);
-}
-.stats-strip::-webkit-scrollbar { display: none; }
-
-/* Groups grow to fill available width (flex-grow set inline = sensor count)
-   and wrap onto additional rows once they no longer fit, rather than being
-   squeezed past legibility or clipped/scrolled off-screen. */
+/* ── STAT TILES ─────────────────────────────────────────────────────────
+   Shared by #conditions-more, #conditions-forecast (.stat-group-body), and
+   #system-body -- the tile/label/value/unit visual language originally
+   built for the old .stats-strip. */
 
 /* grouped layout */
 .stat-group {
@@ -200,12 +189,6 @@ header {
 .stat:last-child { border-right: none; }
 .stat:hover { background: var(--bg-alt); }
 
-/* ungrouped fallback: direct .stat children of .stats-strip */
-.stats-strip > .stat {
-  padding: 16px 20px;
-  min-width: 120px;
-}
-
 .stat-label {
   color: var(--text-muted);
   font-size: 10px;
@@ -236,24 +219,9 @@ header {
   letter-spacing: 0;
 }
 
-/* ── INSIGHT PANEL ──────────────────────────────────────────────────── */
-/* Shares the stats-strip visual language: same background, border, and
-   stat-group / stat-group-body / stat structure. Only two additions:
-   .insight-val (numeric value) and .insight-note (interpretation line). */
-
-.insights-panel {
-  display: flex;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--bg);
-  min-height: 0; /* collapses cleanly when JS hasn't populated it yet */
-}
-.insights-panel::-webkit-scrollbar { display: none; }
-
-/* Beds and Insights groups grow to fill available width and wrap onto their
-   own row once they no longer fit, same as .stats-strip above. */
+/* ── INSIGHT VALUES ─────────────────────────────────────────────────── */
+/* Two additions to the stat-tile language above: .insight-val (numeric
+   value) and .insight-note (interpretation line), used by #conditions-forecast. */
 
 /* numeric value — same weight/face as .stat-value, slightly smaller to
    leave room for the .insight-note line below it */
@@ -326,18 +294,6 @@ header {
   height: 140px;
 }
 
-.bed-moisture-row {
-  grid-template-columns: repeat(4, 1fr);
-  padding-bottom: 0;
-}
-
-@media (max-width: 900px) {
-  .bed-moisture-row { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 720px) {
-  .bed-moisture-row { grid-template-columns: 1fr; }
-}
-
 /* ── EMPTY STATE ────────────────────────────────────────────────────── */
 
 .empty {
@@ -387,12 +343,6 @@ footer {
 /* ── MOBILE ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
-  /* Groups stack vertically; their stat rows scroll horizontally inside */
-  .stats-strip {
-    flex-direction: column;
-    overflow-x: visible;
-  }
-
   .stat-group {
     border-right: none;
     border-bottom: 2px solid var(--border);
@@ -520,39 +470,41 @@ footer {
 .sky-cloud::before { width: 55%; height: 160%; top: -50%; left: 18%; }
 .sky-cloud::after  { width: 40%; height: 130%; top: -35%; right: 18%; }
 
-.sky-chips {
+/* ── GARDEN STATUS SENTENCE (§10) ─────────────────────────────────────────
+   Replaces the old .sky-chips Temp/Humidity/Pressure/Now row, which could
+   render literal "—" dashes whenever the async /api/insights fetch hadn't
+   resolved yet. One pill, one sentence, driven by fast /api/latest data. */
+.garden-status {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   z-index: 4;
   pointer-events: none;
+  padding: 0 16px;
 }
 
-.sky-chip {
+.garden-status span {
   background: var(--g-chip-bg);
   color: var(--g-chip-ink);
   border-radius: 12px;
-  padding: 5px 11px;
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 700;
   font-family: 'Nunito Sans', sans-serif;
   box-shadow: 0 2px 8px var(--g-chip-shadow);
-  display: flex;
-  align-items: center;
-  gap: 4px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   letter-spacing: 0.01em;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
-.sky-chip-label { font-weight: 600; opacity: 0.6; font-size: 10px; margin-right: 1px; }
 
 /* ── Grass horizon strip -- stitches the sky-to-ground color seam ── */
 .garden-horizon {
@@ -951,8 +903,7 @@ footer {
   .g-bed { width: 100%; }
   .g-bed-frame { width: 100%; max-width: 210px; }
   .garden-sky { height: 72px; }
-  .sky-chips  { gap: 5px; }
-  .sky-chip   { font-size: 11px; padding: 4px 9px; }
+  .garden-status span { font-size: 11px; padding: 4px 11px; }
 }
 
 /* ── Ambient animation (no-preference only) ─────────────────────────── */
@@ -1015,13 +966,7 @@ footer {
   box-shadow:    0 4px 16px rgba(0, 0, 0, 0.10);
 }
 
-[data-theme="light"] .insights-panel {
-  background:    #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="light"] .stats-strip {
+[data-theme="light"] .dash-section {
   background:    #ffffff;
   border-bottom: 1px solid #e5e7eb;
   box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
@@ -1031,52 +976,199 @@ footer {
   filter: saturate(0.92) brightness(1.02);
 }
 
-/* ── WATER GAUGES (§2) ──────────────────────────────────────────────────── */
+/* ── DASHBOARD SECTIONS: Watering / Conditions / System (§9) ─────────────
+   Mobile-first single column, Watering first; desktop two columns with
+   Watering spanning the top row. Reuses the existing 900px breakpoint
+   value (the complement of .bed-moisture-row's old max-width:900px rule). */
 
-/* Bed columns inside the insight strip. min-width keeps them from collapsing
-   on desktop; mobile overrides this below. */
-.bed-bar-col {
-  min-width: 130px;
-  padding-top: 8px;
-  padding-bottom: 10px;
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
 }
 
-/* SVG water gauge scales to column width via width="100%" on the element. */
-.water-gauge { display: block; max-width: 140px; }
+@media (min-width: 901px) {
+  .dash-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dash-watering {
+    grid-column: 1 / -1;
+  }
+}
 
-/* ── INSIGHTS PANEL MOBILE (responsive) ─────────────────────────────────── */
+.dash-section {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 24px;
+}
 
-@media (max-width: 720px) {
-  /* Stack bed bars above insight items instead of side-by-side */
-  .insights-panel {
-    flex-direction: column;
-  }
+.dash-section-title {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.6;
+  margin-bottom: 14px;
+}
 
-  /* Bed columns: each takes 50% of the row, no fixed min-width */
-  .bed-bar-col {
-    min-width: 0;
-    flex: 1;
-  }
-  .water-gauge { max-width: 100%; }
+/* System: native <details>/<summary> gives "collapsed by default" for free.
+   align-self:start keeps it sized to its own content on desktop, where it
+   shares a grid row with the much taller Conditions column -- otherwise
+   CSS Grid's default align-items:stretch would stretch it to match. */
+.dash-system {
+  align-self: start;
+}
+.dash-system > summary.dash-section-title {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-system > summary::-webkit-details-marker { display: none; }
+.dash-system > summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.dash-system[open] > summary::before {
+  transform: rotate(90deg);
+}
+.dash-system[open] > summary {
+  margin-bottom: 14px;
+}
 
-  /* Insight items: wrap into a 2-column grid */
-  #insight-items-group .stat-group-body {
-    flex-wrap: wrap;
-  }
-  #insight-items-group .stat {
-    flex: 0 0 50%;
-    min-width: 0;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    box-sizing: border-box;
-  }
-  #insight-items-group .stat:nth-child(odd) {
-    border-right: 1px solid var(--border);
-  }
-  #insight-items-group .stat:last-child,
-  #insight-items-group .stat:nth-last-child(2):nth-child(odd) {
-    border-bottom: none;
-  }
+.system-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── MOISTURE BARS (§11) ───────────────────────────────────────────────────
+   Horizontal bar per bed, stacked so all four are directly comparable.
+   Replaces the old vertical tank gauge (.water-gauge/.bed-bar-col). */
+
+.watering-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mbar-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mbar-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mbar-pct {
+  margin-left: auto;
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mbar-pct--ok       { color: var(--color-success); }
+.mbar-pct--warn     { color: #d97706; }
+.mbar-pct--critical { color: #dc2626; }
+[data-theme="dark"] .mbar-pct--warn     { color: #f59e0b; }
+[data-theme="dark"] .mbar-pct--critical { color: #f87171; }
+
+.mbar-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bg-alt);
+  overflow: hidden;
+}
+
+.mbar-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(34, 197, 94, 0.20);
+}
+
+.mbar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+.mbar-fill--ok       { background: #22c55e; }
+.mbar-fill--warn     { background: #f59e0b; }
+.mbar-fill--critical { background: #ef4444; }
+
+.mbar-spark { display: block; margin-top: 6px; }
+
+/* ── CONDITION CARDS (§12) ─────────────────────────────────────────────────
+   One big primary number per card; secondary values demoted to a small
+   muted row below (reuses .insight-note). */
+
+.conditions-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cond-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+[data-theme="light"] .cond-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.cond-primary {
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.cond-secondary {
+  margin-top: 8px;
+}
+
+.conditions-more {
+  margin-bottom: 8px;
+}
+
+.chart-card-collapsed {
+  /* Without this, CSS Grid's default align-items:stretch makes the closed
+     card match its row-sibling's full height, defeating the point of
+     collapsing it -- it should size to just its summary line until opened. */
+  align-self: start;
+}
+.chart-card-collapsed summary.chart-title {
+  cursor: pointer;
+  list-style: none;
+}
+.chart-card-collapsed summary::-webkit-details-marker { display: none; }
+.chart-card-collapsed[open] summary.chart-title {
+  margin-bottom: 14px;
 }
 
 /* ── BATTERY BADGE (§4) ─────────────────────────────────────────────────── */
