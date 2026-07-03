@@ -295,16 +295,11 @@
   {% endif %}
 </div>
 
+<!-- per-bed soil moisture charts, one row of 4 -->
+<div class="charts bed-moisture-row" id="bed-moisture-grid"></div>
+
 <!-- time-series charts -->
 <div class="charts" id="charts-grid">
-  <div class="chart-card chart-card--wide">
-    <div class="chart-title">Soil moisture</div>
-    <div class="chart-wrap"><canvas id="chart-moisture-group"></canvas></div>
-  </div>
-  <div class="chart-card chart-card--wide">
-    <div class="chart-title">Sensor battery</div>
-    <div class="chart-wrap"><canvas id="chart-batt-group"></canvas></div>
-  </div>
   {% for c in charts %}
   <div class="chart-card">
     <div class="chart-title">{{ c.label }}</div>
@@ -375,10 +370,9 @@ let SKY = {{ sky_json | safe }};
  *  battery:       {nominal, warn, critical} voltage thresholds. */
 const BANDS = {{ bands_json | safe }};
 
-/** Consolidated moisture/battery chart groups -- one entry per bed:
- *  {key, bed, plants}. Built server-side from dashboard.beds (main.py). */
+/** Consolidated moisture chart group -- one entry per bed: {key, bed, plants}.
+ *  Built server-side from dashboard.beds (main.py). */
 const MOISTURE_GROUP = {{ moisture_group_json | safe }};
-const BATT_GROUP     = {{ batt_group_json | safe }};
 
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
@@ -1188,8 +1182,6 @@ function applyChartTheme() {
     tip.borderColor     = c.tooltipBorder;
     tip.titleColor      = c.tooltipTitle;
     tip.bodyColor       = c.tooltipBody;
-    const legend = chart.options.plugins.legend;
-    if (legend && legend.display) legend.labels.color = c.ticks;
     chart.update('none');
   });
 }
@@ -1413,144 +1405,25 @@ async function loadChart(key, color) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   CONSOLIDATED GROUP CHARTS (one line per bed -- moisture, battery)
+   PER-BED SOIL MOISTURE ROW
    ════════════════════════════════════════════════════════════════════════════ */
 
-/* Stable per-bed color, shared between the moisture and battery group charts
-   so "Bed 2" is always the same color across both. */
-const GROUP_PALETTE = ['#22c55e', '#3b82f6', '#f97316', '#a855f7'];
-
-/* Distinct dash pattern per bed (on top of color) so lines stay tellable apart
-   for colorblind viewers or when two beds' values overlap closely. */
-const DASH_PATTERNS = [[], [6, 3], [2, 2], [8, 3, 2, 3]];
-
-function makeGroupChartOpts(unit, yMin, yMax) {
-  const c = chartThemeColors();
-  return {
-    type: 'line',
-    data: { labels: [], datasets: [] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          align: 'end',
-          labels: {
-            color: c.ticks,
-            usePointStyle: true,
-            boxHeight: 8,
-            font: { size: 14 },
-          }
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          backgroundColor:  c.tooltipBg,
-          borderColor:      c.tooltipBorder,
-          borderWidth:      1,
-          titleColor:       c.tooltipTitle,
-          bodyColor:        c.tooltipBody,
-          padding:          8,
-          callbacks: {
-            title: function (items) {
-              if (!items.length) return '';
-              const chart = items[0].chart;
-              const beds  = chart._beds || [];
-              return beds[items[0].datasetIndex] || '';
-            },
-            label: function (ctx) {
-              return ' ' + ctx.dataset.label + ' ' + parseFloat(ctx.parsed.y).toFixed(1) + unit;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid:  { color: c.grid },
-          ticks: { color: c.ticks, maxTicksLimit: 6, font: { size: 10 } }
-        },
-        y: {
-          grid:  { color: c.grid },
-          ticks: { color: c.ticks, font: { size: 10 } },
-          min: yMin,
-          max: yMax,
-        }
-      }
-    }
-  };
-}
-
-/** Load/update a consolidated multi-bed chart (moisture or battery).
- *  members: [{key, bed, plants}] -- one per bed, from MOISTURE_GROUP/BATT_GROUP.
- *  unit: suffix shown in tooltip values ('%' or 'V').
- *  yMin/yMax: fixed axis bounds so day-to-day comparisons and small deltas
- *    (e.g. slow battery drain) aren't distorted by Chart.js auto-scaling.
- *  lines: optional [{y, color, label}] threshold lines (e.g. low-battery cutoff). */
-async function loadGroupChart(canvasId, members, unit, yMin, yMax, lines) {
-  if (!members || !members.length) return;
-
-  const results = await Promise.all(members.map(function (m) {
-    return fetch('/api/series?sensor=' + encodeURIComponent(m.key) + '&hours=' + HOURS)
-      .then(function (resp) { return resp.ok ? resp.json() : []; });
-  }));
-
-  /* Cache each member's rows so stat-strip sparklines/deltas keep working now
-     that moisture/battery leave the generic per-sensor chart loop. */
-  members.forEach(function (m, i) { seriesCache[m.key] = results[i]; });
-
-  /* Merge all members onto a shared, sorted timestamp axis. Beds normally share
-     the gateway's post cadence, so timestamps line up; spanGaps covers misses. */
-  var tsSet = new Set();
-  results.forEach(function (rows) { rows.forEach(function (r) { tsSet.add(r.ts); }); });
-  var allTs = Array.from(tsSet).sort();
-  var labels = allTs.map(fmtTime);
-
-  var datasets = members.map(function (m, i) {
-    var byTs = {};
-    results[i].forEach(function (r) { byTs[r.ts] = r.value; });
-    var data = allTs.map(function (ts) { return ts in byTs ? byTs[ts] : null; });
-
-    /* Highlight the most recent reading with a dot so each bed's "now" value
-       is readable without tracing the line to the right edge. */
-    var lastIdx = -1;
-    for (var j = data.length - 1; j >= 0; j--) { if (data[j] !== null) { lastIdx = j; break; } }
-    var color = GROUP_PALETTE[i % GROUP_PALETTE.length];
-    var pointRadius = data.map(function (_, idx) { return idx === lastIdx ? 4 : 0; });
-
-    return {
-      label: bedEmoji(m.plants),
-      data: data,
-      borderColor: color,
-      borderDash: DASH_PATTERNS[i % DASH_PATTERNS.length],
-      borderWidth: 1.5,
-      pointRadius: pointRadius,
-      pointBackgroundColor: color,
-      pointBorderColor: color,
-      tension: 0.3,
-      fill: false,
-      spanGaps: true,
-    };
-  });
-
-  if (instances[canvasId]) {
-    instances[canvasId].data.labels   = labels;
-    instances[canvasId].data.datasets = datasets;
-    instances[canvasId]._beds         = members.map(function (m) { return m.bed; });
-    instances[canvasId]._lines        = lines || [];
-    instances[canvasId].update('none');
-  } else {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    instances[canvasId] = new Chart(canvas, makeGroupChartOpts(unit, yMin, yMax));
-    instances[canvasId].data.labels   = labels;
-    instances[canvasId].data.datasets = datasets;
-    instances[canvasId]._beds         = members.map(function (m) { return m.bed; });
-    instances[canvasId]._lines        = lines || [];
-    instances[canvasId].update();
-  }
+/** Build the 4 per-bed moisture chart-cards (one row) from MOISTURE_GROUP.
+ *  Each card's title is the bed's dominant-crop emoji + bed name; the chart
+ *  itself is a single-series chart driven by the existing loadChart(), which
+ *  already draws the optimal-moisture band + too-wet line from
+ *  BANDS.moistureBands[key] and the 💦 watering-spike marker. */
+function renderBedMoistureCards() {
+  const grid = document.getElementById('bed-moisture-grid');
+  if (!grid || !MOISTURE_GROUP.length) return;
+  grid.innerHTML = MOISTURE_GROUP.map(function (m) {
+    return (
+      '<div class="chart-card">' +
+        '<div class="chart-title">' + bedEmoji(m.plants) + ' ' + m.bed + ' moisture</div>' +
+        '<div class="chart-wrap"><canvas id="chart-' + m.key + '"></canvas></div>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 /* ── Sparkline helper (§3) ──────────────────────────────────────────────────
@@ -1858,10 +1731,7 @@ async function refresh() {
   /* Fetch /api/latest and all chart series in parallel so seriesCache is
      populated before updateStats() tries to render sparklines. */
   var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
-  var battWarn = BANDS && BANDS.battery ? BANDS.battery.warn : 1.1;
-  chartLoads.push(loadGroupChart('chart-moisture-group', MOISTURE_GROUP, '%', 0, 100));
-  chartLoads.push(loadGroupChart('chart-batt-group', BATT_GROUP, 'V', 0.8, 1.6,
-    [{ y: battWarn, color: '#ef4444', label: 'Low battery (' + battWarn + 'V)' }]));
+  chartLoads = chartLoads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
   var results    = await Promise.all([fetch('/api/latest')].concat(chartLoads));
   var latestResp = results[0];
 
@@ -1879,6 +1749,7 @@ async function refresh() {
 
 /* ── Boot ── */
 renderBeds();
+renderBedMoistureCards();
 refresh();
 setInterval(refresh, 60_000);
 </script>

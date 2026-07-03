@@ -342,11 +342,16 @@ header {
   height: 140px;
 }
 
-.chart-card--wide {
-  grid-column: 1 / -1;
+.bed-moisture-row {
+  grid-template-columns: repeat(4, 1fr);
+  padding-bottom: 0;
 }
-.chart-card--wide .chart-wrap {
-  height: 200px;
+
+@media (max-width: 900px) {
+  .bed-moisture-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .bed-moisture-row { grid-template-columns: 1fr; }
 }
 
 /* ── EMPTY STATE ────────────────────────────────────────────────────── */

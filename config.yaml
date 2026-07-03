@@ -10,19 +10,19 @@ sensors:
   soilmoisture1:
     label: "Bed 1 moisture"
     color: "#4ade80"
-    chart: false    # rendered in the consolidated moisture chart instead
+    chart: false    # rendered as its own per-bed chart in the moisture row, not the generic grid
   soilmoisture2:
     label: "Bed 2 moisture"
     color: "#22c55e"
-    chart: false    # rendered in the consolidated moisture chart instead
+    chart: false    # rendered as its own per-bed chart in the moisture row, not the generic grid
   soilmoisture3:
     label: "Bed 3 moisture"
     color: "#16a34a"
-    chart: false    # rendered in the consolidated moisture chart instead
+    chart: false    # rendered as its own per-bed chart in the moisture row, not the generic grid
   soilmoisture4:
     label: "Bed 4 moisture"
     color: "#15803d"
-    chart: false    # rendered in the consolidated moisture chart instead
+    chart: false    # rendered as its own per-bed chart in the moisture row, not the generic grid
   temp_f:
     label: "Outdoor temp"
     color: "#fb923c"
