@@ -771,6 +771,7 @@ footer {
   bottom: 0;
   width: 44px;
   height: 56px;
+  cursor: pointer;
   transform-origin: center bottom;
   transform: rotate(var(--g-wilt-rot, 0deg));
   filter: saturate(var(--g-sat, 1)) brightness(var(--g-bright, 1));
@@ -860,6 +861,68 @@ footer {
   18%  { opacity: 1;   transform: translateY(-6px) scale(1.15); }
   80%  { opacity: 0.6; transform: translateY(-12px) scale(1); }
   100% { opacity: 0;   transform: translateY(-18px) scale(0.85); }
+}
+
+/* ── Easter egg: tap-4x-to-explode vegetable overlay ───────────────────── */
+.g-egg-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1000;
+}
+.g-egg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  font-size: 1.8rem;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+
+/* Reduced-motion fallback: a few emoji that simply fade in place, no flight */
+.g-egg-still {
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-50%, -50%);
+  animation: g-egg-still-fade 1.1s ease-out forwards;
+}
+@keyframes g-egg-still-fade {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .g-egg-burst {
+    left: var(--x);
+    top: var(--y);
+    animation: g-egg-burst 0.9s var(--delay, 0s) ease-out forwards;
+  }
+  @keyframes g-egg-burst {
+    0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+    12%  { opacity: 1; transform: translate(-50%, -50%) scale(var(--scale, 1)); }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(var(--rot))
+                 scale(var(--scale, 1));
+    }
+  }
+
+  .g-egg-rain {
+    left: var(--x);
+    top: -10vh;
+    animation: g-egg-rain var(--dur, 1.8s) var(--delay, 0s) ease-in forwards;
+  }
+  @keyframes g-egg-rain {
+    0%   { opacity: 0;   transform: translate(0, 0)               rotate(0deg); }
+    10%  { opacity: 1; }
+    85%  { opacity: 1; }
+    100% {
+      opacity: 0;
+      transform: translate(var(--drift), 120vh) rotate(var(--rot));
+    }
+  }
 }
 
 /* Responsive */

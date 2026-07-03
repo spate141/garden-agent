@@ -681,6 +681,7 @@ function renderBeds() {
     bed.plants.forEach(function (type, i) {
       const plantEl = document.createElement('div');
       plantEl.className = 'g-plant';
+      plantEl.dataset.type = type;   /* stable emoji lookup even when sprite goes dormant */
 
       /* seeded jitter */
       const jitterRange = pw * 0.35;
@@ -1746,6 +1747,106 @@ async function refresh() {
 
   if (dot) dot.classList.remove('active');
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   EASTER EGG — tap a vegetable 4× rapidly to make it explode + rain 🎉
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const EGG_TAP_LIMIT  = 4;      /* taps required (within EGG_TAP_WINDOW) to trigger */
+const EGG_TAP_WINDOW = 1500;   /* ms — pause this long and the streak resets */
+const eggTapState = new WeakMap();  /* plantEl -> {count, timer} */
+
+let eggLayer = null;
+function getEggLayer() {
+  if (!eggLayer) {
+    eggLayer = document.createElement('div');
+    eggLayer.className = 'g-egg-layer';
+    document.body.appendChild(eggLayer);
+  }
+  return eggLayer;
+}
+
+function spawnEggParticle(cls, style) {
+  const el = document.createElement('span');
+  el.className = 'g-egg ' + cls;
+  Object.keys(style).forEach(function (k) { el.style.setProperty(k, style[k]); });
+  el.addEventListener('animationend', function () { el.remove(); });
+  getEggLayer().appendChild(el);
+  return el;
+}
+
+function explodeEmoji(emoji, rect) {
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const layer = getEggLayer();
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) {
+    /* minimal, non-flashy fallback: a handful of emoji fade in place near the plant */
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = 18 + Math.random() * 30;
+      const el = spawnEggParticle('g-egg-still', {
+        '--x': (cx + Math.cos(a) * d) + 'px',
+        '--y': (cy + Math.sin(a) * d) + 'px',
+      });
+      el.textContent = emoji;
+    }
+    return;
+  }
+
+  /* ── burst: radial spray from the tapped plant ── */
+  const burstCount = 56;
+  for (let i = 0; i < burstCount; i++) {
+    const angle    = Math.random() * Math.PI * 2;
+    const distance = 90 + Math.random() * 260;
+    const el = spawnEggParticle('g-egg-burst', {
+      '--x':     cx + 'px',
+      '--y':     cy + 'px',
+      '--tx':    (Math.cos(angle) * distance) + 'px',
+      '--ty':    (Math.sin(angle) * distance) + 'px',
+      '--rot':   ((Math.random() - 0.5) * 720) + 'deg',
+      '--scale': (0.7 + Math.random() * 1.1).toFixed(2),
+      '--delay': (Math.random() * 0.12) + 's',
+    });
+    el.textContent = emoji;
+  }
+
+  /* ── rain: a brief shower across the whole viewport ── */
+  const vw = window.innerWidth;
+  const rainCount = 34;
+  for (let i = 0; i < rainCount; i++) {
+    const x = Math.random() * vw;
+    const el = spawnEggParticle('g-egg-rain', {
+      '--x':     x + 'px',
+      '--drift': ((Math.random() - 0.5) * 120) + 'px',
+      '--rot':   ((Math.random() - 0.5) * 540) + 'deg',
+      '--dur':   (1.4 + Math.random() * 0.9) + 's',
+      '--delay': (0.1 + Math.random() * 0.5) + 's',
+    });
+    el.textContent = emoji;
+  }
+}
+
+document.getElementById('garden-beds').addEventListener('click', function (e) {
+  const plant = e.target.closest('.g-plant');
+  if (!plant) return;
+
+  const prev = eggTapState.get(plant);
+  if (prev && prev.timer) clearTimeout(prev.timer);
+  const count = (prev ? prev.count : 0) + 1;
+
+  if (count >= EGG_TAP_LIMIT) {
+    const type  = plant.dataset.type;
+    const emoji = PLANT_EMOJI[type] || PLANT_EMOJI.unknown;
+    explodeEmoji(emoji, plant.getBoundingClientRect());
+    eggTapState.delete(plant);   /* re-arm immediately for another round */
+    return;
+  }
+
+  const timer = setTimeout(function () { eggTapState.delete(plant); }, EGG_TAP_WINDOW);
+  eggTapState.set(plant, { count: count, timer: timer });
+});
 
 /* ── Boot ── */
 renderBeds();
