@@ -289,6 +289,20 @@ async def dashboard(request: Request):
         "battery":       _batt_config,
     })
 
+    # Consolidated moisture/battery chart groups: one entry per bed, keyed to the
+    # bed's sensor and carrying its plant list so the client can pick a dominant
+    # emoji. Colors/emoji are assigned client-side for a stable per-bed palette.
+    _moisture_group = []
+    _batt_group = []
+    for _bed in cfg.dashboard.get("beds", []):
+        _sensors = _bed.get("sensors", {})
+        _plants = _bed.get("plants", [])
+        _name = _bed.get("name", _bed.get("id", ""))
+        if _sensors.get("soil_moisture"):
+            _moisture_group.append({"key": _sensors["soil_moisture"], "bed": _name, "plants": _plants})
+        if _sensors.get("soil_battery"):
+            _batt_group.append({"key": _sensors["soil_battery"], "bed": _name, "plants": _plants})
+
     # Sky animation: pass sunrise/sunset UTC epochs so the sun arc is correct on first paint.
     # Reuses the cached Open-Meteo forecast — no extra network call.
     from garden.agent.weather import get_forecast as _get_fc
@@ -317,5 +331,7 @@ async def dashboard(request: Request):
             "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
             "sky_json": json.dumps(_sky),
             "bands_json": bands_json,
+            "moisture_group_json": json.dumps(_moisture_group),
+            "batt_group_json": json.dumps(_batt_group),
         },
     )

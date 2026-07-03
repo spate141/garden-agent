@@ -342,6 +342,13 @@ header {
   height: 140px;
 }
 
+.chart-card--wide {
+  grid-column: 1 / -1;
+}
+.chart-card--wide .chart-wrap {
+  height: 200px;
+}
+
 /* ── EMPTY STATE ────────────────────────────────────────────────────── */
 
 .empty {
