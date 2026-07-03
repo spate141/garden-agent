@@ -88,6 +88,37 @@ Test Telegram delivery:
 ./scripts/tg_test.sh
 ```
 
+## Local Simulation
+
+For a live-feeling dashboard without real hardware, `scripts/dev.sh` starts the
+server and streams a continuous, slowly-drifting sensor feed into it in one
+command:
+
+```bash
+./scripts/dev.sh
+```
+
+This sets `GARDEN_DRY_RUN=1`, which suppresses real Telegram sends and
+Anthropic API calls — alerts and the daily brief are logged instead of sent,
+so you can exercise the full pipeline safely offline. Extra args are passed
+through to `simulate.py`, e.g. a faster tick rate:
+
+```bash
+./scripts/dev.sh --interval 5
+```
+
+`simulate.py` can also be run standalone against a server you started yourself:
+
+```bash
+uv run python scripts/simulate.py --host http://127.0.0.1:8000 --interval 10
+```
+
+Simulated values random-walk within healthy ranges, so deterministic alert
+rules won't normally fire — `GARDEN_DRY_RUN=1` is a backstop in case a walk
+drifts past a threshold anyway. To manually set `GARDEN_DRY_RUN=1` in a
+one-off shell instead, add `GARDEN_DRY_RUN=1` to `secrets.env` (see
+`secrets.env.example`).
+
 ## Deploy (GCP e2-micro + Cloudflare Tunnel)
 
 ```bash
