@@ -103,7 +103,7 @@ async def api_insights() -> JSONResponse:
     ET₀ water balance, and per-bed crop stress.  Polled by the dashboard insight
     panel on the same 60 s refresh tick as /api/latest.
     """
-    from garden.agent.weather import get_forecast
+    from garden.agent.weather import get_current, get_forecast
 
     latest_map: dict[str, Any] = {r["sensor_key"]: r for r in storage.latest()}
     derived_cfg = cfg.derived
@@ -149,6 +149,18 @@ async def api_insights() -> JSONResponse:
             "sunrise_ts":          fc.get("sunrise_ts"),
             "sunset_ts":           fc.get("sunset_ts"),
             "sunrise_ts_tomorrow": fc.get("sunrise_ts_tomorrow"),
+        }
+
+    # ── Live "right now" conditions (separate short-TTL cache from the daily forecast) ──
+    cur = get_current()
+    if cur:
+        insights["current"] = {
+            "conditions":      cur.get("conditions"),
+            "weather_code":    cur.get("weather_code"),
+            "rain_in":         cur.get("rain_in"),
+            "cloud_cover_pct": cur.get("cloud_cover_pct"),
+            "is_raining":      cur.get("is_raining", False),
+            "intensity":       cur.get("intensity"),
         }
 
     # ── Per-bed stress ────────────────────────────────────────────────────────

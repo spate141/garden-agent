@@ -47,6 +47,11 @@ _WMO: dict[int, str] = {
     99: "thunderstorm with heavy hail",
 }
 
+# WMO codes that mean "precipitation is actively falling" and the subset of
+# those that count as heavy enough to escalate the dashboard's rain visual.
+_RAIN_CODES: set[int] = {51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99}
+_HEAVY_CODES: set[int] = {65, 82, 95, 96, 99}
+
 
 # ── Geocoding cache (resolved once per process) ───────────────────────────────
 
@@ -248,6 +253,98 @@ def get_forecast() -> dict[str, Any] | None:
 
     except Exception as exc:
         log.warning("Open-Meteo parse error: %s", exc)
+        return None
+
+
+# ── Current-conditions cache (short TTL — this is the "right now" feed) ──────
+
+_current_cache: dict[str, Any] = {}
+_current_cache_ts: float = 0.0
+
+
+def get_current() -> dict[str, Any] | None:
+    """
+    Fetch Open-Meteo's live current-conditions block — separate from the daily
+    forecast because it needs a much shorter cache to answer "is it raining
+    right now" instead of "what's expected today".
+
+    Cached in-process for cfg.weather['current_cache_minutes'] (default 15 min).
+
+    Returned dict keys:
+      weather_code, conditions   — WMO code + human text
+      rain_in, precip_in         — current instantaneous rain / total precip (inches)
+      cloud_cover_pct            — 0-100
+      is_raining                 — bool, precip actively falling right now
+      intensity                 — 'heavy' | 'light' (meaningful only when is_raining)
+    """
+    global _current_cache, _current_cache_ts
+
+    from garden.config import cfg
+
+    if not cfg.weather.get("enabled", True):
+        return None
+
+    cache_minutes = cfg.weather.get("current_cache_minutes", 15)
+    now_mono = time.monotonic()
+    if _current_cache and (now_mono - _current_cache_ts) < cache_minutes * 60:
+        return dict(_current_cache)
+
+    coords = _get_latlon()
+    if coords is None:
+        return None
+
+    lat, lon = coords
+    tz = cfg.location.get("timezone", "UTC")
+
+    try:
+        r = httpx.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude":         lat,
+                "longitude":        lon,
+                "temperature_unit":   "fahrenheit",
+                "precipitation_unit": "inch",
+                "current": "weather_code,precipitation,rain,cloud_cover",
+                "timezone": tz,
+            },
+            timeout=10,
+            follow_redirects=True,
+        )
+        r.raise_for_status()
+    except Exception as exc:
+        log.warning("Open-Meteo current-conditions fetch failed: %s", exc)
+        return None
+
+    try:
+        raw     = r.json()
+        current = raw["current"]
+
+        weather_code = int(current["weather_code"])
+        rain_in      = current.get("rain", 0.0) or 0.0
+        precip_in    = current.get("precipitation", 0.0) or 0.0
+        is_raining   = weather_code in _RAIN_CODES or rain_in > 0 or precip_in > 0
+
+        cur: dict[str, Any] = {
+            "weather_code":     weather_code,
+            "conditions":       _WMO.get(weather_code, "unknown"),
+            "rain_in":          rain_in,
+            "precip_in":        precip_in,
+            "cloud_cover_pct":  current.get("cloud_cover"),
+            "is_raining":       is_raining,
+            "intensity":        "heavy" if weather_code in _HEAVY_CODES else "light",
+        }
+
+        _current_cache    = cur
+        _current_cache_ts = now_mono
+
+        log.info(
+            "Current conditions: %s, raining=%s (%s), cloud cover %s%%",
+            cur["conditions"], cur["is_raining"], cur["intensity"], cur["cloud_cover_pct"],
+        )
+        return dict(cur)
+
+    except Exception as exc:
+        log.warning("Open-Meteo current-conditions parse error: %s", exc)
         return None
 
 

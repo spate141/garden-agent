@@ -387,6 +387,11 @@
         <span class="sky-chip-label">Pressure</span>
         <span id="wv-pres">—</span>
       </span>
+      <span class="sky-chip" aria-label="Current conditions">
+        <span aria-hidden="true" id="wv-cond-emoji">🌤️</span>
+        <span class="sky-chip-label">Now</span>
+        <span id="wv-cond">—</span>
+      </span>
     </div>
   </div>
   <!-- grass horizon strip: stitches sky blue to ground brown -->
@@ -502,6 +507,12 @@ const G = {{ garden_thresholds | safe }};
  *  sunrise_ts / sunset_ts : today's times
  *  sunrise_ts_tomorrow    : tomorrow's sunrise (bounds the post-sunset moon arc) */
 let SKY = {{ sky_json | safe }};
+
+/** Live "right now" conditions from Open-Meteo's current block (short-TTL,
+ *  separate from the daily forecast). null until the first /api/insights
+ *  response arrives, or if weather/location is unavailable.
+ *  { conditions, weather_code, rain_in, cloud_cover_pct, is_raining, intensity } */
+let CURRENT = null;
 
 /** Chart band/zone data, derived server-side from config.yaml (single source of truth).
  *  moistureBands: {[sensorKey]: {min, max, label, crops}} per-bed optimal range.
@@ -1262,13 +1273,19 @@ function _updateSky(readings, ts, timeOfDay) {
     _setMoonPhase(moon, moonPhase(new Date()));
   }
 
-  /* clouds: opacity driven by humidity + pressure */
+  /* clouds: prefer the real cloud_cover% from live weather; fall back to the
+     humidity + pressure proxy when current conditions are unavailable */
   const hum  = readings[WEATHER_KEYS.humidity];
   const pres = readings[WEATHER_KEYS.pressure];
-  let cf = 0.75;
-  if (hum  != null && hum  > 70)   cf += (hum - 70)    / 60;
-  if (pres != null && pres < 1010) cf += (1010 - pres)  / 35;
-  cf = Math.min(2.0, cf);
+  let cf;
+  if (CURRENT && CURRENT.cloud_cover_pct != null) {
+    cf = (CURRENT.cloud_cover_pct / 100) * 2.0;
+  } else {
+    cf = 0.75;
+    if (hum  != null && hum  > 70)   cf += (hum - 70)    / 60;
+    if (pres != null && pres < 1010) cf += (1010 - pres)  / 35;
+    cf = Math.min(2.0, cf);
+  }
 
   const cloudy = cf > 1.3;
   sky.querySelectorAll('.sky-cloud').forEach(function (c, i) {
@@ -1297,6 +1314,25 @@ function _updateSky(readings, ts, timeOfDay) {
   _setText('wv-temp', temp  != null ? temp.toFixed(1)  + '°F'   : '—');
   _setText('wv-hum',  hum   != null ? hum.toFixed(0)   + '%'    : '—');
   _setText('wv-pres', pres  != null ? pres.toFixed(2)  + ' inHg': '—');
+  _setText('wv-cond', CURRENT ? CURRENT.conditions : '—');
+  const condEmojiEl = document.getElementById('wv-cond-emoji');
+  if (condEmojiEl) condEmojiEl.textContent = _conditionsEmoji(CURRENT);
+
+  /* live rain visual — sky-strip drizzle for light rain, full-page downpour for heavy */
+  updateWeatherRain(CURRENT);
+}
+
+/** Pick a chip emoji for current conditions; mirrors the WMO code buckets in weather.py. */
+function _conditionsEmoji(current) {
+  if (!current) return '🌤️';
+  if (current.is_raining) return current.intensity === 'heavy' ? '⛈️' : '🌧️';
+  const code = current.weather_code;
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2)  return '⛅';
+  if (code === 3)  return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code === 71 || code === 73 || code === 75) return '❄️';
+  return '🌤️';
 }
 
 function _addFireflies() {
@@ -1816,6 +1852,10 @@ async function loadInsights() {
     };
   }
 
+  /* Live "right now" conditions — drives the sky-strip chip, cloud cover, and rain */
+  CURRENT = data.current || null;
+  updateWeatherRain(CURRENT);
+
   var panel = document.getElementById('insight-items-group');
   if (!panel) return;
 
@@ -1882,6 +1922,20 @@ async function loadInsights() {
       unit:   '°F low',
       note:   'Cover tender plants',
       status: 'alert',
+    });
+  }
+
+  /* ── Right now (live conditions) ── */
+  if (data.current) {
+    var rainNote = data.current.is_raining
+      ? (data.current.intensity === 'heavy' ? 'Heavy rain — hold off on watering' : 'Light rain — hold off on watering')
+      : '';
+    items.push({
+      label:  'Right now',
+      value:  data.current.conditions || '?',
+      unit:   '',
+      note:   rainNote,
+      status: data.current.is_raining ? 'warn' : '',
     });
   }
 
@@ -2028,6 +2082,69 @@ function explodeEmoji(emoji, rect) {
       '--delay': (0.1 + Math.random() * 0.5) + 's',
     });
     el.textContent = emoji;
+  }
+}
+
+/* ── Live weather rain — driven by CURRENT.is_raining / CURRENT.intensity ──
+   Light rain: a small looping shower clipped to the sky strip (#garden-sky).
+   Heavy rain / thunderstorms: escalates to a full-page downpour reusing the
+   easter-egg particle system (spawnEggParticle / g-egg-rain). Respects
+   prefers-reduced-motion the same way the easter egg does. */
+let _heavyRainTimer = null;
+
+function updateWeatherRain(current) {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sky = document.getElementById('garden-sky');
+  const raining = !reduced && !!(current && current.is_raining);
+
+  if (sky) {
+    const hasDrops = !!sky.querySelector('.sky-rain-drop');
+    if (raining && !hasDrops) {
+      _addSkyRainDrops(sky);
+    } else if (!raining && hasDrops) {
+      sky.querySelectorAll('.sky-rain-drop').forEach(function (d) { d.remove(); });
+    }
+  }
+
+  const heavy = raining && current.intensity === 'heavy';
+  if (heavy) _startHeavyRain(); else _stopHeavyRain();
+}
+
+function _addSkyRainDrops(sky) {
+  const dropCount = 10;
+  for (let i = 0; i < dropCount; i++) {
+    const el = document.createElement('span');
+    el.className = 'sky-rain-drop';
+    el.setAttribute('aria-hidden', 'true');
+    el.style.left = (Math.random() * 96) + '%';
+    el.style.setProperty('--rdur',   (0.6 + Math.random() * 0.5) + 's');
+    el.style.setProperty('--rdelay', (Math.random() * 1.2) + 's');
+    sky.appendChild(el);
+  }
+}
+
+function _startHeavyRain() {
+  if (_heavyRainTimer) return;   /* already running */
+  _heavyRainTimer = setInterval(function () {
+    const vw = window.innerWidth;
+    for (let i = 0; i < 6; i++) {
+      const x = Math.random() * vw;
+      const el = spawnEggParticle('g-egg-rain weather-rain-drop', {
+        '--x':     x + 'px',
+        '--drift': ((Math.random() - 0.5) * 80) + 'px',
+        '--rot':   '0deg',
+        '--dur':   (1.0 + Math.random() * 0.6) + 's',
+        '--delay': (Math.random() * 0.3) + 's',
+      });
+      el.textContent = '💧';
+    }
+  }, 350);
+}
+
+function _stopHeavyRain() {
+  if (_heavyRainTimer) {
+    clearInterval(_heavyRainTimer);
+    _heavyRainTimer = null;
   }
 }
 
