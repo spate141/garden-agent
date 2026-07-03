@@ -911,8 +911,8 @@ footer {
 
   /* Live weather downpour: smaller, plainer droplets than the easter-egg burst */
   .weather-rain-drop {
-    font-size: 1rem;
-    opacity: 0.85;
+    font-size: 0.55rem;
+    opacity: 0.8;
   }
 }
 
@@ -921,8 +921,8 @@ footer {
   .sky-rain-drop {
     position: absolute;
     top: -6px;
-    width: 2px;
-    height: 14px;
+    width: 1px;
+    height: 9px;
     border-radius: 1px;
     background: linear-gradient(180deg, rgba(190,210,255,0) 0%, rgba(190,210,255,0.85) 100%);
     pointer-events: none;
