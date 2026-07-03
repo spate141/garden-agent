@@ -159,17 +159,10 @@ header {
 }
 .stats-strip::-webkit-scrollbar { display: none; }
 
-/* desktop: keep this to a single row — let stats shrink to fit the window
-   width (proportionally, via the existing flex-grow) instead of forcing a
-   horizontal scrollbar or wrapping onto extra rows */
-@media (min-width: 721px) {
-  .stats-strip {
-    overflow-x: hidden;
-  }
-  .stats-strip .stat {
-    min-width: 0;
-  }
-}
+/* Shrink-to-fit on desktop caused columns to be silently clipped once there
+   were enough sensors that even a min-width:0 squeeze couldn't fit them all
+   in one row. Scroll horizontally instead — nothing gets cut off, and the
+   hidden scrollbar (above) keeps it visually clean. */
 
 /* grouped layout */
 .stat-group {
@@ -1019,18 +1012,18 @@ footer {
   filter: saturate(0.92) brightness(1.02);
 }
 
-/* ── BULLET BARS (§2) ───────────────────────────────────────────────────── */
+/* ── WATER GAUGES (§2) ──────────────────────────────────────────────────── */
 
 /* Bed columns inside the insight strip. min-width keeps them from collapsing
    on desktop; mobile overrides this below. */
 .bed-bar-col {
-  min-width: 160px;
+  min-width: 130px;
   padding-top: 8px;
   padding-bottom: 10px;
 }
 
-/* SVG bullet bar scales to column width via width="100%" on the element. */
-.bullet-bar { display: block; max-width: 260px; }
+/* SVG water gauge scales to column width via width="100%" on the element. */
+.water-gauge { display: block; max-width: 140px; }
 
 /* ── INSIGHTS PANEL MOBILE (responsive) ─────────────────────────────────── */
 
@@ -1045,7 +1038,7 @@ footer {
     min-width: 0;
     flex: 1;
   }
-  .bullet-bar { max-width: 100%; }
+  .water-gauge { max-width: 100%; }
 
   /* Insight items: wrap into a 2-column grid */
   #insight-items-group .stat-group-body {

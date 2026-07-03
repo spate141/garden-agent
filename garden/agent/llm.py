@@ -144,6 +144,10 @@ def write_alert(
     if not cfg.anthropic_api_key:
         return fallback_body
 
+    if cfg.dry_run:
+        log.info("[dry-run] LLM alert suppressed for %s, using fallback", rule_id)
+        return fallback_body
+
     is_needs_water  = rule_id.startswith("soil_moisture_low") or rule_id.startswith("soil_moisture_rapid_drop")
     is_just_watered = rule_id.startswith("soil_moisture_rapid_rise")
     if is_needs_water:
@@ -226,6 +230,10 @@ def write_daily_brief(
     Generate a morning garden briefing. Returns LLM prose or a plain fallback.
     """
     if not cfg.anthropic_api_key:
+        return _brief_fallback(forecast, sensor_summary)
+
+    if cfg.dry_run:
+        log.info("[dry-run] LLM daily brief suppressed, using fallback")
         return _brief_fallback(forecast, sensor_summary)
 
     from garden.agent.weather import forecast_summary

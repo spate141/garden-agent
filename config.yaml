@@ -87,25 +87,27 @@ sensors:
 
 # ── Dashboard layout ──────────────────────────────────────────────────────────
 # Bed definitions and weather key bindings — injected into the browser as JSON.
-# plants: sprite names (tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini)
+# plants: sprite names (tomato | eggplant | okra | peas | sweet_pepper | hot_pepper | zucchini
+#          | tomato_cherry | tomato_roma | tomato_beefsteak | tomato_heirloom | tomato_grape | tomato_san_marzano)
 dashboard:
   beds:
     - id: bed1
       name: "Bed 1"
       sensors: {soil_moisture: soilmoisture1, soil_battery: soilbatt1}
-      plants: [tomato, tomato, tomato]
+      plants: [tomato_cherry, tomato_roma, tomato_beefsteak, tomato_heirloom, tomato_grape, tomato_san_marzano]
     - id: bed2
       name: "Bed 2"
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
-      plants: [eggplant, eggplant, okra, okra]
+      plants: [eggplant, okra, okra, eggplant, okra, okra, okra, okra, okra, okra, okra, okra]
     - id: bed3
       name: "Bed 3"
       sensors: {soil_moisture: soilmoisture3, soil_battery: soilbatt3}
-      plants: [sweet_pepper, sweet_pepper, sweet_pepper, sweet_pepper]
+      plants: [sweet_pepper_red, sweet_pepper_yellow, sweet_pepper_green, sweet_pepper_orange]
     - id: bed4
       name: "Bed 4"
       sensors: {soil_moisture: soilmoisture4, soil_battery: soilbatt4}
       plants: [zucchini, eggplant]
+      layout: vertical   # stack plants in a single column instead of side-by-side
   weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
   stat_groups:
     - name: "Bed 1"
@@ -213,9 +215,19 @@ derived:
 # Override any value here; falls back to built-in defaults in garden/derived.py.
 crops:
   tomato:       {moist: [50, 80], temp: [60, 95]}
+  tomato_cherry:      {moist: [50, 80], temp: [60, 95]}
+  tomato_roma:        {moist: [50, 80], temp: [60, 95]}
+  tomato_beefsteak:   {moist: [50, 80], temp: [60, 95]}
+  tomato_heirloom:    {moist: [50, 80], temp: [60, 95]}
+  tomato_grape:       {moist: [50, 80], temp: [60, 95]}
+  tomato_san_marzano: {moist: [50, 80], temp: [60, 95]}
   eggplant:     {moist: [50, 75], temp: [65, 95]}
   okra:         {moist: [40, 70], temp: [70, 100]}
   peas:         {moist: [60, 85], temp: [45, 75]}
   sweet_pepper: {moist: [50, 75], temp: [65, 90]}
+  sweet_pepper_red:    {moist: [50, 75], temp: [65, 90]}
+  sweet_pepper_green:  {moist: [50, 75], temp: [65, 90]}
+  sweet_pepper_yellow: {moist: [50, 75], temp: [65, 90]}
+  sweet_pepper_orange: {moist: [50, 75], temp: [65, 90]}
   hot_pepper:   {moist: [45, 70], temp: [65, 95]}
   zucchini:     {moist: [55, 80], temp: [60, 90]}

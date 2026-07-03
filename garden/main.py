@@ -170,7 +170,12 @@ async def api_insights() -> JSONResponse:
                 cfg.crops,
             )
         else:
-            stress = {"status": "unknown", "reason": "Sensor data unavailable", "crops": []}
+            stress = {
+                "status": "unknown",
+                "reason": "Sensor data unavailable",
+                "detail": "Sensor data unavailable",
+                "crops": [],
+            }
 
         bed_results.append({
             "id":   bed.get("id"),

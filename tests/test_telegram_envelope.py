@@ -9,6 +9,7 @@ Locks in:
 import httpx
 import pytest
 
+from garden.config import cfg
 from garden.telegram import tg, _escape_html
 
 
@@ -78,3 +79,21 @@ def test_tg_truncates_long_body(monkeypatch):
     # Should not raise; the function handles truncation internally
     result = tg("Test", long_body)
     assert result is True
+
+
+def test_tg_dry_run_suppresses_send(monkeypatch):
+    """When cfg.dry_run is set, tg() logs instead of calling httpx.post."""
+    called = False
+
+    def fake_post(url, json=None, timeout=None):
+        nonlocal called
+        called = True
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(cfg, "dry_run", True)
+
+    result = tg("Test", "body")
+
+    assert result is True
+    assert called is False

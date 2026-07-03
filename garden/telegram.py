@@ -45,6 +45,10 @@ def tg(title: str, body: str, html: bool = False) -> bool:
     """
     from garden.config import cfg
 
+    if cfg.dry_run:
+        log.info("[dry-run] Telegram suppressed: %s\n%s", title, body)
+        return True
+
     if html:
         text = f"\U0001f331 Garden: {title}\n\n{body}"
         parse_mode = "HTML"

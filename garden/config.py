@@ -46,6 +46,7 @@ class _Config:
         self.telegram_chat_id: str = self._require("TELEGRAM_CHAT_ID")
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
         self.db_path: Path = Path(os.getenv("DB_PATH", "garden.sqlite3"))
+        self.dry_run: bool = os.getenv("GARDEN_DRY_RUN", "").strip().lower() in ("1", "true", "yes")
 
         # ── location (from secrets.env — gitignored, never in config.yaml) ──
         self.location: dict[str, str] = {

@@ -162,10 +162,20 @@ def frost_risk(dewpoint_f_val: float, frost_threshold_f: float = 35.6) -> tuple[
 # Values are conservative growing-season averages; override via config.yaml crops: block.
 CROP_RANGES: dict[str, dict[str, Any]] = {
     "tomato":       {"moist": (50, 80), "temp": (60, 95),  "label": "Tomato"},
+    "tomato_cherry":      {"moist": (50, 80), "temp": (60, 95), "label": "Cherry Tomato"},
+    "tomato_roma":        {"moist": (50, 80), "temp": (60, 95), "label": "Roma Tomato"},
+    "tomato_beefsteak":   {"moist": (50, 80), "temp": (60, 95), "label": "Beefsteak Tomato"},
+    "tomato_heirloom":    {"moist": (50, 80), "temp": (60, 95), "label": "Heirloom Tomato"},
+    "tomato_grape":       {"moist": (50, 80), "temp": (60, 95), "label": "Grape Tomato"},
+    "tomato_san_marzano": {"moist": (50, 80), "temp": (60, 95), "label": "San Marzano Tomato"},
     "eggplant":     {"moist": (50, 75), "temp": (65, 95),  "label": "Eggplant"},
     "okra":         {"moist": (40, 70), "temp": (70, 100), "label": "Okra"},
     "peas":         {"moist": (60, 85), "temp": (45, 75),  "label": "Peas"},
     "sweet_pepper": {"moist": (50, 75), "temp": (65, 90),  "label": "Sweet Pepper"},
+    "sweet_pepper_red":    {"moist": (50, 75), "temp": (65, 90), "label": "Red Sweet Pepper"},
+    "sweet_pepper_green":  {"moist": (50, 75), "temp": (65, 90), "label": "Green Sweet Pepper"},
+    "sweet_pepper_yellow": {"moist": (50, 75), "temp": (65, 90), "label": "Yellow Sweet Pepper"},
+    "sweet_pepper_orange": {"moist": (50, 75), "temp": (65, 90), "label": "Orange Sweet Pepper"},
     "hot_pepper":   {"moist": (45, 70), "temp": (65, 95),  "label": "Hot Pepper"},
     "zucchini":     {"moist": (55, 80), "temp": (60, 90),  "label": "Zucchini"},
 }
@@ -214,7 +224,12 @@ def bed_stress(
             seen.add(p)
 
     if not unique:
-        return {"status": "unknown", "reason": "No recognised crop types in bed", "crops": []}
+        return {
+            "status": "unknown",
+            "reason": "No recognised crop types in bed",
+            "detail": "No recognised crop types in bed",
+            "crops": [],
+        }
 
     # Aggregate range: intersection (strictest min and max across crops)
     moist_min = max(ranges[p]["moist"][0] for p in unique)
@@ -224,33 +239,40 @@ def bed_stress(
     labels    = [ranges[p]["label"] for p in unique]
     label_str = ", ".join(labels)
 
-    # Temperature stress takes priority over moisture stress
+    # Temperature stress takes priority over moisture stress.
+    # "reason" includes crop names (for the LLM brief); "detail" omits them
+    # (for the compact dashboard insight card, which shows the bed name already).
     if air_temp_f < temp_min:
         return {
             "status": "cold",
             "reason": f"Too cold for {label_str}: {air_temp_f:.0f}°F, min {temp_min:.0f}°F",
+            "detail": f"Too cold: {air_temp_f:.0f}°F, min {temp_min:.0f}°F",
             "crops": labels,
         }
     if air_temp_f > temp_max:
         return {
             "status": "heat",
             "reason": f"Heat stress for {label_str}: {air_temp_f:.0f}°F, max {temp_max:.0f}°F",
+            "detail": f"Heat stress: {air_temp_f:.0f}°F, max {temp_max:.0f}°F",
             "crops": labels,
         }
     if soil_moist < moist_min:
         return {
             "status": "dry",
             "reason": f"Soil too dry for {label_str}: {soil_moist:.0f}%, min {moist_min:.0f}%",
+            "detail": f"Soil too dry: {soil_moist:.0f}%, min {moist_min:.0f}%",
             "crops": labels,
         }
     if soil_moist > moist_max:
         return {
             "status": "wet",
             "reason": f"Soil too wet for {label_str}: {soil_moist:.0f}%, max {moist_max:.0f}%",
+            "detail": f"Soil too wet: {soil_moist:.0f}%, max {moist_max:.0f}%",
             "crops": labels,
         }
     return {
         "status": "ok",
         "reason": f"{label_str}: moisture {soil_moist:.0f}%, temp {air_temp_f:.0f}°F, all good",
+        "detail": f"Moisture {soil_moist:.0f}%, temp {air_temp_f:.0f}°F, all good",
         "crops": labels,
     }
