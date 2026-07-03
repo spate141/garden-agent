@@ -152,6 +152,7 @@ header {
 
 .stats-strip {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   scrollbar-width: none;
@@ -159,10 +160,9 @@ header {
 }
 .stats-strip::-webkit-scrollbar { display: none; }
 
-/* Shrink-to-fit on desktop caused columns to be silently clipped once there
-   were enough sensors that even a min-width:0 squeeze couldn't fit them all
-   in one row. Scroll horizontally instead — nothing gets cut off, and the
-   hidden scrollbar (above) keeps it visually clean. */
+/* Groups grow to fill available width (flex-grow set inline = sensor count)
+   and wrap onto additional rows once they no longer fit, rather than being
+   squeezed past legibility or clipped/scrolled off-screen. */
 
 /* grouped layout */
 .stat-group {
@@ -186,11 +186,12 @@ header {
 
 .stat-group-body {
   display: flex;
+  flex-wrap: wrap;
   flex: 1;
 }
 
 .stat {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 110px;
   padding: 5px 20px 16px;
   border-right: 1px solid var(--border);
@@ -242,6 +243,7 @@ header {
 
 .insights-panel {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   scrollbar-width: none;
@@ -250,19 +252,8 @@ header {
 }
 .insights-panel::-webkit-scrollbar { display: none; }
 
-/* desktop: same shrink-to-fit behavior as .stats-strip — Beds and Insights
-   stay on this one row, no wrapping onto a second row */
-@media (min-width: 721px) {
-  .insights-panel {
-    overflow-x: hidden;
-  }
-  .insights-panel .bed-bar-col {
-    min-width: 0;
-  }
-  .insights-panel .stat {
-    min-width: 0;
-  }
-}
+/* Beds and Insights groups grow to fill available width and wrap onto their
+   own row once they no longer fit, same as .stats-strip above. */
 
 /* numeric value — same weight/face as .stat-value, slightly smaller to
    leave room for the .insight-note line below it */
