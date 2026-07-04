@@ -371,8 +371,27 @@
     <div class="sky-sun"  id="sky-sun"  aria-hidden="true"></div>
     <div class="sky-moon" id="sky-moon" aria-hidden="true"></div>
     <!-- clouds injected by JS -->
-    <div class="garden-status" id="garden-status" role="status" aria-live="polite">
-      <span id="garden-status-text">Checking bed status…</span>
+    <div class="sky-chips" role="region" aria-label="Outdoor conditions">
+      <span class="sky-chip" aria-label="Outdoor temperature">
+        <span aria-hidden="true">🌡️</span>
+        <span class="sky-chip-label">Temp</span>
+        <span id="wv-temp">—</span>
+      </span>
+      <span class="sky-chip" aria-label="Outdoor humidity">
+        <span aria-hidden="true">💧</span>
+        <span class="sky-chip-label">Humidity</span>
+        <span id="wv-hum">—</span>
+      </span>
+      <span class="sky-chip" aria-label="Atmospheric pressure">
+        <span aria-hidden="true">🌬️</span>
+        <span class="sky-chip-label">Pressure</span>
+        <span id="wv-pres">—</span>
+      </span>
+      <span class="sky-chip" aria-label="Current conditions">
+        <span aria-hidden="true" id="wv-cond-emoji">🌤️</span>
+        <span class="sky-chip-label">Now</span>
+        <span id="wv-cond">—</span>
+      </span>
     </div>
   </div>
   <!-- grass horizon strip: stitches sky blue to ground brown -->
@@ -382,52 +401,57 @@
   </div>
 </section>
 
-<!-- ── DASHBOARD SECTIONS: Watering / Conditions / System ─────────────────── -->
-<div class="dash-grid" id="dash-grid">
+<!-- insight + bed-status strip (two independently-updated sub-groups in one row) -->
+<div class="insights-panel" id="insights-panel" aria-live="polite" aria-label="Garden insights">
+  <!-- beds sub-group: populated by updateBulletBars() via updateStats() -->
+  <div id="beds-bar-group"></div>
+  <!-- insight items: populated by loadInsights() -->
+  <div id="insight-items-group"></div>
+</div>
 
-  <section class="dash-section dash-watering" id="section-watering" aria-label="Watering">
-    <h2 class="dash-section-title">Watering</h2>
-    <!-- populated by renderWateringBars() -->
-    <div class="watering-bars" id="watering-bars" aria-live="polite"></div>
-  </section>
-
-  <section class="dash-section dash-conditions" id="section-conditions" aria-label="Conditions">
-    <h2 class="dash-section-title">Conditions</h2>
-    <!-- populated by renderConditionsCards() -->
-    <div class="conditions-cards" id="conditions-cards" aria-live="polite"></div>
-    <!-- populated by renderConditionsMore() -->
-    <div class="conditions-more" id="conditions-more" aria-live="polite"></div>
-    <!-- populated by loadInsights() (water balance, frost lookahead, right now) -->
-    <div class="conditions-forecast" id="conditions-forecast" aria-live="polite"></div>
-
-    <!-- time-series charts -->
-    <div class="charts" id="charts-grid">
-      {% for c in charts %}
-      {% if c.key == 'temp1_f' %}
-      <details class="chart-card chart-card-collapsed">
-        <summary class="chart-title">{{ c.label }} — 24h chart</summary>
-        <div class="chart-wrap">
-          <canvas id="chart-{{ c.key }}"></canvas>
+<!-- current values -->
+<div class="stats-strip" id="stats-strip">
+  {% if stat_groups %}
+    {% for group in stat_groups %}
+    <div class="stat-group" style="flex: {{ group.sensors | length }}">
+      <div class="stat-group-name">{{ group.name }}</div>
+      <div class="stat-group-body">
+        {% for s in group.sensors %}
+        <div class="stat">
+          <div class="stat-label">{{ s.label }}</div>
+          <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
+            {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+          </div>
         </div>
-      </details>
-      {% else %}
-      <div class="chart-card">
-        <div class="chart-title">{{ c.label }}</div>
-        <div class="chart-wrap">
-          <canvas id="chart-{{ c.key }}"></canvas>
-        </div>
+        {% endfor %}
       </div>
-      {% endif %}
-      {% endfor %}
     </div>
-  </section>
+    {% endfor %}
+  {% else %}
+    {% for s in stats %}
+    <div class="stat">
+      <div class="stat-label">{{ s.label }}</div>
+      <div class="stat-value" data-key="{{ s.key }}" style="color:{{ s.color }}">
+        {{ "%.1f"|format(s.value) }}<span class="stat-unit">{{ s.unit }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
 
-  <details class="dash-section dash-system" id="section-system">
-    <summary class="dash-section-title">System</summary>
-    <!-- populated by renderSystemPanel() -->
-    <div class="system-body" id="system-body" aria-live="polite"></div>
-  </details>
+<!-- per-bed soil moisture charts, one row of 4 -->
+<div class="charts bed-moisture-row" id="bed-moisture-grid"></div>
 
+<!-- time-series charts -->
+<div class="charts" id="charts-grid">
+  {% for c in charts %}
+  <div class="chart-card">
+    <div class="chart-title">{{ c.label }}</div>
+    <div class="chart-wrap">
+      <canvas id="chart-{{ c.key }}"></canvas>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
 {% else %}
@@ -490,19 +514,6 @@ let SKY = {{ sky_json | safe }};
  *  { conditions, weather_code, rain_in, cloud_cover_pct, is_raining, intensity } */
 let CURRENT = null;
 
-/** Latest /api/latest rows keyed by sensor_key -- set by updateStats(), read
- *  by renderGardenStatus()/buildMoistureBar() so they don't need their own fetch. */
-let _lastLatestMap = {};
-
-/** Most recent /api/insights payload -- set by loadInsights(), read by
- *  renderConditionsCards() so the VPD card survives being re-rendered from
- *  updateStats() between insight polls. */
-let _lastInsights = null;
-
-/** Most recent /api/insights beds[] array -- feeds both the hero status
- *  sentence and the per-bar status chips. */
-let _bedStatuses = [];
-
 /** Chart band/zone data, derived server-side from config.yaml (single source of truth).
  *  moistureBands: {[sensorKey]: {min, max, label, crops}} per-bed optimal range.
  *  vpdBands:      [{upTo, label}] VPD zone breakpoints.
@@ -512,11 +523,6 @@ const BANDS = {{ bands_json | safe }};
 /** Consolidated moisture chart group -- one entry per bed: {key, bed, plants}.
  *  Built server-side from dashboard.beds (main.py). */
 const MOISTURE_GROUP = {{ moisture_group_json | safe }};
-
-/** Label/color for every configured sensor (config.yaml `sensors:` block),
- *  including stat-only fields with chart:false — lets Conditions/System
- *  render labels for demoted fields without hardcoding them in JS. */
-const SENSOR_META = {{ sensor_meta_json | safe }};
 
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
@@ -1304,8 +1310,29 @@ function _updateSky(readings, ts, timeOfDay) {
     sky.querySelectorAll('.g-firefly').forEach(function (f) { f.remove(); });
   }
 
+  /* weather value chips */
+  _setText('wv-temp', temp  != null ? temp.toFixed(1)  + '°F'   : '—');
+  _setText('wv-hum',  hum   != null ? hum.toFixed(0)   + '%'    : '—');
+  _setText('wv-pres', pres  != null ? pres.toFixed(2)  + ' inHg': '—');
+  _setText('wv-cond', CURRENT ? CURRENT.conditions : '—');
+  const condEmojiEl = document.getElementById('wv-cond-emoji');
+  if (condEmojiEl) condEmojiEl.textContent = _conditionsEmoji(CURRENT);
+
   /* live rain visual — sky-strip drizzle for light rain, full-page downpour for heavy */
   updateWeatherRain(CURRENT);
+}
+
+/** Pick a chip emoji for current conditions; mirrors the WMO code buckets in weather.py. */
+function _conditionsEmoji(current) {
+  if (!current) return '🌤️';
+  if (current.is_raining) return current.intensity === 'heavy' ? '⛈️' : '🌧️';
+  const code = current.weather_code;
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2)  return '⛅';
+  if (code === 3)  return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code === 71 || code === 73 || code === 75) return '❄️';
+  return '🌤️';
 }
 
 function _addFireflies() {
@@ -1605,6 +1632,24 @@ async function loadChart(key, color) {
    PER-BED SOIL MOISTURE ROW
    ════════════════════════════════════════════════════════════════════════════ */
 
+/** Build the 4 per-bed moisture chart-cards (one row) from MOISTURE_GROUP.
+ *  Each card's title is the bed's dominant-crop emoji + bed name; the chart
+ *  itself is a single-series chart driven by the existing loadChart(), which
+ *  already draws the optimal-moisture band + too-wet line from
+ *  BANDS.moistureBands[key] and the 💦 watering-spike marker. */
+function renderBedMoistureCards() {
+  const grid = document.getElementById('bed-moisture-grid');
+  if (!grid || !MOISTURE_GROUP.length) return;
+  grid.innerHTML = MOISTURE_GROUP.map(function (m) {
+    return (
+      '<div class="chart-card">' +
+        '<div class="chart-title">' + bedEmoji(m.plants) + ' ' + m.bed + ' moisture</div>' +
+        '<div class="chart-wrap"><canvas id="chart-' + m.key + '"></canvas></div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
 /* ── Sparkline helper (§3) ──────────────────────────────────────────────────
    Builds a <polyline> SVG path from a series rows array [{ts, value}].
    Returns the inner SVG markup (caller wraps in <svg>). */
@@ -1623,126 +1668,88 @@ function _sparkPath(rows) {
   return '<polyline fill="none" stroke="var(--accent)" stroke-width="1.5" points="' + pts.join(' ') + '"/>';
 }
 
-/* ── Bed -> sensor-key lookups (built once from BEDS) ── */
-var BED_MOISTURE_KEY   = {};   /* bed.id -> soil_moisture sensor key */
-var MOISTURE_BATT_KEY  = {};   /* soil_moisture key -> that bed's soil_battery key */
-var MOISTURE_KEY_PLANTS = {};  /* soil_moisture key -> that bed's plants[] */
-BEDS.forEach(function (bed) {
-  BED_MOISTURE_KEY[bed.id] = bed.sensors.soil_moisture;
-  MOISTURE_BATT_KEY[bed.sensors.soil_moisture] = bed.sensors.soil_battery;
-  MOISTURE_KEY_PLANTS[bed.sensors.soil_moisture] = bed.plants;
-});
-
-/* Shared bed-status vocabulary (used by both the hero status sentence and the
-   per-bar status chip) — hoisted here so neither duplicates it. */
-var BED_STATUS_WORD = { ok: 'in range', dry: 'running dry', wet: 'running wet', cold: 'too cold', heat: 'too hot', unknown: '' };
-var BED_STATUS_CLASS = { ok: 'ok', dry: 'warn', wet: 'warn', cold: 'warn', heat: 'alert', unknown: '' };
-
-/* ── Moisture bars (§11) ─────────────────────────────────────────────────────
-   Horizontal bar per bed, stacked so all 4 are directly comparable. Target
-   band shaded from BANDS.moistureBands; fill color green (in range), amber
-   (outside band), red (critical -- below G.dry, the same cutoff that fires
-   the real soil_moisture_low alert). % label sits at the bar's end, with an
-   inline 24h sparkline and a small battery icon alongside. */
-function moistureBarStatus(value, band) {
-  if (value < G.dry) return 'critical';
-  if (value < band.min || value > band.max) return 'warn';
-  return 'ok';
-}
-
-function buildMoistureBar(sensorKey, band, row) {
-  var plants = MOISTURE_KEY_PLANTS[sensorKey];
-  var emoji  = plants ? bedEmoji(plants) : '';
-  var chip   = '<span class="mbar-status" data-mbar-status></span>';
-
-  if (!row) {
-    return (
-      '<div class="mbar" data-bed-key="' + sensorKey + '">' +
-        '<div class="mbar-row">' +
-          '<span class="mbar-label">' + emoji + ' ' + band.label + '</span>' +
-          chip +
-          '<span class="mbar-pct">—</span>' +
-        '</div>' +
-        '<div class="mbar-track"></div>' +
-      '</div>'
-    );
+/* ── Water gauges (§2) ──────────────────────────────────────────────────────
+   Small vertical tank gauge showing current moisture vs the optimal band
+   from BANDS.moistureBands. Fill color: green (ok), amber (too dry), red
+   (too wet). A readout (value% + status) sits beside the tank. */
+function buildWaterGauge(sensorKey, value) {
+  var band = BANDS && BANDS.moistureBands && BANDS.moistureBands[sensorKey];
+  if (!band) return '';
+  var W = 90, H = 44, maxV = 100;
+  var tankW = 20, tankH = 36, tankX = 4, tankY = (H - tankH) / 2;
+  function py(v) {
+    var clamped = Math.min(Math.max(v, 0), maxV);
+    return tankY + tankH - (clamped / maxV) * tankH;
   }
-
-  var value  = parseFloat(row.value);
-  var status = moistureBarStatus(value, band);
-  var pct    = Math.max(0, Math.min(100, value));
-  var bandLeft  = Math.max(0, Math.min(100, band.min));
-  var bandWidth = Math.max(0, Math.min(100, band.max) - bandLeft);
-
-  var battKey  = MOISTURE_BATT_KEY[sensorKey];
-  var battRow  = battKey ? _lastLatestMap[battKey] : null;
-  var battHtml = battRow ? buildBatteryIcon(parseFloat(battRow.value)) : '';
-
-  var sparkHtml = seriesCache[sensorKey] && seriesCache[sensorKey].length > 1
-    ? '<svg class="kpi-spark mbar-spark" width="100" height="24">' + _sparkPath(seriesCache[sensorKey]) + '</svg>'
-    : '';
-
+  var status = value > band.max ? 'too wet' : value < band.min ? 'too dry' : 'ok';
+  var fill   = status === 'ok' ? '#22c55e' : status === 'too wet' ? '#ef4444' : '#f59e0b';
+  var fillY  = py(value);
+  var fillH  = (tankY + tankH) - fillY;
+  var bandTopY = py(band.max);
+  var bandBotY = py(band.min);
+  var clipId = 'gauge-clip-' + sensorKey;
   return (
-    '<div class="mbar" data-bed-key="' + sensorKey + '">' +
-      '<div class="mbar-row">' +
-        '<span class="mbar-label">' + emoji + ' ' + band.label + '</span>' +
-        chip +
-        battHtml +
-        '<span class="mbar-pct mbar-pct--' + status + '">' + value.toFixed(0) + '%</span>' +
-      '</div>' +
-      '<div class="mbar-track">' +
-        '<div class="mbar-band" style="left:' + bandLeft + '%;width:' + bandWidth + '%"></div>' +
-        '<div class="mbar-fill mbar-fill--' + status + '" style="width:' + pct + '%"></div>' +
-      '</div>' +
-      sparkHtml +
-    '</div>'
+    '<svg class="water-gauge" viewBox="0 0 ' + W + ' ' + H + '"' +
+    ' width="100%" height="' + H + '" preserveAspectRatio="xMinYMid meet" role="img"' +
+    ' aria-label="' + band.label + ' moisture ' + value.toFixed(0) + '% (' + status + ')">' +
+      '<defs><clipPath id="' + clipId + '">' +
+        '<rect x="' + tankX + '" y="' + tankY + '" width="' + tankW + '" height="' + tankH + '" rx="5"/>' +
+      '</clipPath></defs>' +
+      /* tank outline */
+      '<rect x="' + tankX + '" y="' + tankY + '" width="' + tankW + '" height="' + tankH + '" rx="5"' +
+      ' fill="var(--bg-alt)" stroke="var(--border)" stroke-width="1.5"/>' +
+      /* optimal band */
+      '<rect x="' + tankX + '" y="' + bandTopY + '" width="' + tankW + '" height="' + Math.max(0, bandBotY - bandTopY) + '"' +
+      ' fill="rgba(34,197,94,0.20)"/>' +
+      /* water fill, clipped to the rounded tank shape */
+      '<rect x="' + tankX + '" y="' + fillY + '" width="' + tankW + '" height="' + Math.max(0, fillH) + '"' +
+      ' fill="' + fill + '" clip-path="url(#' + clipId + ')"/>' +
+      /* too-wet marker */
+      '<line x1="' + tankX + '" y1="' + bandTopY + '" x2="' + (tankX + tankW) + '" y2="' + bandTopY + '"' +
+      ' stroke="#ef4444" stroke-width="1.5" stroke-dasharray="2,2"/>' +
+      /* readout */
+      '<text x="' + (tankX + tankW + 8) + '" y="' + (H / 2 - 2) + '" font-size="13" font-weight="700" fill="' + fill + '">' +
+        value.toFixed(0) + '%' +
+      '</text>' +
+      '<text x="' + (tankX + tankW + 8) + '" y="' + (H / 2 + 12) + '" font-size="10" fill="var(--text-muted)">' +
+        status +
+      '</text>' +
+    '</svg>'
   );
 }
 
-function renderWateringBars(latestMap) {
-  var container = document.getElementById('watering-bars');
+function updateBulletBars(latestMap) {
+  var container = document.getElementById('beds-bar-group');
   if (!container || !BANDS || !BANDS.moistureBands) return;
   var keys = Object.keys(BANDS.moistureBands);
   if (!keys.length) return;
 
-  container.innerHTML = keys.map(function (sensorKey) {
-    return buildMoistureBar(sensorKey, BANDS.moistureBands[sensorKey], latestMap[sensorKey]);
+  var cols = keys.map(function(sensorKey) {
+    var row  = latestMap[sensorKey];
+    var band = BANDS.moistureBands[sensorKey];
+    var barHtml = row ? buildWaterGauge(sensorKey, parseFloat(row.value)) : '';
+    return (
+      '<div class="stat bed-bar-col">' +
+        '<div class="stat-label">' + band.label + '</div>' +
+        barHtml +
+      '</div>'
+    );
   }).join('');
 
-  /* Re-apply the last known agronomic status chip immediately so it
-     survives the innerHTML rebuild (refresh() re-renders bars every poll). */
-  annotateWateringBars(_bedStatuses);
+  container.innerHTML =
+    '<div class="stat-group" style="flex:' + keys.length + '">' +
+      '<div class="stat-group-name">Beds</div>' +
+      '<div class="stat-group-body">' + cols + '</div>' +
+    '</div>';
 }
 
-/** Fill in the one-word bed-status chip on each moisture bar from
- *  /api/insights beds[] (BANDS.moistureBands alone doesn't carry live
- *  agronomic status -- only the crop-derived min/max band). */
-function annotateWateringBars(beds) {
-  var container = document.getElementById('watering-bars');
-  if (!container || !beds || !beds.length) return;
-  beds.forEach(function (bed) {
-    var sensorKey = BED_MOISTURE_KEY[bed.id];
-    if (!sensorKey) return;
-    var bar = container.querySelector('[data-bed-key="' + sensorKey + '"]');
-    if (!bar) return;
-    var chip = bar.querySelector('[data-mbar-status]');
-    if (!chip) return;
-    var cls = BED_STATUS_CLASS[bed.status] || '';
-    chip.textContent = BED_STATUS_WORD[bed.status] || '';
-    chip.className = 'mbar-status' + (cls ? ' insight-' + cls + '-val' : '');
-  });
-}
-
-/* ── Battery icon (§13) ──────────────────────────────────────────────────────
-   Small SVG outline + proportional fill, colored ok/low/critical from
-   BANDS.battery. Voltage text only shown below BANDS.battery.display_threshold
-   -- healthy batteries stay a quiet icon, not a number. */
-function buildBatteryIcon(volts) {
+/* ── Battery badge (§4) ─────────────────────────────────────────────────────
+   SVG icon with proportional fill and ok/low/critical color from BANDS.battery. */
+function buildBatteryBadge(volts) {
   var bc = BANDS && BANDS.battery;
   var nominal  = bc ? bc.nominal  : 1.5;
   var warn     = bc ? bc.warn     : 1.1;
   var critical = bc ? bc.critical : 0.94;
-  var display  = bc ? bc.display_threshold : 1.3;
   var state = volts <= critical
     ? { color: '#ef4444', label: 'critical' }
     : volts <= warn
@@ -1750,9 +1757,6 @@ function buildBatteryIcon(volts) {
     : { color: '#22c55e', label: 'ok' };
   var pct = Math.max(0, Math.min(100, ((volts - critical) / (nominal - critical)) * 100));
   var fillW = Math.round((18 * pct) / 100);
-  var voltHtml = volts < display
-    ? '<span style="color:' + state.color + ';font-size:11px;margin-left:3px">' + volts.toFixed(2) + 'V</span>'
-    : '';
   return (
     '<span class="battery-badge" title="' + volts.toFixed(2) + 'V (' + state.label + ')">' +
       '<svg width="26" height="14" style="vertical-align:middle">' +
@@ -1760,193 +1764,67 @@ function buildBatteryIcon(volts) {
         '<rect x="22" y="4" width="3" height="6" fill="' + state.color + '"/>' +
         '<rect x="2" y="3" width="' + fillW + '" height="8" fill="' + state.color + '"/>' +
       '</svg>' +
-      voltHtml +
+      '<span style="color:' + state.color + ';font-size:11px;margin-left:3px">' + volts.toFixed(2) + 'V</span>' +
     '</span>'
   );
 }
 
-/* ── System panel (§ collapsed) ───────────────────────────────────────────── */
-function renderSystemPanel(latestMap) {
-  var container = document.getElementById('system-body');
-  if (!container) return;
-
-  var rows = BEDS.map(function (bed) {
-    var battRow  = latestMap[bed.sensors.soil_battery];
-    var moistTs  = latestMap[bed.sensors.soil_moisture] ? latestMap[bed.sensors.soil_moisture].ts : null;
-    var stale    = isStale(moistTs);
-    var mins     = _minutesAgo(moistTs);
-    var lastSeen = mins == null ? 'no data yet' : (stale ? 'last seen ' + mins + 'm ago' : 'active');
-    return (
-      '<div class="stat">' +
-        '<div class="stat-label">' + bed.name + '</div>' +
-        '<div class="system-row">' +
-          (battRow ? buildBatteryIcon(parseFloat(battRow.value)) : '') +
-          '<span class="insight-note">' + lastSeen + '</span>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
-
-  container.innerHTML = '<div class="stat-group-body">' + rows + '</div>';
-}
-
-/* ── Conditions cards (§12) ───────────────────────────────────────────────── */
-function buildConditionCard(opts) {
-  var sparkHtml = opts.sparkRows && opts.sparkRows.length > 1
-    ? '<svg class="kpi-spark cond-spark" width="100" height="24">' + _sparkPath(opts.sparkRows) + '</svg>'
-    : '';
-  var colorAttr = opts.color ? ' style="color:' + opts.color + '"' : '';
-  return (
-    '<div class="cond-card">' +
-      '<div class="stat-label">' + opts.label + '</div>' +
-      '<div class="cond-primary"' + colorAttr + '>' +
-        opts.primaryValue + (opts.primaryUnit ? '<span class="stat-unit">' + opts.primaryUnit + '</span>' : '') +
-      '</div>' +
-      sparkHtml +
-      (opts.secondaryHtml ? '<div class="cond-secondary insight-note">' + opts.secondaryHtml + '</div>' : '') +
-    '</div>'
-  );
-}
-
-var VPD_STATUS_COLOR = { ok: 'var(--color-success)', low: '#d97706', high: '#d97706', very_high: '#dc2626' };
-
-function renderConditionsCards(latestMap) {
-  var container = document.getElementById('conditions-cards');
-  if (!container) return;
-
-  var cards = [];
-
-  var gazeboTemp = latestMap['temp1_f'];
-  if (gazeboTemp) {
-    cards.push(buildConditionCard({
-      label: SENSOR_META.temp1_f ? SENSOR_META.temp1_f.label : 'Gazebo temp',
-      primaryValue: parseFloat(gazeboTemp.value).toFixed(1),
-      primaryUnit: '°F',
-      sparkRows: seriesCache['temp1_f'],
-    }));
-  }
-
-  var gazeboHum = latestMap['humidity1'];
-  if (gazeboHum) {
-    cards.push(buildConditionCard({
-      label: SENSOR_META.humidity1 ? SENSOR_META.humidity1.label : 'Gazebo humidity',
-      primaryValue: parseFloat(gazeboHum.value).toFixed(0),
-      primaryUnit: '%',
-    }));
-  }
-
-  if (_lastInsights && _lastInsights.vpd) {
-    var secondary = [];
-    if (_lastInsights.dewpoint)   secondary.push('Dew point ' + _lastInsights.dewpoint.value.toFixed(0) + '°F');
-    if (_lastInsights.heat_index) secondary.push('Feels like ' + _lastInsights.heat_index.value.toFixed(0) + '°F');
-    cards.push(buildConditionCard({
-      label: 'VPD',
-      primaryValue: _lastInsights.vpd.value.toFixed(2),
-      primaryUnit: 'kPa',
-      color: VPD_STATUS_COLOR[_lastInsights.vpd.status] || '',
-      secondaryHtml: secondary.join(' · '),
-    }));
-  }
-
-  container.innerHTML = cards.join('');
-}
-
-/** Small tile row for the Station's demoted fields (outdoor temp/humidity,
- *  indoor temp/humidity, pressure, abs. pressure) -- same .stat markup the
- *  old stats-strip used, just a smaller/secondary mount point. */
-var CONDITIONS_MORE_KEYS = ['temp_f', 'humidity', 'temp_in_f', 'humidityin', 'baromrel_inhg', 'baromabs_inhg'];
-
-function renderConditionsMore(latestMap) {
-  var container = document.getElementById('conditions-more');
-  if (!container) return;
-
-  var tiles = CONDITIONS_MORE_KEYS.map(function (key) {
-    var row = latestMap[key];
-    if (!row) return '';
-    var meta = SENSOR_META[key] || { label: key, color: '' };
-    var extras = buildKpiExtras(key, parseFloat(row.value), row.ts);
-    return (
-      '<div class="stat">' +
-        '<div class="stat-label">' + meta.label + '</div>' +
-        '<div class="stat-value" style="color:' + meta.color + '">' +
-          parseFloat(row.value).toFixed(1) + '<span class="stat-unit">' + row.unit + '</span>' +
-        '</div>' +
-        extras +
-      '</div>'
-    );
-  }).join('');
-
-  container.innerHTML = '<div class="stat-group-body">' + tiles + '</div>';
-}
-
-/** Delta + sparkline block for a sensor, e.g. "▲ 0.3°F/hr" + 24h sparkline.
- *  Extracted from the old generic stat-tile updater so Conditions cards and
- *  tiles can share it instead of duplicating the "closest reading ~1hr ago"
- *  search. Returns '' if there isn't enough cached history yet. */
-function buildKpiExtras(key, currentValue, ts) {
-  var cached = seriesCache[key];
-  if (!cached || cached.length < 2) return '';
-
-  var nowMs    = new Date(ts).getTime();
-  var targetMs = nowMs - 3600000;
-  var best     = cached[0];
-  cached.forEach(function (r) {
-    if (Math.abs(new Date(r.ts).getTime() - targetMs) <
-        Math.abs(new Date(best.ts).getTime() - targetMs)) { best = r; }
-  });
-  var delta  = currentValue - parseFloat(best.value);
-  var arrow  = delta > 0.05 ? '▲' : delta < -0.05 ? '▼' : '■';
-  var dcolor = delta > 0.05 ? '#22c55e' : delta < -0.05 ? '#ef4444' : '#9ca3af';
-
-  return (
-    '<div class="kpi-extras">' +
-      '<div class="kpi-delta" style="color:' + dcolor + '">' +
-        arrow + ' ' + Math.abs(delta).toFixed(1) + '/hr' +
-      '</div>' +
-      '<svg class="kpi-spark" width="100" height="24">' + _sparkPath(cached) + '</svg>' +
-    '</div>'
-  );
-}
-
-/* ── Garden status sentence (replaces the old sky-chips Temp/Humidity/
-   Pressure/Now row) ── */
-function bedStatusSentence(beds) {
-  if (!beds || !beds.length) return 'Checking bed status…';
-  var notOk = beds.filter(function (b) { return b.status !== 'ok' && b.status !== 'unknown'; });
-  if (!notOk.length) return 'All beds in range';
-  return notOk.map(function (b) {
-    return b.name + ' ' + (BED_STATUS_WORD[b.status] || b.status);
-  }).join(' · ');
-}
-
-function _fmtAgo(ts) {
-  var mins = _minutesAgo(ts);
-  if (mins == null) return 'no data yet';
-  return mins <= 0 ? 'just now' : mins + 'm ago';
-}
-
-function renderGardenStatus() {
-  var el = document.getElementById('garden-status-text');
-  if (!el) return;
-  var lastTs = null;
-  BEDS.forEach(function (bed) {
-    var row = _lastLatestMap[bed.sensors.soil_moisture];
-    if (row && (!lastTs || row.ts > lastTs)) lastTs = row.ts;
-  });
-  el.textContent = bedStatusSentence(_bedStatuses) + ' · Updated ' + _fmtAgo(lastTs);
-}
-
-/** Update all data-driven sections from a /api/latest rows array. */
+/** Update the stat-strip values from a latest-rows array */
 function updateStats(rows) {
   const map = {};
   rows.forEach(function (r) { map[r.sensor_key] = r; });
-  _lastLatestMap = map;
 
-  renderWateringBars(map);
-  renderConditionsCards(map);
-  renderConditionsMore(map);
-  renderSystemPanel(map);
-  renderGardenStatus();
+  /* Bullet bars for each bed */
+  updateBulletBars(map);
+
+  document.querySelectorAll('.stat-value[data-key]').forEach(function (el) {
+    var key = el.dataset.key;
+    if (!map[key]) return;
+
+    /* Battery sensor keys: render as SVG badge instead of plain number */
+    if (key.startsWith('soilbatt')) {
+      el.innerHTML = buildBatteryBadge(parseFloat(map[key].value));
+      return;
+    }
+
+    /* Plain numeric value update */
+    var unit     = el.querySelector('.stat-unit');
+    var unitHTML = unit ? unit.outerHTML : '';
+    el.innerHTML = parseFloat(map[key].value).toFixed(1) + unitHTML;
+
+    /* Sparkline + delta (appended to parent .stat if present; skip battery) */
+    var statEl = el.closest ? el.closest('.stat') : el.parentElement;
+    if (!statEl) return;
+    var cached = seriesCache[key];
+    if (!cached || cached.length < 2) return;
+
+    /* Remove previously injected extras so they don't stack on repeat polls */
+    var prev = statEl.querySelector('.kpi-extras');
+    if (prev) prev.remove();
+
+    var current  = parseFloat(map[key].value);
+    /* Reading closest to 1 hour ago */
+    var nowMs    = new Date(map[key].ts).getTime();
+    var targetMs = nowMs - 3600000;
+    var best     = cached[0];
+    cached.forEach(function(r) {
+      if (Math.abs(new Date(r.ts).getTime() - targetMs) <
+          Math.abs(new Date(best.ts).getTime() - targetMs)) { best = r; }
+    });
+    var delta  = current - parseFloat(best.value);
+    var arrow  = delta > 0.05 ? '▲' : delta < -0.05 ? '▼' : '■';
+    var dcolor = delta > 0.05 ? '#22c55e' : delta < -0.05 ? '#ef4444' : '#9ca3af';
+    var unit2  = map[key].unit || '';
+
+    var extrasDiv = document.createElement('div');
+    extrasDiv.className = 'kpi-extras';
+    extrasDiv.innerHTML =
+      '<div class="kpi-delta" style="color:' + dcolor + '">' +
+        arrow + ' ' + Math.abs(delta).toFixed(1) + unit2 + '/hr' +
+      '</div>' +
+      '<svg class="kpi-spark" width="100" height="24">' + _sparkPath(cached) + '</svg>';
+    statEl.appendChild(extrasDiv);
+  });
 
   if (rows.length) {
     const latest = rows.reduce(function (a, b) { return a.ts > b.ts ? a : b; });
@@ -1974,27 +1852,51 @@ async function loadInsights() {
     };
   }
 
-  /* Live "right now" conditions — drives cloud cover and rain (no longer a chip) */
+  /* Live "right now" conditions — drives the sky-strip chip, cloud cover, and rain */
   CURRENT = data.current || null;
   updateWeatherRain(CURRENT);
 
-  /* VPD/dew point/feels-like now render as the VPD condition card (see
-     renderConditionsCards) instead of a generic insight item -- just cache
-     the payload and re-render that card. */
-  _lastInsights = data;
-  renderConditionsCards(_lastLatestMap);
-
-  /* Bed status feeds the hero sentence and the per-bar status chips. */
-  _bedStatuses = data.beds || [];
-  renderGardenStatus();
-  annotateWateringBars(_bedStatuses);
-
-  var panel = document.getElementById('conditions-forecast');
+  var panel = document.getElementById('insight-items-group');
   if (!panel) return;
 
   /* Each item: { label, value, unit, note, status }
      status → '' | 'ok' | 'warn' | 'alert'  (used to colour the value) */
   var items = [];
+
+  /* ── VPD ── */
+  if (data.vpd) {
+    var VS = { ok: 'ok', low: 'warn', high: 'warn', very_high: 'alert' };
+    items.push({
+      label: 'VPD',
+      value: data.vpd.value.toFixed(2),
+      unit:  'kPa',
+      note:  data.vpd.label,
+      status: VS[data.vpd.status] || '',
+    });
+  }
+
+  /* ── Dew point ── */
+  if (data.dewpoint) {
+    items.push({
+      label:  'Dew point',
+      value:  data.dewpoint.value.toFixed(1),
+      unit:   '°F',
+      note:   data.dewpoint.frost_risk ? data.dewpoint.message : 'No frost risk',
+      status: data.dewpoint.frost_risk ? 'alert' : 'ok',
+    });
+  }
+
+  /* ── Feels like ── */
+  if (data.heat_index) {
+    var hv = data.heat_index.value;
+    items.push({
+      label:  'Feels like',
+      value:  hv.toFixed(1),
+      unit:   '°F',
+      note:   '',
+      status: hv >= 103 ? 'alert' : (hv >= 90 ? 'warn' : ''),
+    });
+  }
 
   /* ── Water balance ── */
   if (data.forecast && data.forecast.water_balance_in != null) {
@@ -2037,6 +1939,21 @@ async function loadInsights() {
     });
   }
 
+  /* ── Per-bed stress ── */
+  var BED_STATUS = { ok: 'ok', dry: 'warn', wet: 'warn', cold: 'warn', heat: 'alert', unknown: '' };
+  var BED_LABEL  = { ok: 'OK', dry: 'Dry', wet: 'Wet', cold: 'Cold', heat: 'Hot', unknown: '?' };
+  if (data.beds) {
+    data.beds.forEach(function (bed) {
+      items.push({
+        label:  bed.name,
+        value:  BED_LABEL[bed.status] || bed.status,
+        unit:   '',
+        note:   bed.detail,
+        status: BED_STATUS[bed.status] || '',
+      });
+    });
+  }
+
   if (!items.length) { panel.innerHTML = ''; return; }
 
   /* Build a single stat-group that matches the stats-strip visual language */
@@ -2059,7 +1976,7 @@ async function loadInsights() {
 
   panel.innerHTML =
     '<div class="stat-group" style="flex:' + items.length + '">' +
-      '<div class="stat-group-name">Forecast</div>' +
+      '<div class="stat-group-name">Insights</div>' +
       '<div class="stat-group-body">' + statCols + '</div>' +
     '</div>';
 }
@@ -2253,6 +2170,7 @@ document.getElementById('garden-beds').addEventListener('click', function (e) {
 
 /* ── Boot ── */
 renderBeds();
+renderBedMoistureCards();
 refresh();
 setInterval(refresh, 60_000);
 </script>
