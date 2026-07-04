@@ -680,7 +680,6 @@ footer {
 
 @media (max-width: 640px) {
   .bed-detail { margin: 0 16px 16px; }
-  .garden     { margin: 16px -16px 0; border-radius: 0; }
 }
 
 /* ── MOBILE ─────────────────────────────────────────────────────────── */
@@ -729,6 +728,9 @@ footer {
   --g-soil-mid:         #4e3620;
   --g-soil-wet:         #2d1c0d;
 }
+@media (max-width: 640px) {
+  .garden { margin: 16px -16px 0; }
+}
 
 /* ── Sky strip ── */
 .garden-sky {
@@ -737,6 +739,7 @@ footer {
   height: 86px;
   background: linear-gradient(180deg, #5ba8d8 0%, #c8e8ff 100%);
   overflow: hidden;
+  border-radius: var(--radius) var(--radius) 0 0;
   transition: background 3s ease, filter 3s ease;
 }
 
@@ -801,18 +804,14 @@ footer {
 }
 
 .sky-chips {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  z-index: 4;
-  pointer-events: none;
+  padding: 14px 16px;
+  background: var(--g-wood-dark);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .sky-chip {
@@ -893,8 +892,9 @@ footer {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--g-chip-ink);
-  opacity: 0.7;
+  color: #f3e9d2;
+  opacity: 0.85;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
   margin-bottom: 5px;
 }
 
