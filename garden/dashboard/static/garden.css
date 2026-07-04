@@ -1,48 +1,76 @@
-/* ── DESIGN TOKENS (ported from snehal.ai style.scss) ──────────────── */
+/* ── DESIGN TOKENS (garden.snehal.ai standalone identity — redesign.md §7) ── */
 
 :root,
 [data-theme="light"] {
-  --bg:              #fafaf9;
-  --bg-alt:          #f8fafc;
-  --bg-header:       rgba(250, 250, 249, 0.92);
-  --text:            #1e293b;
-  --text-muted:      #64748b;
-  --heading:         #0f172a;
-  --border:          #e2e8f0;
-  --accent:          #1d4ed8;
-  --accent-2:        #2563eb;
-  --accent-bg:       rgba(29, 78, 216, 0.07);
-  --accent-border:   rgba(29, 78, 216, 0.2);
-  --card-bg:         #f3f3f0;
-  --card-border:     rgba(0, 0, 0, 0.08);
-  --toggle-bg:       #f1f5f9;
-  --toggle-border:   #cbd5e1;
-  --header-shadow:   0 1px 8px rgba(0, 0, 0, 0.07);
-  --selection-bg:    rgba(29, 78, 216, 0.18);
-  --selection-text:  #0f172a;
-  --color-success:   #4e7f2f;
+  /* Surfaces */
+  --bg:            #f7f8f6;
+  --surface:       #ffffff;
+  --surface-2:     #f1f3ef;
+  --hairline:      rgba(30,40,30,0.08);
+
+  /* Text */
+  --text:          #1c241d;
+  --text-muted:    #5c6b5e;
+  --text-faint:    #93a094;
+
+  /* Accent */
+  --accent:        #3f9c5a;
+  --accent-soft:   rgba(63,156,90,0.12);
+  --accent-border: rgba(63,156,90,0.28);
+
+  /* Status */
+  --ok:            #3f9c5a;
+  --warn:          #c98a2b;
+  --warn-soft:     rgba(201,138,43,0.12);
+  --crit:          #c0503f;
+  --crit-soft:     rgba(192,80,63,0.12);
+  --fill-healthy:  #16a34a;
+
+  /* Metric families (charts) */
+  --m-moisture:    #3f9c5a;
+  --m-temp:        #e08a3c;
+  --m-humidity:    #4a90c2;
+  --m-vpd:         #d0692f;
+  --m-pressure:    #8a7bc0;
+  --m-dew:         #4bb0c4;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(20,30,20,0.05);
+  --shadow-md: 0 6px 24px rgba(20,30,20,0.08);
+  --radius:    16px;
+  --radius-sm: 10px;
+
+  /* Translucent header fill for the sticky top bar's backdrop-blur (§2) */
+  --header-bg: rgba(255, 255, 255, 0.86);
 }
 
 [data-theme="dark"] {
-  --bg:              #1f1f1e;
-  --bg-alt:          #272726;
-  --bg-header:       rgba(31, 31, 30, 0.92);
-  --text:            #e6edf3;
-  --text-muted:      #8b949e;
-  --heading:         #f0f6fc;
-  --border:          #3d3d3c;
-  --accent:          #60a5fa;
-  --accent-2:        #93c5fd;
-  --accent-bg:       rgba(96, 165, 250, 0.10);
-  --accent-border:   rgba(96, 165, 250, 0.28);
-  --card-bg:         #31312e;
-  --card-border:     rgba(255, 255, 255, 0.08);
-  --toggle-bg:       #2f2f2e;
-  --toggle-border:   #3d3d3c;
-  --header-shadow:   0 1px 8px rgba(0, 0, 0, 0.4);
-  --selection-bg:    rgba(147, 197, 253, 0.22);
-  --selection-text:  #f0f6fc;
-  --color-success:   #7db84e;
+  --bg:            #0f1411;
+  --surface:       #161c18;
+  --surface-2:     #1d251f;
+  --hairline:      rgba(255,255,255,0.07);
+  --text:          #e8efe9;
+  --text-muted:    #9db0a1;
+  --text-faint:    #66756a;
+  --accent:        #57b874;
+  --accent-soft:   rgba(87,184,116,0.16);
+  --accent-border: rgba(87,184,116,0.32);
+  --ok:            #57b874;
+  --warn:          #e0a44a;
+  --warn-soft:     rgba(224,164,74,0.16);
+  --crit:          #db6a58;
+  --crit-soft:     rgba(219,106,88,0.16);
+  --fill-healthy:  #34d399;
+  --m-moisture:    #57b874;
+  --m-temp:        #eda766;
+  --m-humidity:    #6aa9d6;
+  --m-vpd:         #e08653;
+  --m-pressure:    #a396d4;
+  --m-dew:         #63c2d4;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 28px rgba(0,0,0,0.5);
+
+  --header-bg: rgba(15, 20, 17, 0.86);
 }
 
 /* ── BASE ───────────────────────────────────────────────────────────── */
@@ -54,70 +82,116 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 body {
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.6 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font: 15px/1.6 'Inter', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: "tnum" 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-::-moz-selection { background: var(--selection-bg); color: var(--selection-text); }
-::selection      { background: var(--selection-bg); color: var(--selection-text); }
+::-moz-selection { background: var(--accent-soft); color: var(--text); }
+::selection      { background: var(--accent-soft); color: var(--text); }
 
-/* ── HEADER ─────────────────────────────────────────────────────────── */
+/* ── FOCUS STATES (a11y, redesign.md §12 polish pass) ──────────────────── */
+/* One visible ring everywhere, keyboard-only (no ring on mouse/touch clicks).
+   Applies uniformly to chips, theme toggle, trends controls, climate stats,
+   and the bed detail panel -- no per-component overrides needed since
+   they're all plain buttons. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── PAGE SHELL ─────────────────────────────────────────────────────── */
+/* Single scrolling column, max content width 1200px, centered, comfortable
+   side gutters — redesign.md §1. Regions B/C/D live inside this wrapper;
+   the top bar (region A) stays full-bleed above it. */
+
+.page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 0 16px; }
+}
+
+/* ── HEADER (region A — top bar) ────────────────────────────────────── */
+/* Slim, ~52px, near-invisible: wordmark left; live clock, connection dot,
+   theme toggle right. redesign.md §2. */
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 24px;
-  border-bottom: 1px solid var(--border);
+  height: 52px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--hairline);
   position: sticky;
   top: 0;
-  background: var(--bg-header);
+  background: var(--header-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--header-shadow);
   z-index: 10;
+}
+
+@media (max-width: 640px) {
+  header { padding: 0 16px; }
 }
 
 .logo {
   font-family: 'Bitter', Georgia, serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--heading);
+  color: var(--text);
   letter-spacing: -0.01em;
   display: flex;
   align-items: center;
   gap: 7px;
+  opacity: 0.92;
 }
 
 .meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.last-update {
+.header-clock {
   color: var(--text-muted);
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 11px;
-  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 500;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
-.refresh-dot {
+@media (max-width: 480px) {
+  .header-clock { display: none; }
+}
+
+/* Connection dot: green = fresh, amber = stale >10min, red = disconnected.
+   Color communicates state; the title attribute carries it in text too. */
+.conn-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-success);
-  opacity: 0.45;
-  transition: opacity 0.3s;
+  background: var(--ok);
   flex-shrink: 0;
+  transition: background-color 0.3s, box-shadow 0.3s;
 }
-.refresh-dot.active { opacity: 1; }
+.conn-dot.is-fresh   { background: var(--ok); }
+.conn-dot.is-stale   { background: var(--warn); }
+.conn-dot.is-offline { background: var(--crit); }
+.conn-dot.is-fetching { box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* ── THEME TOGGLE ───────────────────────────────────────────────────── */
 
@@ -127,9 +201,9 @@ header {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 1px solid var(--toggle-border);
+  border: 1px solid var(--hairline);
   border-radius: 8px;
-  background: var(--toggle-bg);
+  background: var(--surface-2);
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
@@ -139,7 +213,7 @@ header {
 .theme-toggle:hover {
   border-color: var(--accent-border);
   color: var(--accent);
-  background: var(--accent-bg);
+  background: var(--accent-soft);
 }
 
 /* In light mode show moon (click to go dark), in dark mode show sun (click to go light) */
@@ -148,139 +222,287 @@ header {
 [data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
-/* ── STATS STRIP ────────────────────────────────────────────────────── */
+/* ── BED STATUS CHIPS (action surface) ──────────────────────────────── */
+/* redesign.md §3.3: dot + name + one-word state, no numbers. Calm chips
+   recede; chips needing action get a soft tint + ring so they're louder
+   without relying on color alone (dot goes ringed, not just recolored). */
 
-.stats-strip {
+.bed-chip-row {
   display: flex;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--bg);
+  gap: 12px;
+  padding: 16px 24px 20px;
 }
-.stats-strip::-webkit-scrollbar { display: none; }
 
-/* Groups grow to fill available width (flex-grow set inline = sensor count)
-   and wrap onto additional rows once they no longer fit, rather than being
-   squeezed past legibility or clipped/scrolled off-screen. */
+/* 640-1023px (redesign.md §8): chips stay a single row, scrolling horizontally
+   if they don't all fit rather than shrinking past legibility. */
+@media (max-width: 1023px) and (min-width: 641px) {
+  .bed-chip-row { overflow-x: auto; }
+  .bed-chip { flex: 0 0 160px; }
+}
 
-/* grouped layout */
-.stat-group {
+/* <640px (redesign.md §8): chips become a 2x2 grid instead of scrolling. */
+@media (max-width: 640px) {
+  .bed-chip-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    padding: 12px 16px 16px;
+    gap: 8px;
+  }
+}
+
+.bed-chip {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.bed-chip:hover { box-shadow: var(--shadow-sm); }
+
+/* Moisture-level fill: a soft horizontal wash showing % of the chip filled,
+   colored by how far the reading is from the crop's healthy band. Sits
+   behind the dot/name/state content (negative z-index, own stacking
+   context from the chip's z-index:0 above). */
+.bed-chip-fill {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0.32;
+  transition: width 0.3s ease, background 0.3s ease;
+  pointer-events: none;
+}
+
+.bed-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+}
+
+.bed-chip-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bed-chip-state {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* calm / all-clear: quiet, recedes */
+.bed-chip.is-ok .bed-chip-dot { background: var(--ok); }
+
+/* needs action: amber tint + ring so contrast does the talking, not a banner */
+.bed-chip.is-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn) inset;
+}
+.bed-chip.is-warn .bed-chip-dot {
+  background: none;
+  border: 2px solid var(--warn);
+  width: 6px;
+  height: 6px;
+}
+.bed-chip.is-warn .bed-chip-state { color: var(--warn); font-weight: 700; }
+
+/* genuine problem only: sensor dead / critical battery / offline */
+.bed-chip.is-offline {
+  background: var(--crit-soft);
+  border-color: var(--crit);
+}
+.bed-chip.is-offline .bed-chip-dot { background: var(--crit); }
+.bed-chip.is-offline .bed-chip-state { color: var(--crit); font-weight: 700; }
+
+/* ── LOADING SKELETONS (redesign.md §9) ─────────────────────────────── */
+/* Soft, muted placeholders shown for the brief window before the first
+   /api/latest + /api/insights response lands. Calm pulse, not a spinner. */
+.bed-chip.is-skeleton {
+  background: var(--surface-2);
+  border-color: var(--hairline);
+  cursor: default;
+  min-height: 40px;
+}
+.climate-stat.is-skeleton {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  min-width: 64px;
+  min-height: 34px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bed-chip.is-skeleton, .climate-stat.is-skeleton {
+    animation: g-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes g-skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+/* ── CLIMATE STRIP (region C) ───────────────────────────────────────── */
+/* redesign.md §5: the only always-on numeric surface. One low-elevation
+   surface, hairline divider from the hero, verdict left (most prominent),
+   3 headline stats right. */
+
+.climate-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 0 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.climate-verdict {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  flex: 1 1 260px;
+}
+
+.climate-stats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.climate-stat {
   display: flex;
   flex-direction: column;
-  border-right: 2px solid var(--border);
-  /* flex value set inline (= sensor count) so every stat gets equal width */
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-width: 84px;
 }
-.stat-group:last-child { border-right: none; }
 
-.stat-group-name {
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 800;
+.climate-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  padding: 8px 20px 0;
-  opacity: 0.55;
-  white-space: nowrap;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
 }
 
-.stat-group-body {
-  display: flex;
-  flex-wrap: wrap;
-  flex: 1;
-}
-
-.stat {
-  flex: 1 1 auto;
-  min-width: 110px;
-  padding: 5px 20px 16px;
-  border-right: 1px solid var(--border);
-  transition: background 0.12s;
-}
-.stat:last-child { border-right: none; }
-.stat:hover { background: var(--bg-alt); }
-
-/* ungrouped fallback: direct .stat children of .stats-strip */
-.stats-strip > .stat {
-  padding: 16px 20px;
-  min-width: 120px;
-}
-
-.stat-label {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 7px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stat-value {
-  font-family: 'Bitter', Georgia, serif;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+.climate-stat-value {
   font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.stat-unit {
-  font-family: 'Nunito Sans', -apple-system, sans-serif;
-  font-size: 12px;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-muted);
-  margin-left: 2px;
-  letter-spacing: 0;
-}
-
-/* ── INSIGHT PANEL ──────────────────────────────────────────────────── */
-/* Shares the stats-strip visual language: same background, border, and
-   stat-group / stat-group-body / stat structure. Only two additions:
-   .insight-val (numeric value) and .insight-note (interpretation line). */
-
-.insights-panel {
+  color: var(--text);
   display: flex;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--bg);
-  min-height: 0; /* collapses cleanly when JS hasn't populated it yet */
-}
-.insights-panel::-webkit-scrollbar { display: none; }
-
-/* Beds and Insights groups grow to fill available width and wrap onto their
-   own row once they no longer fit, same as .stats-strip above. */
-
-/* numeric value — same weight/face as .stat-value, slightly smaller to
-   leave room for the .insight-note line below it */
-.insight-val {
-  font-family: 'Bitter', Georgia, serif;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
+  align-items: baseline;
+  gap: 4px;
 }
 
-/* interpretation line below the value */
-.insight-note {
-  font-size: 10px;
+.climate-stat-unit {
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--text-muted);
-  margin-top: 5px;
-  line-height: 1.35;
-  white-space: normal;
 }
 
-/* status colours applied to the numeric value */
-.insight-ok-val    { color: var(--color-success); }
-.insight-warn-val  { color: #d97706; }
-.insight-alert-val { color: #dc2626; }
-[data-theme="dark"] .insight-warn-val  { color: #f59e0b; }
-[data-theme="dark"] .insight-alert-val { color: #f87171; }
+.climate-stat-sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
+
+.climate-stat-trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.climate-stat-trend.is-up   { color: var(--warn); }
+.climate-stat-trend.is-down { color: var(--accent); }
+.climate-stat-trend.is-flat { color: var(--text-faint); }
+
+@media (max-width: 1023px) {
+  .climate-strip { flex-direction: column; align-items: flex-start; }
+  .climate-verdict { flex: 0 1 auto; }
+  .climate-stats { width: 100%; justify-content: space-between; gap: 16px; }
+}
+
+@media (max-width: 640px) {
+  .climate-strip { padding: 16px; margin: 0 16px; }
+  .climate-stats { gap: 12px; }
+  .climate-stat  { min-width: 0; flex: 1 1 30%; }
+}
+
+/* ── TRENDS SECTION (region D) — redesign.md §6 ────────────────────────── */
+/* Demoted below the fold behind a quiet header; always visible — the
+   time-range control + the small-multiples moisture row + grouped charts. */
+
+
+.trends-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 24px;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+}
+
+.trends-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.trends-controls {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px 16px;
+}
+
+.trends-range-btn {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.trends-range-btn:hover { color: var(--text); }
+.trends-range-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.trends-climate-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (max-width: 720px) {
+  .trends-climate-grid { grid-template-columns: 1fr; }
+}
 
 /* ── CHARTS GRID ────────────────────────────────────────────────────── */
 
@@ -297,8 +519,8 @@ header {
 }
 
 .chart-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
   border-radius: 14px;
   padding: 18px 18px 14px;
   transition: box-shadow 0.18s ease, transform 0.18s ease;
@@ -361,7 +583,7 @@ header {
   font-family: 'Bitter', Georgia, serif;
   font-size: 17px;
   font-weight: 600;
-  color: var(--heading);
+  color: var(--text);
 }
 
 .empty-hint {
@@ -380,46 +602,91 @@ footer {
   font-variant-numeric: tabular-nums;
   text-align: center;
   padding: 13px 24px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   letter-spacing: 0.01em;
+}
+
+/* ── BED DETAIL (inline expand) ─────────────────────────────────────── */
+/* redesign.md §4.1, reworked: shown directly beneath the bed chip row
+   instead of a side drawer. Only one bed open at a time. The old drawer's
+   Climate tab was dropped entirely -- Trends already covers that ground. */
+
+.bed-chip.is-open { box-shadow: 0 0 0 2px var(--accent) inset; }
+
+.bed-detail {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  margin: 0 24px 20px;
+  padding: 16px;
+}
+
+.bed-detail-line {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.bed-detail-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.bed-detail-metric-val {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bed-detail-metric-band {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.bed-detail-rate {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+.bed-detail-rate.is-up   { color: var(--warn); }
+.bed-detail-rate.is-down { color: var(--accent); }
+.bed-detail-rate.is-flat { color: var(--text-faint); }
+
+.bed-detail-chart {
+  position: relative;
+  height: 84px;
+  margin: 10px 0 14px;
+}
+
+.bed-detail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bed-detail-verdict {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+@media (max-width: 640px) {
+  .bed-detail { margin: 0 16px 16px; }
+  .garden     { margin: 16px 16px 0; }
 }
 
 /* ── MOBILE ─────────────────────────────────────────────────────────── */
 
-@media (max-width: 720px) {
-  /* Groups stack vertically; their stat rows scroll horizontally inside */
-  .stats-strip {
-    flex-direction: column;
-    overflow-x: visible;
-  }
-
-  .stat-group {
-    border-right: none;
-    border-bottom: 2px solid var(--border);
-  }
-  .stat-group:last-child { border-bottom: none; }
-
-  .stat-group-body {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .stat-group-body .stat {
-    min-width: 0;
-    border-bottom: 1px solid var(--border);
-  }
-  /* remove bottom border on last row (last 2 items) */
-  .stat-group-body .stat:nth-last-child(-n+2) { border-bottom: none; }
-  /* remove right border on even items (right column) */
-  .stat-group-body .stat:nth-child(2n) { border-right: none; }
-}
-
 @media (max-width: 480px) {
-  header        { padding: 9px 16px; }
   .theme-toggle { width: 32px; height: 32px; border-radius: 7px; }
-  .stat         { padding: 4px 14px 13px; }
-  .stat-value   { font-size: 19px; }
-  .last-update  { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -427,8 +694,9 @@ footer {
    ═══════════════════════════════════════════════════════════════════ */
 
 .garden {
-  width: 100%;
   overflow: hidden;
+  margin: 16px 24px 0;
+  border-radius: var(--radius);
   border-bottom: 2px solid rgba(0,0,0,0.08);
   /* Garden palette -- ported from reference_bed.html :root */
   --g-wood-light:       #b07a44;
@@ -519,6 +787,18 @@ footer {
 }
 .sky-cloud::before { width: 55%; height: 160%; top: -50%; left: 18%; }
 .sky-cloud::after  { width: 40%; height: 130%; top: -35%; right: 18%; }
+
+/* Overcast/rain grey veil (redesign.md §3.1 Layer 2) -- opacity toggled by JS,
+   sits above the gradient/clouds but below the sun/moon/chips. */
+.sky-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(200,205,210,0.35);
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 3s ease;
+}
 
 .sky-chips {
   position: absolute;
@@ -618,23 +898,30 @@ footer {
   margin-bottom: 5px;
 }
 
-/* Wooden raised-bed frame */
+/* Wooden raised-bed frame -- premium refinement (redesign.md §3.2): gentler
+   rounded corners, one soft top-down light instead of a glossy specular edge,
+   and a soft contact shadow grounding the planter on the soil. */
 .g-bed-frame {
   position: relative;
   width: 210px;
   height: 158px;
-  border-radius: 6px;
-  /* Multi-layer wooden plank border illusion */
+  border-radius: 16px;
+  /* Multi-layer wooden plank border illusion, with a single soft top-down
+     light wash painted over it (first layer = topmost). */
   background:
+    linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 32%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.08) 100%),
     linear-gradient(to right,  var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
     linear-gradient(to left,   var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
     linear-gradient(to bottom, var(--g-wood-shadow) 0, var(--g-wood) 5px, var(--g-wood-light) 7px, var(--g-wood) 13px, transparent 13px),
     linear-gradient(to top,    var(--g-wood-shadow) 0, var(--g-wood) 4px, var(--g-wood-light) 6px, var(--g-wood) 11px, transparent 11px);
-  box-shadow: 3px 5px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+  box-shadow:
+    0 14px 20px -8px rgba(0,0,0,0.32),  /* soft contact shadow on the ground */
+    0 2px 5px rgba(0,0,0,0.16),
+    inset 0 1px 0 rgba(255,255,255,0.10);
   overflow: hidden;
 }
 
-/* Plank grain lines */
+/* Plank grain lines -- kept subtle so the frame reads as matte form, not outline */
 .g-bed-frame::before {
   content: '';
   position: absolute;
@@ -642,7 +929,7 @@ footer {
   background-image:
     repeating-linear-gradient(90deg,
       transparent 0, transparent 34px,
-      rgba(0,0,0,0.07) 34px, rgba(0,0,0,0.07) 35px);
+      rgba(0,0,0,0.045) 34px, rgba(0,0,0,0.045) 35px);
   pointer-events: none;
   z-index: 6;
 }
@@ -651,11 +938,24 @@ footer {
 .g-soil {
   position: absolute;
   inset: 13px 13px 16px;
-  border-radius: 2px;
+  border-radius: 6px;
   /* default gradient for healthy/damp soil; JS overrides with computed colors */
   background: linear-gradient(to bottom, var(--g-soil-mid), var(--g-soil-wet));
   overflow: hidden;
 }
+
+/* Faint wet sheen on the soil while it's actually raining (redesign.md §3.1
+   Layer 2). `.is-raining` is toggled on the hero root by _updateSky(). */
+.g-soil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 40%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2.5s ease;
+}
+.garden.is-raining .g-soil::after { opacity: 1; }
 
 /* Front rail -- overlaps soil bottom so plants sit inside the bed */
 .g-front-rail {
@@ -666,7 +966,7 @@ footer {
   height: 28px;
   background: linear-gradient(to bottom, var(--g-wood) 0%, var(--g-wood-dark) 100%);
   border-top: 4px solid var(--g-wood-light);
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 14px 14px;
   z-index: 8;
   overflow: hidden;
 }
@@ -776,59 +1076,6 @@ footer {
   overflow: visible;
 }
 
-/* Wood label nailed to the front rail */
-.g-label {
-  position: absolute;
-  bottom: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 62%;
-  height: 22px;
-  background: var(--g-label-wood);
-  border: 2px solid var(--g-wood-shadow);
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  z-index: 9;
-  box-sizing: border-box;
-}
-.g-label::before,
-.g-label::after {
-  content: '';
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #2a160a;
-  box-shadow: 0 12px 0 #2a160a;
-  pointer-events: none;
-}
-.g-label::before { top: 2px; left: 5px; }
-.g-label::after  { top: 2px; right: 5px; }
-.g-label-moist {
-  font-size: 10px;
-  font-weight: 700;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  color: #f3e9d2;
-  white-space: nowrap;
-}
-.g-label-batt {
-  font-size: 10px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  color: #cdeccd;
-  white-space: nowrap;
-}
-
-/* Low-battery soft pulse */
-.g-label-batt.g-batt-low {
-  color: #ff9977;
-  animation: g-batt-pulse 2.4s ease-in-out infinite;
-}
-@keyframes g-batt-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
 
 /* Droplet alert ping */
 .g-droplet-ping {
@@ -958,20 +1205,22 @@ footer {
 /* ── Ambient animation (no-preference only) ─────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
 
-  /* Gentle plant sway — inner wrapper only, so wilt transition is unaffected */
+  /* Gentle plant sway — inner wrapper only, so wilt transition is unaffected.
+     Amplitude (2-4deg) and period (6-10s) are per-plant custom properties set
+     in JS, so a bed's plants never sway in unison (redesign.md §3.2). */
   .g-plant-inner {
-    animation: g-sway 4.2s ease-in-out infinite;
+    animation: g-sway var(--g-sway-dur, 8s) ease-in-out infinite;
     animation-delay: var(--g-delay, 0s);
   }
   @keyframes g-sway {
     0%, 100% { transform: rotate(var(--g-rot, 0deg)); }
-    35%       { transform: rotate(calc(var(--g-rot, 0deg) + 2.8deg)); }
-    68%       { transform: rotate(calc(var(--g-rot, 0deg) - 1.8deg)); }
+    35%       { transform: rotate(calc(var(--g-rot, 0deg) + var(--g-sway-amp, 3deg))); }
+    68%       { transform: rotate(calc(var(--g-rot, 0deg) - var(--g-sway-amp, 3deg) * 0.65)); }
   }
 
-  /* Cloud drift */
+  /* Cloud drift -- slow and few (redesign.md §3.1 motion budget: 40-90s) */
   .sky-cloud {
-    animation: g-cloud-drift var(--g-cdur, 22s) linear infinite;
+    animation: g-cloud-drift var(--g-cdur, 60s) linear infinite;
     animation-delay: var(--g-cdelay, 0s);
   }
   @keyframes g-cloud-drift {
@@ -1001,9 +1250,9 @@ footer {
 }
 
 /* ── LIGHT-MODE PANEL POLISH (§8) ───────────────────────────────────────── */
-/* In light mode the .chart-card and insights/stats panels use a cream card-bg
-   that blends into the page background. Override to white with a clear border
-   and a soft shadow so panels separate visually the way dark-mode cards do. */
+/* In light mode .chart-card uses a cream card-bg that blends into the page
+   background. Override to white with a clear border and a soft shadow so
+   cards separate visually the way dark-mode cards do. */
 
 [data-theme="light"] .chart-card {
   background:    #ffffff;
@@ -1015,97 +1264,18 @@ footer {
   box-shadow:    0 4px 16px rgba(0, 0, 0, 0.10);
 }
 
-[data-theme="light"] .insights-panel {
-  background:    #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="light"] .stats-strip {
-  background:    #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
 [data-theme="light"] .sky-banner {
   filter: saturate(0.92) brightness(1.02);
 }
 
 /* ── WATER GAUGES (§2) ──────────────────────────────────────────────────── */
 
-/* Bed columns inside the insight strip. min-width keeps them from collapsing
-   on desktop; mobile overrides this below. */
-.bed-bar-col {
-  min-width: 130px;
-  padding-top: 8px;
-  padding-bottom: 10px;
-}
-
-/* SVG water gauge scales to column width via width="100%" on the element. */
-.water-gauge { display: block; max-width: 140px; }
-
-/* ── INSIGHTS PANEL MOBILE (responsive) ─────────────────────────────────── */
-
-@media (max-width: 720px) {
-  /* Stack bed bars above insight items instead of side-by-side */
-  .insights-panel {
-    flex-direction: column;
-  }
-
-  /* Bed columns: each takes 50% of the row, no fixed min-width */
-  .bed-bar-col {
-    min-width: 0;
-    flex: 1;
-  }
-  .water-gauge { max-width: 100%; }
-
-  /* Insight items: wrap into a 2-column grid */
-  #insight-items-group .stat-group-body {
-    flex-wrap: wrap;
-  }
-  #insight-items-group .stat {
-    flex: 0 0 50%;
-    min-width: 0;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    box-sizing: border-box;
-  }
-  #insight-items-group .stat:nth-child(odd) {
-    border-right: 1px solid var(--border);
-  }
-  #insight-items-group .stat:last-child,
-  #insight-items-group .stat:nth-last-child(2):nth-child(odd) {
-    border-bottom: none;
-  }
-}
-
 /* ── BATTERY BADGE (§4) ─────────────────────────────────────────────────── */
+/* Reused by the bed detail's per-bed battery indicator (§4.1). */
 
 .battery-badge {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   line-height: 1;
-}
-
-/* ── KPI SPARKLINE + DELTA (§3) ─────────────────────────────────────────── */
-
-.kpi-extras {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
-}
-
-.kpi-delta {
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  line-height: 1;
-}
-
-.kpi-spark {
-  display: block;
-  overflow: visible;
 }
