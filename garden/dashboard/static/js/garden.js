@@ -922,6 +922,9 @@ function _updateSky(readings, ts, timeOfDay) {
     sky.querySelectorAll('.g-firefly').forEach(function (f) { f.remove(); });
   }
 
+  /* birds only fly in daylight — ground them at night */
+  sky.classList.toggle('is-night', timeOfDay === 'night');
+
   /* weather value chips */
   _setText('wv-temp', temp  != null ? temp.toFixed(1)  + '°F'   : '—');
   _setText('wv-hum',  hum   != null ? hum.toFixed(0)   + '%'    : '—');
@@ -997,10 +1000,10 @@ function cssVar(name) {
 
 function chartThemeColors() {
   return {
-    grid:          cssVar('--border'),
+    grid:          cssVar('--hairline'),
     ticks:         cssVar('--text-muted'),
-    tooltipBg:     cssVar('--card-bg'),
-    tooltipBorder: cssVar('--border'),
+    tooltipBg:     cssVar('--surface'),
+    tooltipBorder: cssVar('--hairline'),
     tooltipTitle:  cssVar('--text-muted'),
     tooltipBody:   cssVar('--text'),
   };
