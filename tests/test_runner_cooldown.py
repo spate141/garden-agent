@@ -69,11 +69,12 @@ def _local_now():
 def test_already_sent_today_same_day(monkeypatch):
     """Brief sent earlier today → True."""
     from garden import storage
-    from zoneinfo import ZoneInfo
 
     now = _local_now()
-    # Store a last_fired_ts for today (an hour ago in UTC)
-    ts = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    # Store a last_fired_ts anchored to local midnight today, not a fixed
+    # "1 hour ago" offset -- near local midnight, "1 hour ago" in UTC can
+    # land on the previous local day and make this test flaky.
+    ts = now.replace(hour=0, minute=1, second=0, microsecond=0).isoformat()
     monkeypatch.setattr(
         storage, "get_alert_state",
         lambda rule_id: {"last_fired_ts": ts}
