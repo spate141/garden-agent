@@ -1,0 +1,37 @@
+<!-- ── GARDEN HERO ─────────────────────────────────────────────────────────── -->
+<section class="garden" id="garden" aria-label="Garden beds visualization">
+  <div class="garden-sky" id="garden-sky">
+    <div class="sky-sun"  id="sky-sun"  aria-hidden="true"></div>
+    <div class="sky-moon" id="sky-moon" aria-hidden="true"></div>
+    <!-- overcast/rain grey veil (redesign.md §3.1); opacity driven by JS -->
+    <div class="sky-veil" id="sky-veil" aria-hidden="true"></div>
+    <!-- clouds injected by JS -->
+  </div>
+  <!-- grass horizon strip: stitches sky blue to ground brown -->
+  <div class="garden-horizon" aria-hidden="true"></div>
+  <div class="garden-ground" id="garden-beds" aria-live="polite">
+    <!-- bed cards injected by JS -->
+  </div>
+  <div class="sky-chips" role="region" aria-label="Outdoor conditions">
+    <span class="sky-chip" aria-label="Outdoor temperature">
+      <span aria-hidden="true">🌡️</span>
+      <span class="sky-chip-label">Temp</span>
+      <span id="wv-temp">—</span>
+    </span>
+    <span class="sky-chip" aria-label="Outdoor humidity">
+      <span aria-hidden="true">💧</span>
+      <span class="sky-chip-label">Humidity</span>
+      <span id="wv-hum">—</span>
+    </span>
+    <span class="sky-chip" aria-label="Atmospheric pressure">
+      <span aria-hidden="true">🌬️</span>
+      <span class="sky-chip-label">Pressure</span>
+      <span id="wv-pres">—</span>
+    </span>
+    <span class="sky-chip" aria-label="Current conditions">
+      <span aria-hidden="true" id="wv-cond-emoji">🌤️</span>
+      <span class="sky-chip-label">Now</span>
+      <span id="wv-cond">—</span>
+    </span>
+  </div>
+</section>

@@ -1,0 +1,74 @@
+/* ── DESIGN TOKENS (garden.snehal.ai standalone identity — redesign.md §7) ── */
+
+:root,
+[data-theme="light"] {
+  /* Surfaces */
+  --bg:            #f7f8f6;
+  --surface:       #ffffff;
+  --surface-2:     #f1f3ef;
+  --hairline:      rgba(30,40,30,0.08);
+
+  /* Text */
+  --text:          #1c241d;
+  --text-muted:    #5c6b5e;
+  --text-faint:    #93a094;
+
+  /* Accent */
+  --accent:        #3f9c5a;
+  --accent-soft:   rgba(63,156,90,0.12);
+  --accent-border: rgba(63,156,90,0.28);
+
+  /* Status */
+  --ok:            #3f9c5a;
+  --warn:          #c98a2b;
+  --warn-soft:     rgba(201,138,43,0.12);
+  --crit:          #c0503f;
+  --crit-soft:     rgba(192,80,63,0.12);
+  --fill-healthy:  #16a34a;
+
+  /* Metric families (charts) */
+  --m-moisture:    #3f9c5a;
+  --m-temp:        #e08a3c;
+  --m-humidity:    #4a90c2;
+  --m-vpd:         #d0692f;
+  --m-pressure:    #8a7bc0;
+  --m-dew:         #4bb0c4;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(20,30,20,0.05);
+  --shadow-md: 0 6px 24px rgba(20,30,20,0.08);
+  --radius:    16px;
+  --radius-sm: 10px;
+
+  /* Translucent header fill for the sticky top bar's backdrop-blur (§2) */
+  --header-bg: rgba(255, 255, 255, 0.86);
+}
+
+[data-theme="dark"] {
+  --bg:            #0f1411;
+  --surface:       #161c18;
+  --surface-2:     #1d251f;
+  --hairline:      rgba(255,255,255,0.07);
+  --text:          #e8efe9;
+  --text-muted:    #9db0a1;
+  --text-faint:    #66756a;
+  --accent:        #57b874;
+  --accent-soft:   rgba(87,184,116,0.16);
+  --accent-border: rgba(87,184,116,0.32);
+  --ok:            #57b874;
+  --warn:          #e0a44a;
+  --warn-soft:     rgba(224,164,74,0.16);
+  --crit:          #db6a58;
+  --crit-soft:     rgba(219,106,88,0.16);
+  --fill-healthy:  #34d399;
+  --m-moisture:    #57b874;
+  --m-temp:        #eda766;
+  --m-humidity:    #6aa9d6;
+  --m-vpd:         #e08653;
+  --m-pressure:    #a396d4;
+  --m-dew:         #63c2d4;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 28px rgba(0,0,0,0.5);
+
+  --header-bg: rgba(15, 20, 17, 0.86);
+}

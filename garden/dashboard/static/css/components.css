@@ -1,0 +1,496 @@
+/* ── BED STATUS CHIPS (action surface) ──────────────────────────────── */
+/* redesign.md §3.3: dot + name + one-word state, no numbers. Calm chips
+   recede; chips needing action get a soft tint + ring so they're louder
+   without relying on color alone (dot goes ringed, not just recolored). */
+
+.bed-chip-row {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 20px;
+}
+
+/* 640-1023px (redesign.md §8): chips stay a single row, scrolling horizontally
+   if they don't all fit rather than shrinking past legibility. */
+@media (max-width: 1023px) and (min-width: 641px) {
+  .bed-chip-row { overflow-x: auto; }
+  .bed-chip { flex: 0 0 160px; }
+}
+
+/* <640px (redesign.md §8): chips become a 2x2 grid instead of scrolling. */
+@media (max-width: 640px) {
+  .bed-chip-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    padding: 12px 16px 16px;
+    gap: 8px;
+  }
+}
+
+.bed-chip {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.bed-chip:hover { box-shadow: var(--shadow-sm); }
+
+/* Moisture-level fill: a soft horizontal wash showing % of the chip filled,
+   colored by how far the reading is from the crop's healthy band. Sits
+   behind the dot/name/state content (negative z-index, own stacking
+   context from the chip's z-index:0 above). */
+.bed-chip-fill {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0.32;
+  transition: width 0.3s ease, background 0.3s ease;
+  pointer-events: none;
+}
+
+.bed-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+}
+
+.bed-chip-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bed-chip-state {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* calm / all-clear: quiet, recedes */
+.bed-chip.is-ok .bed-chip-dot { background: var(--ok); }
+
+/* needs action: amber tint + ring so contrast does the talking, not a banner */
+.bed-chip.is-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn) inset;
+}
+.bed-chip.is-warn .bed-chip-dot {
+  background: none;
+  border: 2px solid var(--warn);
+  width: 6px;
+  height: 6px;
+}
+.bed-chip.is-warn .bed-chip-state { color: var(--warn); font-weight: 700; }
+
+/* genuine problem only: sensor dead / critical battery / offline */
+.bed-chip.is-offline {
+  background: var(--crit-soft);
+  border-color: var(--crit);
+}
+.bed-chip.is-offline .bed-chip-dot { background: var(--crit); }
+.bed-chip.is-offline .bed-chip-state { color: var(--crit); font-weight: 700; }
+
+/* ── LOADING SKELETONS (redesign.md §9) ─────────────────────────────── */
+/* Soft, muted placeholders shown for the brief window before the first
+   /api/latest + /api/insights response lands. Calm pulse, not a spinner. */
+.bed-chip.is-skeleton {
+  background: var(--surface-2);
+  border-color: var(--hairline);
+  cursor: default;
+  min-height: 40px;
+}
+.climate-stat.is-skeleton {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  min-width: 64px;
+  min-height: 34px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bed-chip.is-skeleton, .climate-stat.is-skeleton {
+    animation: g-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes g-skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+/* ── CLIMATE STRIP (region C) ───────────────────────────────────────── */
+/* redesign.md §5: the only always-on numeric surface. One low-elevation
+   surface, hairline divider from the hero, verdict left (most prominent),
+   3 headline stats right. */
+
+.climate-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 0 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.climate-verdict {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  flex: 1 1 260px;
+}
+
+.climate-stats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.climate-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-width: 84px;
+}
+
+.climate-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.climate-stat-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.climate-stat-unit {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.climate-stat-sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
+
+.climate-stat-trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.climate-stat-trend.is-up   { color: var(--warn); }
+.climate-stat-trend.is-down { color: var(--accent); }
+.climate-stat-trend.is-flat { color: var(--text-faint); }
+
+@media (max-width: 1023px) {
+  .climate-strip { flex-direction: column; align-items: flex-start; }
+  .climate-verdict { flex: 0 1 auto; }
+  .climate-stats { width: 100%; justify-content: space-between; gap: 16px; }
+}
+
+@media (max-width: 640px) {
+  .climate-strip { padding: 16px; margin: 0 16px; }
+  .climate-stats { gap: 12px; }
+  .climate-stat  { min-width: 0; flex: 1 1 30%; }
+}
+
+/* ── TRENDS SECTION (region D) — redesign.md §6 ────────────────────────── */
+/* Demoted below the fold behind a quiet header; always visible — the
+   time-range control + the small-multiples moisture row + grouped charts. */
+
+
+.trends-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 24px;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+}
+
+.trends-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.trends-controls {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px 16px;
+}
+
+.trends-range-btn {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.trends-range-btn:hover { color: var(--text); }
+.trends-range-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.trends-climate-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (max-width: 720px) {
+  .trends-climate-grid { grid-template-columns: 1fr; }
+}
+
+/* ── CHARTS GRID ────────────────────────────────────────────────────── */
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 24px;
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .charts { grid-template-columns: 1fr; padding: 16px; gap: 12px; }
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  min-width: 0; /* prevent grid cell blowout on mobile */
+}
+.chart-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+}
+[data-theme="dark"] .chart-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.chart-title {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 140px;
+}
+
+.bed-moisture-row {
+  grid-template-columns: repeat(4, 1fr);
+  padding-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .bed-moisture-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .bed-moisture-row { grid-template-columns: 1fr; }
+}
+
+/* ── EMPTY STATE ────────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 80px 24px;
+  gap: 8px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 36px;
+  margin-bottom: 4px;
+  opacity: 0.4;
+}
+
+.empty-label {
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-hint {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ── FOOTER ─────────────────────────────────────────────────────────── */
+
+footer {
+  color: var(--text-muted);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 13px 24px;
+  border-top: 1px solid var(--hairline);
+  letter-spacing: 0.01em;
+}
+
+/* ── BED DETAIL (inline expand) ─────────────────────────────────────── */
+/* redesign.md §4.1, reworked: shown directly beneath the bed chip row
+   instead of a side drawer. Only one bed open at a time. The old drawer's
+   Climate tab was dropped entirely -- Trends already covers that ground. */
+
+.bed-chip.is-open { box-shadow: 0 0 0 2px var(--accent) inset; }
+
+.bed-detail {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  margin: 0 24px 20px;
+  padding: 16px;
+}
+
+.bed-detail-line {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.bed-detail-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.bed-detail-metric-val {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bed-detail-metric-band {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.bed-detail-rate {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+.bed-detail-rate.is-up   { color: var(--warn); }
+.bed-detail-rate.is-down { color: var(--accent); }
+.bed-detail-rate.is-flat { color: var(--text-faint); }
+
+.bed-detail-chart {
+  position: relative;
+  height: 84px;
+  margin: 10px 0 14px;
+}
+
+.bed-detail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bed-detail-verdict {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+@media (max-width: 640px) {
+  .bed-detail { margin: 0 16px 16px; }
+}
+
+/* ── MOBILE ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .theme-toggle { width: 32px; height: 32px; border-radius: 7px; }
+}
+
+/* ── LIGHT-MODE PANEL POLISH (§8) ───────────────────────────────────────── */
+/* In light mode .chart-card uses a cream card-bg that blends into the page
+   background. Override to white with a clear border and a soft shadow so
+   cards separate visually the way dark-mode cards do. */
+
+[data-theme="light"] .chart-card {
+  background:    #ffffff;
+  border:        1px solid #e5e7eb;
+  box-shadow:    0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .chart-card:hover {
+  box-shadow:    0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .sky-banner {
+  filter: saturate(0.92) brightness(1.02);
+}
+
+/* ── WATER GAUGES (§2) ──────────────────────────────────────────────────── */
+
+/* ── BATTERY BADGE (§4) ─────────────────────────────────────────────────── */
+/* Reused by the bed detail's per-bed battery indicator (§4.1). */
+
+.battery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}

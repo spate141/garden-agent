@@ -1,0 +1,109 @@
+/* ── HEADER (region A — top bar) ────────────────────────────────────── */
+/* Slim, ~52px, near-invisible: wordmark left; live clock, connection dot,
+   theme toggle right. redesign.md §2. */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--hairline);
+  position: sticky;
+  top: 0;
+  background: var(--header-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.meta {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  header { padding: 0 16px; }
+}
+
+.logo {
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  opacity: 0.92;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-clock {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .header-clock { display: none; }
+}
+
+/* Connection dot: green = fresh, amber = stale >10min, red = disconnected.
+   Color communicates state; the title attribute carries it in text too. */
+.conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+.conn-dot.is-fresh   { background: var(--ok); }
+.conn-dot.is-stale   { background: var(--warn); }
+.conn-dot.is-offline { background: var(--crit); }
+.conn-dot.is-fetching { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── THEME TOGGLE ───────────────────────────────────────────────────── */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.theme-toggle:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* In light mode show moon (click to go dark), in dark mode show sun (click to go light) */
+.theme-toggle .icon-sun  { display: none; }
+.theme-toggle .icon-moon { display: block; }
+[data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
+[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+

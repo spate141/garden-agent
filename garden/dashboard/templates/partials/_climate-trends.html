@@ -1,0 +1,32 @@
+<!-- ── BED STATUS CHIPS — the action surface (redesign.md §3.3) ─────────────── -->
+<!-- One chip per bed, fixed Bed 1→4 order. Dot + name + one-word state only —
+     no raw numbers here by design. Populated by renderBedChips(). -->
+<div class="bed-chip-row" id="bed-chip-row" role="region" aria-label="Bed status"></div>
+<div class="bed-detail" id="bed-detail" hidden></div>
+
+<!-- ── CLIMATE STRIP (region C) — the only always-on numeric surface ────────── -->
+<!-- redesign.md §5: one verdict sentence + 3 headline stats (VPD, outdoor
+     temp feels-like, water balance). Populated by renderClimateStrip(). -->
+<section class="climate-strip" id="climate-strip" aria-live="polite" aria-label="Overall garden condition">
+  <div class="climate-verdict" id="climate-verdict">Reading sensors…</div>
+  <div class="climate-stats" id="climate-stats"></div>
+</section>
+
+<!-- ── TRENDS (region D) — demoted below the fold (redesign.md §6) ──────────── -->
+<section class="trends" id="trends">
+  <div class="trends-header">
+    <span class="trends-title">Trends</span>
+  </div>
+  <div class="trends-body" id="trends-body">
+    <div class="trends-controls" role="group" aria-label="Trend time range">
+      <button type="button" class="trends-range-btn" data-hours="3">3h</button>
+      <button type="button" class="trends-range-btn" data-hours="12">12h</button>
+      <button type="button" class="trends-range-btn is-active" data-hours="24">24h</button>
+      <button type="button" class="trends-range-btn" data-hours="168">7d</button>
+    </div>
+    <!-- per-bed soil moisture small-multiples, one row of 4 -->
+    <div class="charts bed-moisture-row" id="bed-moisture-grid"></div>
+    <!-- grouped climate charts: Temperature / Humidity / VPD / Pressure+Dew point -->
+    <div class="charts trends-climate-grid" id="trends-climate-grid"></div>
+  </div>
+</section>

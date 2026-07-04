@@ -1,0 +1,49 @@
+/* ── BASE ───────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 'Inter', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: "tnum" 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+::-moz-selection { background: var(--accent-soft); color: var(--text); }
+::selection      { background: var(--accent-soft); color: var(--text); }
+
+/* ── FOCUS STATES (a11y, redesign.md §12 polish pass) ──────────────────── */
+/* One visible ring everywhere, keyboard-only (no ring on mouse/touch clicks).
+   Applies uniformly to chips, theme toggle, trends controls, climate stats,
+   and the bed detail panel -- no per-component overrides needed since
+   they're all plain buttons. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── PAGE SHELL ─────────────────────────────────────────────────────── */
+/* Single scrolling column, max content width 1200px, centered, comfortable
+   side gutters — redesign.md §1. Regions B/C/D live inside this wrapper;
+   the top bar (region A) stays full-bleed above it. */
+
+.page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 0 16px; }
+}

@@ -1,0 +1,302 @@
+<!-- ── SVG plant sprite definitions (hidden) ──────────────────────────────── -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+
+    <!-- TOMATO: bold red sphere with green calyx — clear at small sizes -->
+    <symbol id="sprite-tomato" viewBox="0 0 40 52">
+      <!-- stem -->
+      <rect x="18.5" y="1" width="3" height="12" rx="1.5" fill="#2a6018"/>
+      <!-- calyx: 3 bold ellipses -->
+      <g transform="translate(20,14)">
+        <ellipse rx="10" ry="3.5" fill="#4aaa35"/>
+        <ellipse rx="10" ry="3.5" fill="#3a9028" transform="rotate(60)"/>
+        <ellipse rx="10" ry="3.5" fill="#4aaa35" transform="rotate(120)"/>
+      </g>
+      <circle cx="20" cy="14" r="5.5" fill="#3a8028"/>
+      <!-- single bold fruit -->
+      <circle cx="20" cy="36" r="15" fill="#d42018"/>
+      <!-- highlight -->
+      <ellipse cx="13" cy="28" rx="5" ry="4" fill="rgba(255,255,255,0.28)" transform="rotate(-20 13 28)"/>
+    </symbol>
+
+    <!-- TOMATO CHERRY: small bright-red trio on a shared truss -->
+    <symbol id="sprite-tomato_cherry" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="10" rx="1.5" fill="#2a6018"/>
+      <line x1="20" y1="11" x2="12" y2="24" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="11" x2="20" y2="27" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="11" x2="28" y2="24" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="12" cy="30" r="8"  fill="#e8281a"/>
+      <circle cx="28" cy="30" r="8"  fill="#d42018"/>
+      <circle cx="20" cy="40" r="9"  fill="#ef3222"/>
+      <ellipse cx="9"  cy="27" rx="2.2" ry="1.8" fill="rgba(255,255,255,0.32)"/>
+      <ellipse cx="25" cy="27" rx="2.2" ry="1.8" fill="rgba(255,255,255,0.32)"/>
+      <ellipse cx="17" cy="37" rx="2.6" ry="2.1" fill="rgba(255,255,255,0.32)"/>
+    </symbol>
+
+    <!-- TOMATO ROMA: elongated deep-red plum shape -->
+    <symbol id="sprite-tomato_roma" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="10" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,12)">
+        <ellipse rx="7" ry="3" fill="#4aaa35"/>
+        <ellipse rx="7" ry="3" fill="#3a9028" transform="rotate(90)"/>
+      </g>
+      <circle cx="20" cy="12" r="4" fill="#3a8028"/>
+      <path d="M20,15 C29,17 30,26 28,36 C26.5,45 23,50 20,51 C17,50 13.5,45 12,36 C10,26 11,17 20,15 Z" fill="#b81810"/>
+      <ellipse cx="15" cy="27" rx="3.2" ry="7" fill="rgba(255,255,255,0.24)" transform="rotate(-6 15 27)"/>
+    </symbol>
+
+    <!-- TOMATO BEEFSTEAK: large ribbed orange-red fruit -->
+    <symbol id="sprite-tomato_beefsteak" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="11" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,13)">
+        <ellipse rx="11" ry="4" fill="#4aaa35"/>
+        <ellipse rx="11" ry="4" fill="#3a9028" transform="rotate(45)"/>
+        <ellipse rx="11" ry="4" fill="#4aaa35" transform="rotate(90)"/>
+        <ellipse rx="11" ry="4" fill="#3a9028" transform="rotate(135)"/>
+      </g>
+      <circle cx="20" cy="13" r="6" fill="#3a8028"/>
+      <circle cx="20" cy="37" r="16.5" fill="#d8581e"/>
+      <path d="M20,22 L20,52 M8,26 Q20,32 32,26 M8,48 Q20,42 32,48" stroke="rgba(120,30,0,0.22)" stroke-width="1.4" fill="none"/>
+      <ellipse cx="12" cy="28" rx="5.5" ry="4.5" fill="rgba(255,255,255,0.26)" transform="rotate(-20 12 28)"/>
+    </symbol>
+
+    <!-- TOMATO HEIRLOOM: purple-green streaked, irregular shoulders -->
+    <symbol id="sprite-tomato_heirloom" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="11" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,13)">
+        <ellipse rx="10" ry="3.5" fill="#4aaa35"/>
+        <ellipse rx="10" ry="3.5" fill="#3a9028" transform="rotate(72)"/>
+        <ellipse rx="10" ry="3.5" fill="#4aaa35" transform="rotate(144)"/>
+      </g>
+      <circle cx="20" cy="13" r="5.5" fill="#3a8028"/>
+      <path d="M20,18 C31,19 33,29 30,38 C27,47 23,51 20,51 C17,51 12,48 10,39 C8,29 10,19 20,18 Z" fill="#7a3a54"/>
+      <path d="M20,20 C14,26 14,38 18,48" stroke="#4a7a2e" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M22,20 C27,27 27,38 23,48" stroke="#9a4a68" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+      <ellipse cx="13" cy="29" rx="4" ry="6" fill="rgba(255,255,255,0.18)" transform="rotate(-10 13 29)"/>
+    </symbol>
+
+    <!-- TOMATO GRAPE: two tiny oblong fruit clustered close on the vine -->
+    <symbol id="sprite-tomato_grape" viewBox="0 0 40 52">
+      <line x1="20" y1="1" x2="20" y2="20" stroke="#3d8a2a" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="20" y1="14" x2="10" y2="24" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="18" x2="20" y2="30" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="14" x2="30" y2="24" stroke="#3d8a2a" stroke-width="2" stroke-linecap="round"/>
+      <ellipse cx="10" cy="30" rx="6" ry="8.5" fill="#e0201a"/>
+      <ellipse cx="30" cy="30" rx="6" ry="8.5" fill="#d42018"/>
+      <ellipse cx="20" cy="42" rx="6.5" ry="9" fill="#ef2c1e"/>
+      <ellipse cx="8"  cy="26" rx="1.8" ry="2.6" fill="rgba(255,255,255,0.32)"/>
+      <ellipse cx="28" cy="26" rx="1.8" ry="2.6" fill="rgba(255,255,255,0.32)"/>
+      <ellipse cx="18" cy="38" rx="2"   ry="3"   fill="rgba(255,255,255,0.32)"/>
+    </symbol>
+
+    <!-- TOMATO SAN MARZANO: long narrow paste tomato, blunt point -->
+    <symbol id="sprite-tomato_san_marzano" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,11)">
+        <ellipse rx="6.5" ry="2.8" fill="#4aaa35"/>
+        <ellipse rx="6.5" ry="2.8" fill="#3a9028" transform="rotate(90)"/>
+      </g>
+      <circle cx="20" cy="11" r="3.5" fill="#3a8028"/>
+      <path d="M20,14 C25,15.5 27,23 26,33 C25.3,42 23,50 20,51.5 C17,50 14.7,42 14,33 C13,23 15,15.5 20,14 Z" fill="#c8280f"/>
+      <line x1="20" y1="16" x2="20" y2="49" stroke="rgba(100,10,0,0.20)" stroke-width="1.4"/>
+      <ellipse cx="16.5" cy="26" rx="2.4" ry="8" fill="rgba(255,255,255,0.22)" transform="rotate(-4 16.5 26)"/>
+    </symbol>
+
+    <!-- EGGPLANT: purple egg with green calyx — clear at small sizes -->
+    <symbol id="sprite-eggplant" viewBox="0 0 40 52">
+      <!-- stem -->
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <!-- calyx: 3 bold ellipses -->
+      <g transform="translate(20,11)">
+        <ellipse rx="10" ry="3" fill="#4aaa35"/>
+        <ellipse rx="10" ry="3" fill="#3a9028" transform="rotate(60)"/>
+        <ellipse rx="10" ry="3" fill="#4aaa35" transform="rotate(120)"/>
+      </g>
+      <circle cx="20" cy="11" r="5" fill="#3a8028"/>
+      <!-- egg body -->
+      <ellipse cx="20" cy="34" rx="14" ry="18" fill="#6a30c8"/>
+      <!-- highlight -->
+      <ellipse cx="12" cy="24" rx="4.5" ry="8" fill="rgba(200,150,255,0.32)" transform="rotate(-8 12 24)"/>
+    </symbol>
+
+    <!-- OKRA: bright green pod tapering to a point -->
+    <symbol id="sprite-okra" viewBox="0 0 40 52">
+      <!-- two side leaves -->
+      <path d="M20,11 Q31,4 34,11 Q27,12 20,12 Z" fill="#4aaa35"/>
+      <path d="M20,11 Q9,4  6,11 Q13,12 20,12 Z" fill="#3a9028"/>
+      <!-- pod body -->
+      <path d="M14,11 Q13,27 13.5,40 Q16,50 20,51 Q24,50 26.5,40 Q27,27 26,11 Z" fill="#52aa22"/>
+      <!-- 2 bold ribs -->
+      <line x1="17.5" y1="13" x2="18"   y2="48" stroke="rgba(0,60,0,0.35)" stroke-width="2"/>
+      <line x1="22.5" y1="13" x2="22"   y2="48" stroke="rgba(0,60,0,0.35)" stroke-width="2"/>
+      <!-- edge highlight -->
+      <path d="M14,14 Q13,27 13.5,40 Q15,47 18,50" stroke="rgba(180,255,120,0.35)" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- PEAS: two fat plump pods on a vine -->
+    <symbol id="sprite-peas" viewBox="0 0 40 52">
+      <!-- vine -->
+      <line x1="20" y1="2" x2="20" y2="51" stroke="#3d8a2a" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- upper pod -->
+      <ellipse cx="20" cy="16" rx="10" ry="7" fill="#5aaa28" transform="rotate(-12 20 16)"/>
+      <!-- peas inside upper pod -->
+      <circle cx="14" cy="14" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="20" cy="15" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="26" cy="17" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <!-- lower pod -->
+      <ellipse cx="20" cy="38" rx="10" ry="7" fill="#4a9a22" transform="rotate(12 20 38)"/>
+      <!-- peas inside lower pod -->
+      <circle cx="14" cy="39" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="20" cy="38" r="3.5" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="26" cy="37" r="3.5" fill="rgba(255,255,255,0.22)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER: bold amber bell shape -->
+    <symbol id="sprite-sweet_pepper" viewBox="0 0 40 52">
+      <!-- stem -->
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <!-- calyx -->
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
+      <!-- bell body -->
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#d4980e"/>
+      <!-- shoulder cap -->
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#e8b020"/>
+      <!-- center divider -->
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(100,60,0,0.30)" stroke-width="2"/>
+      <!-- highlight -->
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-8 11 23)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER RED -->
+    <symbol id="sprite-sweet_pepper_red" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#c81c14"/>
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#e0301f"/>
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(90,0,0,0.30)" stroke-width="2"/>
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-8 11 23)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER GREEN -->
+    <symbol id="sprite-sweet_pepper_green" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#3f8a1e"/>
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#54a02a"/>
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(20,60,0,0.30)" stroke-width="2"/>
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-8 11 23)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER YELLOW -->
+    <symbol id="sprite-sweet_pepper_yellow" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#e8c410"/>
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#f8dc28"/>
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(110,90,0,0.28)" stroke-width="2"/>
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.30)" transform="rotate(-8 11 23)"/>
+    </symbol>
+
+    <!-- SWEET PEPPER ORANGE -->
+    <symbol id="sprite-sweet_pepper_orange" viewBox="0 0 40 52">
+      <rect x="18.5" y="1" width="3" height="9" rx="1.5" fill="#2a6018"/>
+      <g transform="translate(20,11)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="11" r="4.5" fill="#3a8028"/>
+      <path d="M7,13 Q6,26 7,36 Q9,46 20,51 Q31,46 33,36 Q34,26 33,13 Z" fill="#e07a10"/>
+      <ellipse cx="20" cy="13" rx="13" ry="4.5" fill="#f2941e"/>
+      <line x1="20" y1="14" x2="20" y2="47" stroke="rgba(110,50,0,0.30)" stroke-width="2"/>
+      <ellipse cx="11" cy="23" rx="4" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-8 11 23)"/>
+    </symbol>
+
+    <!-- HOT PEPPER: three bold red cayenne pods -->
+    <symbol id="sprite-hot_pepper" viewBox="0 0 40 52">
+      <!-- stem -->
+      <rect x="18.5" y="1" width="3" height="10" rx="1.5" fill="#2a6018"/>
+      <!-- calyx -->
+      <g transform="translate(20,12)">
+        <ellipse rx="9" ry="3" fill="#4aaa35"/>
+        <ellipse rx="9" ry="3" fill="#3a9028" transform="rotate(60)"/>
+      </g>
+      <circle cx="20" cy="12" r="4.5" fill="#3a8028"/>
+      <!-- left pod -->
+      <path d="M17,13 C13,20 11,30 10,40 C9.5,46 11,49 13,48 C14.5,47 14.5,43 15,36 C16,27 17,18 19,13 Z" fill="#c81c0c"/>
+      <!-- right pod -->
+      <path d="M23,13 C27,20 29,30 30,40 C30.5,46 29,49 27,48 C25.5,47 25.5,43 25,36 C24,27 23,18 21,13 Z" fill="#c81c0c"/>
+      <!-- center pod (on top, slightly brighter) -->
+      <path d="M17,13 Q17,26 17.5,38 Q18.5,46 20,49 Q21.5,46 22.5,38 Q23,26 23,13 Z" fill="#e02016"/>
+    </symbol>
+
+    <!-- ZUCCHINI: bold fan leaves + thick dark-green cylinder fruit -->
+    <symbol id="sprite-zucchini" viewBox="0 0 40 52">
+      <!-- center stem -->
+      <rect x="18.5" y="10" width="3" height="18" rx="1.5" fill="#2a6018"/>
+      <!-- left fan leaf -->
+      <path d="M20,22 Q10,11 2,15 Q0,22 7,27 Q14,28 20,22 Z" fill="#5aaa38"/>
+      <!-- right fan leaf -->
+      <path d="M20,22 Q30,11 38,15 Q40,22 33,27 Q26,28 20,22 Z" fill="#4a9a28"/>
+      <!-- top leaf -->
+      <ellipse cx="20" cy="12" rx="5.5" ry="9" fill="#68bb44"/>
+      <!-- zucchini fruit -->
+      <rect x="2" y="34" width="36" height="14" rx="7" fill="#2e7018"/>
+      <!-- bold stripes -->
+      <line x1="8"  y1="34" x2="8"  y2="48" stroke="rgba(120,220,80,0.45)" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="16" y1="34" x2="16" y2="48" stroke="rgba(120,220,80,0.30)" stroke-width="3"   stroke-linecap="round"/>
+      <line x1="24" y1="34" x2="24" y2="48" stroke="rgba(120,220,80,0.20)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- blossom end -->
+      <ellipse cx="36" cy="41" rx="4" ry="5.5" fill="#e89800"/>
+      <ellipse cx="36" cy="41" rx="2.5" ry="3.5" fill="#f8c000"/>
+    </symbol>
+
+    <!-- UNKNOWN: simple two-leaf seedling sprout -->
+    <symbol id="sprite-unknown" viewBox="0 0 40 52">
+      <!-- stem -->
+      <rect x="18.5" y="14" width="3" height="36" rx="1.5" fill="#3d8a2a"/>
+      <!-- left cotyledon -->
+      <path d="M20,29 Q10,22 8,30 Q10,36 20,33 Z" fill="#4aaa35"/>
+      <path d="M20,32 Q12,29 9,32" stroke="rgba(0,70,0,0.25)" stroke-width="0.8" fill="none"/>
+      <!-- right cotyledon -->
+      <path d="M20,29 Q30,22 32,30 Q30,36 20,33 Z" fill="#3a9028"/>
+      <path d="M20,32 Q28,29 31,32" stroke="rgba(0,70,0,0.25)" stroke-width="0.8" fill="none"/>
+      <!-- top bud -->
+      <ellipse cx="20" cy="15" rx="5" ry="7" fill="#58c040"/>
+      <ellipse cx="18.5" cy="12" rx="2" ry="3.5" fill="rgba(255,255,255,0.22)"/>
+    </symbol>
+
+    <!-- DORMANT: low rounded mound of sleeping foliage -->
+    <symbol id="sprite-dormant" viewBox="0 0 40 52">
+      <!-- ground oval -->
+      <ellipse cx="20" cy="48" rx="17" ry="4.5" fill="#2e5a1f"/>
+      <!-- base mound -->
+      <ellipse cx="20" cy="44" rx="14" ry="7"   fill="#3f6b29"/>
+      <!-- side wisps -->
+      <ellipse cx="10" cy="43" rx="8"  ry="5"   fill="#365e22"/>
+      <ellipse cx="30" cy="43" rx="8"  ry="5"   fill="#365e22"/>
+      <!-- upper dome -->
+      <ellipse cx="20" cy="40" rx="10" ry="6.5" fill="#4a7a32"/>
+      <!-- center bud tuft -->
+      <ellipse cx="20" cy="37" rx="5"  ry="4"   fill="#5a8a3c"/>
+    </symbol>
+
+
+
+  </defs>
+</svg>
