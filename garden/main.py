@@ -212,39 +212,19 @@ async def dashboard(request: Request):
         if r["sensor_key"] not in ordered:
             ordered.append(r["sensor_key"])
 
-    stats = [
-        {
-            "key": k,
-            "label": cfg.sensor_label(k),
-            "value": latest_map[k]["value"],
-            "unit": latest_map[k]["unit"],
-            "color": cfg.sensor_color(k),
-        }
-        for k in ordered
-    ]
-
-    _stat_groups_raw: list[dict] = cfg.dashboard.get("stat_groups", [])
-    stat_groups: list[dict] = []
-    for grp in _stat_groups_raw:
-        members = [
-            {
-                "key": k,
-                "label": cfg.sensor_label(k),
-                "value": latest_map[k]["value"],
-                "unit": latest_map[k]["unit"],
-                "color": cfg.sensor_color(k),
-            }
-            for k in grp.get("sensors", [])
-            if k in latest_map
-        ]
-        if members:
-            stat_groups.append({"name": grp["name"], "sensors": members})
-
     charts = [
         {"key": k, "label": cfg.sensor_label(k), "color": cfg.sensor_color(k)}
         for k in ordered
         if cfg.sensors.get(k, {}).get("chart", True)
     ]
+
+    # Label/color lookup for every configured sensor (not just charted ones) so the
+    # client can render labels for demoted stat-only fields (indoor temp/humidity,
+    # abs. pressure) without hardcoding config.yaml's labels in JS.
+    sensor_meta_json = json.dumps({
+        k: {"label": cfg.sensor_label(k), "color": cfg.sensor_color(k)}
+        for k in cfg.sensors
+    })
 
     last_ts = max((r["ts"] for r in latest_rows), default=None) if latest_rows else None
 
@@ -298,6 +278,7 @@ async def dashboard(request: Request):
         "nominal":  1.5,
         "warn":     _batt_warn,
         "critical": round(_batt_warn * 0.85, 2),
+        "display_threshold": 1.3,  # UI-only: show voltage text below this; separate from warn/critical alerting
     }
 
     bands_json = json.dumps({
@@ -339,18 +320,17 @@ async def dashboard(request: Request):
         request,
         "index.html",
         {
-            "stats": stats,
             "charts": charts,
             "charts_json": json.dumps(charts),
             "last_ts": last_ts,
             "has_data": bool(latest_rows),
             "garden_thresholds": garden_thresholds,
             "tz_json": json.dumps(cfg.location.get("timezone", "America/Chicago")),
-            "stat_groups": stat_groups,
             "beds_json": json.dumps(cfg.dashboard.get("beds", [])),
             "weather_keys_json": json.dumps(cfg.dashboard.get("weather_keys", {})),
             "sky_json": json.dumps(_sky),
             "bands_json": bands_json,
             "moisture_group_json": json.dumps(_moisture_group),
+            "sensor_meta_json": sensor_meta_json,
         },
     )
