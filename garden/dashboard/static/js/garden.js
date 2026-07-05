@@ -585,6 +585,18 @@ function renderBeds() {
     soilEl.appendChild(plantsEl);
     frameEl.appendChild(soilEl);
 
+    /* moisture gauge stake: slim fill bar, height/color set live in updateGarden
+       from BANDS.moistureBands (per-bed optimal range) -- no ticks/text, hero
+       stays number-free by design. */
+    const stakeEl = document.createElement('div');
+    stakeEl.className = 'g-stake';
+    stakeEl.id = 'stake-' + bed.id;
+    stakeEl.setAttribute('aria-hidden', 'true');
+    const stakeFillEl = document.createElement('div');
+    stakeFillEl.className = 'g-stake-fill';
+    stakeEl.appendChild(stakeFillEl);
+    frameEl.appendChild(stakeEl);
+
     /* front rail: overlaps the soil's bottom edge, plants appear inside the bed */
     const railEl = document.createElement('div');
     railEl.className = 'g-front-rail';
@@ -781,6 +793,29 @@ function _minutesAgo(isoTs) {
 
 const _prevDry = {};
 
+/** Set a bed's gauge-stake fill height and status color.
+ *  moist: 0-100 or null. Status is dry/ok/wet against BANDS.moistureBands[moistKey]
+ *  (that bed's crop-derived optimal window); if no band exists for this sensor,
+ *  falls back to the global G.dry cutoff (dry vs. ok, no "wet" distinction). */
+function _updateStake(bed, moistKey, moist) {
+  const stakeEl = document.getElementById('stake-' + bed.id);
+  if (!stakeEl) return;
+  const fillEl = stakeEl.querySelector('.g-stake-fill');
+  if (!fillEl || moist == null) return;
+
+  fillEl.style.height = Math.max(0, Math.min(100, moist)) + '%';
+
+  const band = BANDS.moistureBands && BANDS.moistureBands[moistKey];
+  let status;
+  if (band) {
+    status = moist < band.min ? 'dry' : (moist > band.max ? 'wet' : 'ok');
+  } else {
+    status = moist < G.dry ? 'dry' : 'ok';
+  }
+  stakeEl.classList.remove('g-stake--dry', 'g-stake--ok', 'g-stake--wet');
+  stakeEl.classList.add('g-stake--' + status);
+}
+
 function updateGarden(rows) {
   const { readings, ts } = parseLatest(rows);
   const timeOfDay = tod();
@@ -817,6 +852,8 @@ function updateGarden(rows) {
         d.style.height  = '4px';
         d.style.opacity = '0.12';
       });
+      const staleStakeEl = document.getElementById('stake-' + bed.id);
+      if (staleStakeEl) staleStakeEl.classList.add('g-stake--asleep');
       /* populate nosig text with time since last reading */
       const minsAgo = _minutesAgo(moistTs);
       const nosig = document.getElementById('nosig-' + bed.id);
@@ -834,6 +871,8 @@ function updateGarden(rows) {
       u.removeAttribute('data-dormant');
     });
     bedEl.classList.remove('g-asleep');
+    const wokeStakeEl = document.getElementById('stake-' + bed.id);
+    if (wokeStakeEl) wokeStakeEl.classList.remove('g-stake--asleep');
 
     /* ── Soil gradient (dry = pale/sandy, wet = dark/rich) ── */
     const soilEl = document.getElementById('soil-' + bed.id);
@@ -841,6 +880,11 @@ function updateGarden(rows) {
       const [topC, botC] = moistToSoilGradient(moist);
       soilEl.style.background = 'linear-gradient(to bottom,' + topC + ',' + botC + ')';
     }
+
+    /* ── Moisture gauge stake: height = raw %, color = status vs. this bed's
+       optimal band (BANDS.moistureBands), falling back to the global dry
+       threshold when the bed has no crop-derived range. ── */
+    _updateStake(bed, moistKey, moist);
 
     /* ── Damp patches: grow and darken with moisture ── */
     if (moist != null) {
