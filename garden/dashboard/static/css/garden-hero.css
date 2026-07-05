@@ -114,6 +114,51 @@
   transition: opacity 3s ease;
 }
 
+/* ── Horizon trees ──────────────────────────────────────────────────────
+   Decorative backdrop only; sit at the bottom of the sky strip (i.e. on the
+   grass horizon seam), clipped by .garden-sky's overflow:hidden. Mixed
+   silhouettes/sizes scattered left and right so the center stays open for
+   the sun/moon arc and birds. */
+.garden-tree {
+  position: absolute;
+  bottom: -3px; /* slight overlap into the grass seam so trunks read as grounded */
+  z-index: 1;
+  pointer-events: none;
+}
+.garden-tree svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: center bottom;
+}
+
+.garden-tree-1 { left: 2%;  width: 30px; height: 40px; }
+.garden-tree-2 { left: 13%; width: 30px; height: 60px; }
+.garden-tree-3 { left: 27%; width: 46px; height: 54px; }
+.garden-tree-4 { left: 80%; width: 28px; height: 56px; }
+.garden-tree-5 { left: 91%; width: 38px; height: 46px; }
+
+/* Night: darken to a soft silhouette, same idea as birds grounding at night */
+#garden-sky.is-night .garden-tree svg {
+  filter: brightness(0.45) saturate(0.6);
+}
+/* Dark theme: mute foliage to match the darker ground/grass */
+[data-theme="dark"] .garden-tree svg {
+  filter: brightness(0.7) saturate(0.8);
+}
+[data-theme="dark"] #garden-sky.is-night .garden-tree svg {
+  filter: brightness(0.4) saturate(0.55);
+}
+
+@media (max-width: 720px) {
+  .garden-tree-1 { width: 24px; height: 32px; }
+  .garden-tree-2 { width: 24px; height: 48px; }
+  .garden-tree-3 { width: 37px; height: 43px; }
+  .garden-tree-4 { width: 22px; height: 45px; }
+  .garden-tree-5 { width: 30px; height: 37px; }
+}
+
 /* ── Flying birds ──────────────────────────────────────────────────────
    Decorative only; JS toggles #garden-sky.is-night to ground them after
    dusk. Sprite from https://codepen.io/imdoug/pen/vYZNoYr, adapted to the
@@ -605,6 +650,25 @@
     0%, 100% { transform: rotate(var(--g-rot, 0deg)); }
     35%       { transform: rotate(calc(var(--g-rot, 0deg) + var(--g-sway-amp, 3deg))); }
     68%       { transform: rotate(calc(var(--g-rot, 0deg) - var(--g-sway-amp, 3deg) * 0.65)); }
+  }
+
+  /* Horizon tree canopy sway -- very subtle, staggered per tree so the
+     backdrop never moves in unison. Base (static) position stays outside
+     this guard, so reduced-motion users just get a still backdrop. */
+  .garden-tree svg {
+    animation-name: g-tree-sway;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .garden-tree-1 svg { animation-duration: 7s;   animation-delay: 0s;   --g-tree-amp: 1.2deg; }
+  .garden-tree-2 svg { animation-duration: 9s;   animation-delay: -2s;  --g-tree-amp: 1.6deg; }
+  .garden-tree-3 svg { animation-duration: 8s;   animation-delay: -4s;  --g-tree-amp: 1.4deg; }
+  .garden-tree-4 svg { animation-duration: 7.5s; animation-delay: -1s;  --g-tree-amp: 1.3deg; }
+  .garden-tree-5 svg { animation-duration: 8.5s; animation-delay: -3s;  --g-tree-amp: 1.5deg; }
+  @keyframes g-tree-sway {
+    0%, 100% { transform: rotate(0deg); }
+    35%       { transform: rotate(var(--g-tree-amp, 1.4deg)); }
+    68%       { transform: rotate(calc(var(--g-tree-amp, 1.4deg) * -0.65)); }
   }
 
   /* Cloud drift -- slow and few (redesign.md §3.1 motion budget: 40-90s) */

@@ -507,11 +507,11 @@ function renderBeds() {
       if (rows > 1) depth = Math.min(1, Math.max(0, depth + (rng() - 0.5) * 0.12));
 
       /* Idle sway (redesign.md §3.2): each plant gets its own gentle amplitude
-         (2-4deg) and slow period (6-10s), staggered so a bed never sways in
+         (4-8deg) and period (3.5-6s), staggered so a bed never sways in
          unison. Drawn after depth on purpose -- these calls don't affect the
          jitter/depth sequence above. */
-      const swayAmp = 2 + rng() * 2;
-      const swayDur = 6 + rng() * 4;
+      const swayAmp = 4 + rng() * 4;
+      const swayDur = 3.5 + rng() * 2.5;
       const swayDelay = rng() * swayDur;
 
       /* depth + per-type meta combine for size: near/far AND species height rhythm */
