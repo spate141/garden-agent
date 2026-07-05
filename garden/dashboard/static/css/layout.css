@@ -56,6 +56,7 @@ header {
   letter-spacing: 0.03em;
   color: var(--text-faint);
   padding-top: 4px;
+  text-align: center;
 }
 
 .meta {
