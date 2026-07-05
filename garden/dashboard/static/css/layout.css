@@ -52,9 +52,10 @@ header {
 .logo-tagline {
   font-family: 'Inter', 'Nunito Sans', sans-serif;
   font-size: 9px;
-  font-weight: 500;
+  font-weight: 300;
   letter-spacing: 0.03em;
   color: var(--text-faint);
+  padding-top: 4px;
 }
 
 .meta {
