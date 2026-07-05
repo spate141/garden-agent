@@ -1999,8 +1999,10 @@ async function loadInsights() {
     };
   }
 
-  /* Live "right now" conditions — drives the sky-strip chip, cloud cover, and rain */
-  CURRENT = data.current || null;
+  /* Live "right now" conditions — drives the sky-strip chip, cloud cover, and rain.
+     A failed upstream fetch omits data.current entirely (see api_insights()); keep
+     showing the last known-good conditions instead of blanking the chip to "--". */
+  CURRENT = data.current || CURRENT;
   updateWeatherRain(CURRENT);
 
   LAST_INSIGHTS = data;
@@ -2014,12 +2016,17 @@ async function refresh() {
   const dot = document.getElementById('conn-dot');
   if (dot) dot.classList.add('is-fetching');
 
-  /* Fetch /api/latest and all chart series in parallel so seriesCache is
-     populated before updateStats() tries to render sparklines. */
+  /* Fetch /api/latest, all chart series, and /api/insights in parallel so
+     seriesCache is populated before updateStats() renders sparklines, and
+     CURRENT (insights) is fresh before updateGarden() paints the "Now" chip
+     off of it -- previously insights was kicked off *after* updateGarden,
+     so the chip always painted from the prior cycle's conditions. */
   var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
   chartLoads = chartLoads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
-  var results    = await Promise.all([fetch('/api/latest')].concat(chartLoads));
-  var latestResp = results[0];
+  var insightsLoad = loadInsights();
+  var results       = await Promise.all([fetch('/api/latest')].concat(chartLoads));
+  var latestResp    = results[0];
+  await insightsLoad;
 
   if (latestResp.ok) {
     const rows = await latestResp.json();
@@ -2034,9 +2041,6 @@ async function refresh() {
   }
 
   renderTrendsClimateGrid();  /* redraw with the freshly loaded seriesCache */
-
-  /* Insight panel — derived metrics + forecast interpretation */
-  loadInsights();
 
   if (dot) dot.classList.remove('is-fetching');
 }
