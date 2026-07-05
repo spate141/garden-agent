@@ -81,7 +81,7 @@ function spriteHref(type) {
 }
 
 /** Per-plant height/width multipliers -- give each type a distinct silhouette rhythm.
- *  h: height relative to base ph (tall okra vs squat zucchini)
+ *  h: height relative to base ph (tall okra vs squat tomato)
  *  w: width relative to base pw (wide tomato vs slim eggplant) */
 const PLANT_META = {
   tomato:       { h: 0.82, w: 1.05 },   /* short bushy dome */
@@ -90,7 +90,7 @@ const PLANT_META = {
   peas:         { h: 1.18, w: 0.88 },   /* tall wispy vine */
   sweet_pepper: { h: 0.88, w: 1.08 },   /* medium, blocky-wide */
   hot_pepper:   { h: 1.12, w: 0.82 },   /* medium-tall, slim pod bouquet */
-  zucchini:     { h: 0.65, w: 1.18 },   /* shortest, widest -- horizontal fruit */
+  zucchini:     { h: 1.05, w: 0.90 },   /* tall bowed cylinder */
   tomato_cherry:      { h: 0.78, w: 0.95 },
   tomato_roma:        { h: 0.95, w: 0.85 },
   tomato_beefsteak:   { h: 0.90, w: 1.15 },
