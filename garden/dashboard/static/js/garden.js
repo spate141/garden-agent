@@ -410,6 +410,7 @@ function renderBeds() {
   if (!container) return;
   container.innerHTML = '';
   _initClouds();
+  _initGrassBlades();
   _initGroundDressing();
 
   BEDS.forEach(function (bed) {
@@ -630,6 +631,87 @@ function _initClouds() {
     el.style.setProperty('--g-cdelay', c.delay + 's');
     sky.appendChild(el);
   });
+}
+
+function _initGrassBlades() {
+  const horizon = document.getElementById('garden-horizon');
+  if (!horizon) return;
+  const old = horizon.querySelector('.g-grass-svg');
+  if (old) old.remove();
+
+  /* fixed-seed RNG: same blade layout every render */
+  const rng = mkRng(0x9a3c71);
+  const ns = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  ns.setAttribute('aria-hidden', 'true');
+  ns.setAttribute('viewBox', '0 0 400 24');
+  ns.setAttribute('preserveAspectRatio', 'none');
+  ns.className = 'g-grass-svg';
+  /* extends a few px above the 14px strip so blades poke up into the sky
+     seam like real grass, rather than stopping in a hard flat line */
+  ns.style.cssText =
+    'position:absolute;left:0;right:0;bottom:0;width:100%;height:24px;pointer-events:none;z-index:2;overflow:visible;';
+
+  const blades = ['#7fbf58', '#6fa64c', '#588a3a', '#4f7d34'];
+  const count = 1200;
+  /* Perf: animating all 1200 blades independently forces continuous repaint
+     of the whole strip every frame (SVG sub-elements don't get the same
+     cheap compositor-layer promotion HTML transforms get). Real grass also
+     doesn't ripple blade-by-blade independently -- nearby blades move
+     together in gusts. So only every 4th blade sways; the rest render as a
+     single static <g> (tilt baked into the SVG transform attribute, no CSS
+     animation, no extra wrapper element) -- full visual density, ~4x fewer
+     concurrently-animated nodes. */
+  const animateEvery = 4;
+  for (let i = 0; i < count; i++) {
+    const x     = (i / count) * 400 + (rng() - 0.5) * 0.27;
+    const h     = 8 + rng() * 10;             /* blade height */
+    const bend1 = (rng() - 0.5) * 9;          /* first S-curve control point */
+    const bend2 = (rng() - 0.5) * 9;          /* second, opposite-leaning */
+    const tilt  = (rng() - 0.5) * 6;          /* resting tilt, not all vertical */
+    const w     = 0.5 + rng() * 0.45;         /* sleek, thin blades */
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    /* cubic S-curve: two opposing control points give each blade a natural
+       wavy lean instead of a single uniform bend */
+    path.setAttribute('d',
+      'M0,0 C' + bend1.toFixed(1) + ',' + (-h * 0.35).toFixed(1) +
+      ' ' + bend2.toFixed(1) + ',' + (-h * 0.7).toFixed(1) +
+      ' ' + ((bend1 + bend2) * 0.15).toFixed(1) + ',' + (-h).toFixed(1));
+    path.setAttribute('stroke', blades[i % blades.length]);
+    path.setAttribute('stroke-width', w.toFixed(2));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-linecap', 'round');
+
+    if (i % animateEvery === 0) {
+      /* outer <g>: static translate positioning (an SVG "transform" attribute,
+         untouched by CSS so the animated inner <g> below can own the CSS
+         "transform" property without clobbering this placement) */
+      const outer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      outer.setAttribute('transform', 'translate(' + x.toFixed(1) + ',24)');
+
+      /* inner <g>: CSS-animated sway, staggered per blade like plant sway */
+      const inner = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      inner.setAttribute('class', 'g-grass-blade');
+      inner.style.cssText = 'transform-origin:0px 0px;';
+      inner.style.setProperty('--g-blade-tilt', tilt.toFixed(1) + 'deg');
+      inner.style.setProperty('--g-blade-amp',  (3 + rng() * 4).toFixed(1) + 'deg');
+      inner.style.animationDuration = (2 + rng() * 2.2).toFixed(2) + 's';
+      inner.style.animationDelay    = (-rng() * 3).toFixed(2) + 's';
+
+      inner.appendChild(path);
+      outer.appendChild(inner);
+      ns.appendChild(outer);
+    } else {
+      /* static blade: single <g>, tilt baked into the transform attribute,
+         no CSS animation at all */
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('transform',
+        'translate(' + x.toFixed(1) + ',24) rotate(' + tilt.toFixed(1) + ')');
+      g.appendChild(path);
+      ns.appendChild(g);
+    }
+  }
+  horizon.appendChild(ns);
 }
 
 function _initGroundDressing() {

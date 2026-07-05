@@ -293,6 +293,12 @@
   --g-grass-dark: #486e2c;
 }
 
+/* Individual grass-blade layer (SVG injected by _initGrassBlades in garden.js).
+   Each blade sways independently (own duration/delay/tilt/amplitude set
+   inline per blade) so the strip ripples like a breeze rather than moving
+   as one flat block. Blade shapes always render; only the sway keyframe
+   below is reduced-motion-gated. */
+
 /* ── Ground strip ── */
 .garden-ground {
   /* richer earth tone; beds stand out more against darker ground */
@@ -645,6 +651,21 @@
   .g-plant-inner {
     animation: g-sway var(--g-sway-dur, 8s) ease-in-out infinite;
     animation-delay: var(--g-delay, 0s);
+  }
+
+  /* Grass-blade flutter — each blade rocks around its own base (own tilt/
+     amplitude/duration/delay set inline in _initGrassBlades), so the strip
+     ripples unevenly like real grass in a breeze rather than one flat wave. */
+  .g-grass-blade {
+    animation-name: g-blade-sway;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    will-change: transform;
+  }
+  @keyframes g-blade-sway {
+    0%, 100% { transform: rotate(var(--g-blade-tilt, 0deg)); }
+    40%       { transform: rotate(calc(var(--g-blade-tilt, 0deg) + var(--g-blade-amp, 4deg))); }
+    75%       { transform: rotate(calc(var(--g-blade-tilt, 0deg) - var(--g-blade-amp, 4deg) * 0.6)); }
   }
   @keyframes g-sway {
     0%, 100% { transform: rotate(var(--g-rot, 0deg)); }
