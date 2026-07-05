@@ -184,6 +184,44 @@ def recent_values(sensor_key: str, n: int) -> list[float]:
     return [r["value"] for r in rows]
 
 
+def stats(sensor_key: str, hours: int = 24) -> dict[str, Any] | None:
+    """
+    Min/max/avg over the trailing `hours` window for one sensor key, plus the
+    oldest reading in that window (so callers can compute their own "change
+    over the window" delta against whatever they treat as "current").
+
+    Returns None when there are zero readings for this sensor_key in the
+    window (new sensor, DB just initialised, etc.) — callers must handle that.
+    """
+    with _conn() as con:
+        agg = con.execute(
+            """
+            SELECT MIN(value) as min, MAX(value) as max, AVG(value) as avg, COUNT(*) as n
+            FROM readings
+            WHERE sensor_key = ? AND ts >= datetime('now', ? || ' hours')
+            """,
+            (sensor_key, f"-{hours}"),
+        ).fetchone()
+        if agg is None or agg["n"] == 0:
+            return None
+        oldest = con.execute(
+            """
+            SELECT value, ts FROM readings
+            WHERE sensor_key = ? AND ts >= datetime('now', ? || ' hours')
+            ORDER BY ts ASC LIMIT 1
+            """,
+            (sensor_key, f"-{hours}"),
+        ).fetchone()
+    return {
+        "min": agg["min"],
+        "max": agg["max"],
+        "avg": round(agg["avg"], 3) if agg["avg"] is not None else None,
+        "n": agg["n"],
+        "oldest_value": oldest["value"] if oldest else None,
+        "oldest_ts": oldest["ts"] if oldest else None,
+    }
+
+
 # ── alert_state helpers ───────────────────────────────────────────────────────
 
 def get_alert_state(rule_id: str) -> dict[str, Any]:

@@ -423,6 +423,11 @@ footer {
   color: var(--text-faint);
 }
 
+.bed-detail-metric-range {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
 .bed-detail-rate {
   font-size: 0.75rem;
   font-weight: 600;
