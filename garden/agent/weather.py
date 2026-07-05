@@ -353,9 +353,12 @@ def forecast_summary(fc: dict[str, Any] | None) -> str:
     if not fc:
         return "Weather: unavailable."
 
+    from garden.config import cfg
+    rain_lookahead_pct = cfg.weather.get("rain_lookahead_pct", 40)
+
     rain = f"{fc['precip_prob_pct']:.0f}% chance, {fc['precip_in']:.2f} in"
     note = ""
-    if fc.get("next_12h_peak_rain_pct", 0) >= 40:
+    if fc.get("next_12h_peak_rain_pct", 0) >= rain_lookahead_pct:
         hrs = fc["next_12h_peak_hour_offset"]
         note = f" Rain likely within ~{hrs + 1}h."
 

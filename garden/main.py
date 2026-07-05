@@ -145,6 +145,9 @@ async def api_insights() -> JSONResponse:
             "water_balance_in":    fc.get("water_balance_in"),
             "frost_risk":          fc.get("frost_risk", False),
             "tomorrow_low_f":      fc.get("tomorrow_low_f"),
+            # Rain lookahead — same fields forecast_summary() feeds to the LLM brief.
+            "next_12h_peak_rain_pct":    fc.get("next_12h_peak_rain_pct"),
+            "next_12h_peak_hour_offset": fc.get("next_12h_peak_hour_offset"),
             # Sun times for sky animation — UTC epoch seconds; absent when location unavailable
             "sunrise_ts":          fc.get("sunrise_ts"),
             "sunset_ts":           fc.get("sunset_ts"),
@@ -196,6 +199,21 @@ async def api_insights() -> JSONResponse:
         })
 
     insights["beds"] = bed_results
+
+    # ── 24h min/max stats — scoped to only the sensors the UI actually renders ──
+    stat_keys: set[str] = {"vpd_kpa"}
+    weather_temp_key = cfg.dashboard.get("weather_keys", {}).get("temp")
+    if weather_temp_key:
+        stat_keys.add(weather_temp_key)
+    for bed in cfg.dashboard.get("beds", []):
+        moist_key = bed.get("sensors", {}).get("soil_moisture")
+        if moist_key:
+            stat_keys.add(moist_key)
+
+    insights["stats"] = {
+        k: s for k in stat_keys if (s := storage.stats(k, hours=24)) is not None
+    }
+
     return JSONResponse(insights)
 
 
@@ -251,9 +269,10 @@ async def dashboard(request: Request):
     # Thresholds read from config.yaml so the dashboard art agrees with the agent rules.
     # The same values drive check_soil_moisture_low, check_battery_low, check_watchdog.
     garden_thresholds = json.dumps({
-        "dry":      cfg.thresholds.get("soil_moisture_low", {}).get("below", 30),
-        "battLow":  cfg.thresholds.get("battery_low", {}).get("below", 1.1),
-        "staleMin": cfg.watchdog.get("sensor_timeout_minutes", 30),
+        "dry":              cfg.thresholds.get("soil_moisture_low", {}).get("below", 30),
+        "battLow":          cfg.thresholds.get("battery_low", {}).get("below", 1.1),
+        "staleMin":         cfg.watchdog.get("sensor_timeout_minutes", 30),
+        "rainLookaheadPct": cfg.weather.get("rain_lookahead_pct", 40),
     })
 
     # Band data for the upgraded charts and UI components.

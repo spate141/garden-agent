@@ -1588,9 +1588,20 @@ function _trendArrow(key, currentVal, tsIso) {
   return { arrow: '■', cls: 'is-flat' };
 }
 
-function _climateStatHTML(label, value, unit, trend, sub) {
+/** What kind of number each climate stat is — shown as a hover tooltip so a
+ *  first-time visitor can tell a live sensor reading from a forecast/derived
+ *  figure without adding any visible clutter to the stat tiles themselves. */
+const CLIMATE_STAT_SOURCE = {
+  vpd:   'Derived from live temperature + humidity sensor readings',
+  temp:  'Live sensor reading (gazebo station)',
+  water: 'Computed from Open-Meteo forecast rainfall minus evapotranspiration — not a physical sensor',
+};
+
+function _climateStatHTML(label, value, unit, trend, sub, kind) {
+  var title = CLIMATE_STAT_SOURCE[kind] || '';
   return (
-    '<button type="button" class="climate-stat" onclick="scrollToTrends()">' +
+    '<button type="button" class="climate-stat" onclick="scrollToTrends()"' +
+      (title ? ' title="' + title + '"' : '') + '>' +
       '<span class="climate-stat-label">' + label + '</span>' +
       '<span class="climate-stat-value">' + value +
         '<span class="climate-stat-unit">' + unit + '</span>' +
@@ -1610,7 +1621,7 @@ function scrollToTrends() {
 
 /** Plain-language verdict: leads with beds needing action, else affirms all-clear.
  *  No em-dashes per the house style — " · " joins clauses instead. */
-function _buildVerdict(beds, current, waterBalanceIn) {
+function _buildVerdict(beds, current, waterBalanceIn, vpd, forecast) {
   var needsWater = (beds || []).filter(function (b) { return b.status === 'dry'; });
   var tooWet     = (beds || []).filter(function (b) { return b.status === 'wet'; });
   var stressed   = (beds || []).filter(function (b) { return b.status === 'cold' || b.status === 'heat'; });
@@ -1635,6 +1646,19 @@ function _buildVerdict(beds, current, waterBalanceIn) {
   var parts = [lead];
   if (cond) parts.push(cond);
   if (irrigation && !needsWater.length) parts.push(irrigation);
+
+  /* Mildew/fungal risk — surfaces vpd_status()'s existing 'low' signal in
+     plain, decision-oriented language rather than raw VPD jargon. */
+  if (vpd && vpd.status === 'low') parts.push('humid air, mildew risk');
+
+  /* Rain outlook — only worth a clause when rain is actually likely soon;
+     reuses the same next-12h lookahead cutoff the LLM brief uses server-side. */
+  var peak = forecast && forecast.next_12h_peak_rain_pct;
+  if (peak != null && peak >= (G.rainLookaheadPct || 40)) {
+    var hrs = forecast.next_12h_peak_hour_offset + 1;
+    parts.push('rain likely within ' + hrs + 'h');
+  }
+
   return parts.join(' · ');
 }
 
@@ -1646,7 +1670,7 @@ function renderClimateStrip(data) {
   if (!verdictEl || !statsEl) return;
 
   var wb = data.forecast && data.forecast.water_balance_in != null ? data.forecast.water_balance_in : null;
-  var verdict = _buildVerdict(data.beds, data.current, wb);
+  var verdict = _buildVerdict(data.beds, data.current, wb, data.vpd, data.forecast);
 
   /* Stale data (redesign.md §9): a quiet inline note, not a page-wide gray-out --
      the connection dot already carries the amber/red signal. */
@@ -1660,14 +1684,18 @@ function renderClimateStrip(data) {
 
   if (data.vpd) {
     var vTrend = _trendArrow('vpd_kpa', data.vpd.value);
-    stats.push(_climateStatHTML('VPD', data.vpd.value.toFixed(2), 'kPa', vTrend, data.vpd.label, 'vpd'));
+    var vStats = data.stats && data.stats.vpd_kpa;
+    var vSub = data.vpd.label + (vStats ? ' · 24h ' + vStats.min.toFixed(2) + '–' + vStats.max.toFixed(2) : '');
+    stats.push(_climateStatHTML('VPD', data.vpd.value.toFixed(2), 'kPa', vTrend, vSub, 'vpd'));
   }
 
   var outdoorTemp = LATEST_READINGS.temp1_f;
   if (outdoorTemp != null) {
     var tTrend = _trendArrow('temp1_f', parseFloat(outdoorTemp));
     var feels  = data.heat_index ? 'feels ' + Math.round(data.heat_index.value) + '°' : '';
-    stats.push(_climateStatHTML('Outdoor temp', Math.round(outdoorTemp), '°F', tTrend, feels, 'temp'));
+    var tStats = data.stats && data.stats[WEATHER_KEYS.temp];
+    var tSub = feels + (tStats ? (feels ? ' · ' : '') + '24h ' + Math.round(tStats.min) + '–' + Math.round(tStats.max) + '°' : '');
+    stats.push(_climateStatHTML('Outdoor temp', Math.round(outdoorTemp), '°F', tTrend, tSub, 'temp'));
   }
 
   if (wb != null) {
@@ -1745,6 +1773,7 @@ function renderBedChips(insightBeds) {
       '<button type="button" class="bed-chip is-' + state.cls + (isOpen ? ' is-open' : '') + '" ' +
         'onclick="toggleBedDetail(\'' + bed.id + '\')" ' +
         'aria-expanded="' + isOpen + '" ' +
+        'title="Soil moisture: live sensor · status: computed from crop-specific healthy range" ' +
         'aria-label="' + bed.name + ': ' + state.word + (moistVal != null ? ', ' + moistVal.toFixed(0) + '% moisture' : '') + '">' +
         '<span class="bed-chip-fill" aria-hidden="true" style="width:' + fillPct + '%; background:' + fillColor + '"></span>' +
         '<span class="bed-chip-dot" aria-hidden="true"></span>' +
@@ -1819,6 +1848,11 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
 
   const bandHTML = band ? band.min + '–' + band.max + '% healthy' : '';
 
+  const bedStats = LAST_INSIGHTS && LAST_INSIGHTS.stats ? LAST_INSIGHTS.stats[moistKey] : null;
+  const rangeHTML = bedStats
+    ? '<span class="bed-detail-metric-range">24h ' + Math.round(bedStats.min) + '–' + Math.round(bedStats.max) + '%</span>'
+    : '';
+
   const battHTML = battVal != null ? buildBatteryBadge(battVal) : '<span class="bed-detail-metric-band">no reading</span>';
 
   const verdict = stale ? 'Check the sensor, no recent data' : _bedVerdict(stress ? stress.status : 'unknown', waterBalanceIn);
@@ -1827,8 +1861,9 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
     '<div class="bed-detail-inner">' +
       '<div class="bed-detail-line">' + plainLine + '</div>' +
       '<div class="bed-detail-metric">' +
-        '<span class="bed-detail-metric-val">' + (moistVal != null ? moistVal.toFixed(0) + '%' : '—') + '</span>' +
+        '<span class="bed-detail-metric-val" title="Live sensor reading">' + (moistVal != null ? moistVal.toFixed(0) + '%' : '—') + '</span>' +
         '<span class="bed-detail-metric-band">' + bandHTML + '</span>' +
+        rangeHTML +
         rateHTML +
       '</div>' +
       '<div class="bed-detail-chart"><canvas id="bed-detail-chart-' + bed.id + '"></canvas></div>' +

@@ -187,6 +187,7 @@ weather:
   enabled: true
   cache_minutes: 120    # how long to reuse a fetched forecast before refreshing
   current_cache_minutes: 15  # separate, shorter cache for "is it raining right now" data
+  rain_lookahead_pct: 40  # next-12h peak rain probability that counts as "rain likely" (dashboard + LLM brief)
 
 # ── Daily morning brief ───────────────────────────────────────────────────────
 # Sent once per day around hour_local in your timezone.
