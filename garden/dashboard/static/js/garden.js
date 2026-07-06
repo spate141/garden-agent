@@ -1250,6 +1250,13 @@ const instances = {};
    Populated by loadChart(); consumed by updateStats() for sparklines + deltas. */
 const seriesCache = {};
 
+/* Cache of series rows keyed by "sensorKey|hours", so switching Trends range
+   back to one already viewed this session redraws instantly from cache
+   instead of waiting on a fresh /api/series round trip. Populated by
+   loadChart() alongside seriesCache; never evicted (payloads are small
+   post-downsampling, and a session only visits a handful of ranges). */
+const seriesCacheByRange = {};
+
 /* VPD zone colors (fixed semantic; do not need to react to light/dark theme). */
 var _VPD_COLORS = [
   'rgba(59,130,246,0.09)',   /* too low   -- blue   */
@@ -1336,17 +1343,19 @@ function fmtTime(iso) {
  * the duplicated/out-of-order tick-label bug). */
 const _seriesReqSeq = {};
 
-async function loadChart(key, color) {
-  const reqId = (_seriesReqSeq[key] = (_seriesReqSeq[key] || 0) + 1);
-  const resp = await fetch('/api/series?sensor=' + encodeURIComponent(key) + '&hours=' + HOURS);
-  if (!resp.ok) return;
-  const rows = await resp.json();
-  if (_seriesReqSeq[key] !== reqId) return; /* a newer request already landed */
+/** Draws/updates the chart for `key` from already-fetched `rows`, and caches
+ *  them (both the sensor-keyed cache other readers rely on, and the
+ *  range-keyed cache that makes range toggles instant). Split out of
+ *  loadChart() so a range switch can render synchronously from
+ *  seriesCacheByRange before the network round trip resolves. */
+function _renderChart(key, color, rows) {
   const labels = rows.map(function (r) { return fmtTime(r.ts); });
   const data   = rows.map(function (r) { return r.value; });
 
-  /* Cache rows for KPI sparklines and delta computation. */
+  /* Cache rows for KPI sparklines and delta computation, and for instant
+     redraw next time this exact (sensor, range) pair is selected. */
   seriesCache[key] = rows;
+  seriesCacheByRange[key + '|' + HOURS] = rows;
 
   var wateringIndices = [];
   if (key.startsWith('soilmoisture') && data.length > 1) {
@@ -1393,6 +1402,23 @@ async function loadChart(key, color) {
     instances[key]._lines                 = lines;
     instances[key].update();
   }
+}
+
+/** Fetches + draws the chart for `key` at the current HOURS. If this exact
+ *  (sensor, range) pair was already fetched this session, redraws instantly
+ *  from seriesCacheByRange first (synchronously, before the network call
+ *  resolves) so range toggles feel instant, then still fetches in the
+ *  background to bring the chart current. */
+async function loadChart(key, color) {
+  const cached = seriesCacheByRange[key + '|' + HOURS];
+  if (cached) _renderChart(key, color, cached);
+
+  const reqId = (_seriesReqSeq[key] = (_seriesReqSeq[key] || 0) + 1);
+  const resp = await fetch('/api/series?sensor=' + encodeURIComponent(key) + '&hours=' + HOURS);
+  if (!resp.ok) return;
+  const rows = await resp.json();
+  if (_seriesReqSeq[key] !== reqId) return; /* a newer request already landed */
+  _renderChart(key, color, rows);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1522,6 +1548,10 @@ function setTrendsHours(hours) {
 async function reloadTrendsSeries() {
   var loads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
   loads = loads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
+  /* loadChart() draws synchronously from seriesCacheByRange (if present)
+     before its own network call yields, so this redraw already reflects any
+     cached data for the newly selected range -- instant on a revisited range. */
+  renderTrendsClimateGrid();
   await Promise.all(loads);
   renderTrendsClimateGrid();
 }
@@ -2007,8 +2037,13 @@ async function loadInsights() {
 
   LAST_INSIGHTS = data;
   renderClimateStrip(data);
-  renderBedChips(data.beds);
-  if (OPEN_BED) renderBedDetail();
+  /* Bed chips read LATEST_READINGS/LATEST_TS (for staleness), which refresh()
+     only updates after this fetch resolves — render there instead, once both
+     are in sync, or every cycle would flash "Offline" until the next click. */
+  if (LATEST_UPDATED_TS) {
+    renderBedChips(data.beds);
+    if (OPEN_BED) renderBedDetail();
+  }
 }
 
 /** Single fetch feeds both the stat strip and the garden */
@@ -2036,6 +2071,10 @@ async function refresh() {
     LATEST_UPDATED_TS = parsed.lastUpdated;
     updateStats(rows);    /* seriesCache is now populated — sparklines render */
     updateGarden(rows);
+    if (LAST_INSIGHTS) {
+      renderBedChips(LAST_INSIGHTS.beds);
+      if (OPEN_BED) renderBedDetail();
+    }
   } else {
     _updateConnDot(null);
   }

@@ -70,3 +70,49 @@ class TestStats:
         _write(db, "humidity", 55.0, 10)
         assert db.stats("temp_f")["max"] == 72.0
         assert db.stats("humidity")["max"] == 55.0
+
+    def test_excludes_readings_outside_sub_day_window(self, db):
+        # Regression test: ingest.py writes `ts` via datetime.isoformat(), e.g.
+        # "2026-07-05T14:30:00+00:00" ("T" separator, "+00:00" offset). The
+        # cutoff must be compared correctly against that format, or a
+        # lexicographic mismatch (e.g. SQLite's datetime('now', '-N hours'),
+        # which renders "2026-07-05 11:30:00" with a space and no offset)
+        # makes any same-day row satisfy `ts >= cutoff` regardless of hour --
+        # collapsing a 3h window down to "today", identical to a 24h window.
+        _write(db, "temp_f", 60.0, 5 * 60)  # 5h ago -- outside a 3h window
+        _write(db, "temp_f", 75.0, 60)      # 1h ago -- inside a 3h window
+        s = db.stats("temp_f", hours=3)
+        assert s["n"] == 1
+        assert s["min"] == 75.0
+        assert s["max"] == 75.0
+
+
+class TestSeries:
+    def test_returns_only_readings_in_window(self, db):
+        _write(db, "temp_f", 60.0, 5 * 60)  # 5h ago -- outside a 3h window
+        _write(db, "temp_f", 75.0, 60)      # 1h ago -- inside a 3h window
+        rows = db.series("temp_f", hours=3)
+        assert len(rows) == 1
+        assert rows[0]["value"] == 75.0
+
+    def test_narrow_window_returns_all_points_unbucketed(self, db):
+        # A narrow window's bucket size (>= 60s) is smaller than the spacing
+        # between these readings, so each stays in its own bucket -- the
+        # bucket-averaging path should not lose or merge distinct readings.
+        _write(db, "temp_f", 60.0, 20)
+        _write(db, "temp_f", 65.0, 10)
+        _write(db, "temp_f", 70.0, 1)
+        rows = db.series("temp_f", hours=1)
+        assert [r["value"] for r in rows] == [60.0, 65.0, 70.0]
+
+    def test_wide_window_downsamples(self, db):
+        # Simulate ~1 reading every 3 minutes across a 24h window (480
+        # points) -- far more than the ~350-point target -- and assert the
+        # bucket-averaging path shrinks the payload while still spanning the
+        # full window.
+        for minutes_ago in range(0, 24 * 60, 3):
+            _write(db, "temp_f", float(minutes_ago % 100), minutes_ago)
+        rows = db.series("temp_f", hours=24)
+        assert 0 < len(rows) < 480
+        # Endpoints of the window are still represented.
+        assert rows[0]["ts"] < rows[-1]["ts"]

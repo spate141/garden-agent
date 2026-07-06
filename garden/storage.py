@@ -19,6 +19,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 
 from pathlib import Path
 from typing import Any, Generator
@@ -118,6 +119,21 @@ def write_snapshot(
 
 # ── query helpers ─────────────────────────────────────────────────────────────
 
+def _hours_ago_iso(hours: int) -> str:
+    """
+    ISO-8601 UTC cutoff, `hours` hours before now, matching the format
+    ingest.py writes to `ts` (e.g. "2026-07-05T14:30:00+00:00").
+
+    We bind this as a parameter rather than using SQLite's
+    datetime('now', '-N hours') because that renders "YYYY-MM-DD HH:MM:SS"
+    (space separator, no offset) — a *lexicographic* comparison against our
+    "T"-separated, offset-suffixed strings then breaks: 'T' (0x54) always
+    sorts after ' ' (0x20), so any same-day row would satisfy `ts >= cutoff`
+    regardless of the actual time, silently ignoring sub-day windows.
+    """
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).replace(microsecond=0).isoformat()
+
+
 def health_info() -> dict[str, Any]:
     """
     Returns a dict for the /health endpoint:
@@ -149,17 +165,29 @@ def latest() -> list[dict[str, Any]]:
 
 
 def series(sensor_key: str, hours: int = 24) -> list[dict[str, Any]]:
-    """Time-series for one sensor over the last `hours` hours."""
+    """
+    Time-series for one sensor over the last `hours` hours.
+
+    Readings are ~60s apart, so wide windows (e.g. 7d) return thousands of
+    rows per sensor. Bucket-average down to ~350 points so payloads stay
+    small and fast to transfer/parse/draw; narrow windows (<=~6h) end up
+    with a bucket smaller than the sample interval, so each bucket holds at
+    most one row and the result is effectively unchanged (still one point
+    per reading, just via the same aggregation path).
+    """
+    cutoff = _hours_ago_iso(hours)
+    bucket_seconds = max(60, (hours * 3600) // 350)
     with _conn() as con:
         rows = con.execute(
             """
-            SELECT ts, value, unit
+            SELECT MIN(ts) as ts, AVG(value) as value, MAX(unit) as unit
             FROM readings
             WHERE sensor_key = ?
-              AND ts >= datetime('now', ? || ' hours')
+              AND ts >= ?
+            GROUP BY CAST(strftime('%s', ts) AS INTEGER) / ?
             ORDER BY ts
             """,
-            (sensor_key, f"-{hours}"),
+            (sensor_key, cutoff, bucket_seconds),
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -193,24 +221,25 @@ def stats(sensor_key: str, hours: int = 24) -> dict[str, Any] | None:
     Returns None when there are zero readings for this sensor_key in the
     window (new sensor, DB just initialised, etc.) — callers must handle that.
     """
+    cutoff = _hours_ago_iso(hours)
     with _conn() as con:
         agg = con.execute(
             """
             SELECT MIN(value) as min, MAX(value) as max, AVG(value) as avg, COUNT(*) as n
             FROM readings
-            WHERE sensor_key = ? AND ts >= datetime('now', ? || ' hours')
+            WHERE sensor_key = ? AND ts >= ?
             """,
-            (sensor_key, f"-{hours}"),
+            (sensor_key, cutoff),
         ).fetchone()
         if agg is None or agg["n"] == 0:
             return None
         oldest = con.execute(
             """
             SELECT value, ts FROM readings
-            WHERE sensor_key = ? AND ts >= datetime('now', ? || ' hours')
+            WHERE sensor_key = ? AND ts >= ?
             ORDER BY ts ASC LIMIT 1
             """,
-            (sensor_key, f"-{hours}"),
+            (sensor_key, cutoff),
         ).fetchone()
     return {
         "min": agg["min"],
