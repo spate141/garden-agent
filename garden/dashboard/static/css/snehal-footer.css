@@ -45,6 +45,12 @@
 @media (max-width: 600px) {
   .snehal-footer__inner {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    gap: 6px;
+  }
+  .snehal-footer__brand {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
 }
