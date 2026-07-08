@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from garden import storage
+from garden import derived, storage
 from garden.config import cfg
 
 
@@ -145,10 +145,31 @@ def check_soil_moisture_rapid_rise() -> list[RuleResult]:
         rise = newest_val - oldest_val
         fired = rise >= rise_pct
 
-        body = (
-            f"{label} rose {rise:.1f}% in {window_minutes} min "
-            f"({oldest_val:.0f}% → {newest_val:.0f}%). Bed was watered."
-        ) if fired else ""
+        body = ""
+        if fired:
+            body = (
+                f"{label} rose {rise:.1f}% in {window_minutes} min "
+                f"({oldest_val:.0f}% → {newest_val:.0f}%). Bed was watered."
+            )
+            # Characterize the full lifecycle (baseline -> peak -> settled field
+            # capacity) so the Telegram alert says whether the water actually
+            # soaked in, not just that a rise happened. `rows` is the 2h series
+            # already fetched above -- a narrow window, safe from bucket smearing.
+            lifecycle_cfg = cfg.thresholds.get("watering_lifecycle", {})
+            samples = [
+                (datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp(), r["value"])
+                for r in rows
+            ]
+            event = derived.analyze_watering(
+                samples,
+                min_rise=lifecycle_cfg.get("min_rise_pct", rise_pct),
+                settle_window_s=lifecycle_cfg.get("settle_window_minutes", 60) * 60,
+                noise_pct=lifecycle_cfg.get("noise_pct", 2.0),
+            )
+            if event.get("detected"):
+                body += f" {event['reason']}."
+                if event["quality"] == "runoff" and not event.get("settling"):
+                    body += " Water slower next time, or check for compacted/hydrophobic soil."
 
         results.append(RuleResult(
             rule_id=f"soil_moisture_rapid_rise:{key}",

@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from garden import storage
+from garden import derived, storage
 from garden.agent import llm
 from garden.agent.rules import RuleResult, run_cron, run_instant
 from garden.agent.weather import forecast_summary, get_forecast
@@ -153,6 +153,41 @@ def run_cron_tick() -> None:
 _BRIEF_RULE_ID = "daily_brief"
 
 
+def _bed_drydown_line(bed: dict, moist_key: str | None, soil_moist: float) -> str | None:
+    """
+    'BedName: drying ~X%/day, dry in ~N days' for the daily brief, or None when
+    there isn't enough history / plant data to project. Suppressed while the
+    bed is still settling from a recent watering (forecast unreliable then).
+    """
+    if not moist_key:
+        return None
+    band = derived.bed_moisture_band(bed.get("plants", []), cfg.crops)
+    if band is None:
+        return None
+    dry_threshold = band[0]
+
+    lifecycle_cfg = cfg.thresholds.get("watering_lifecycle", {})
+    lookback_hours = lifecycle_cfg.get("drydown_lookback_hours", 48)
+    settle_window_s = lifecycle_cfg.get("settle_window_minutes", 60) * 60
+
+    rows = storage.series(moist_key, hours=lookback_hours)
+    samples = [
+        (datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp(), r["value"])
+        for r in rows
+    ]
+    event = derived.analyze_watering(samples, settle_window_s=settle_window_s)
+    if event.get("detected") and event.get("settling"):
+        return None  # still settling from a recent watering -- forecast not meaningful yet
+
+    rate = derived.drydown_rate(samples, settle_window_s=settle_window_s)
+    dtd = derived.days_until_dry(soil_moist, rate["per_day"], dry_threshold)
+    if dtd["days"] is None:
+        return None
+
+    name = bed.get("name", bed.get("id"))
+    return f"  {name}: drying ~{rate['per_day']:.1f}%/day, dry in {dtd['label']}"
+
+
 def _sensor_summary() -> str:
     """
     Build a compact sensor summary for the LLM from the latest readings.
@@ -187,7 +222,6 @@ def _sensor_summary() -> str:
 
     # Per-bed stress assessment
     try:
-        from garden import derived as drv
         src_temp_key = cfg.derived.get("source", {}).get("temp", "temp1_f")
         air_temp_row = by_key.get(src_temp_key)
         air_temp_f   = air_temp_row["value"] if air_temp_row else None
@@ -198,12 +232,30 @@ def _sensor_summary() -> str:
                 moist_row = by_key.get(moist_key) if moist_key else None
                 soil_moist = moist_row["value"] if moist_row else None
                 if soil_moist is not None:
-                    stress = drv.bed_stress(
+                    stress = derived.bed_stress(
                         bed.get("plants", []), soil_moist, air_temp_f, cfg.crops
                     )
                     lines.append(f"  {bed.get('name', bed.get('id'))}: {stress['reason']}")
     except Exception:
         log.debug("Bed stress assessment skipped", exc_info=True)
+
+    # Per-bed drydown forecast — when is each bed next due for watering.
+    try:
+        lines_drydown: list[str] = []
+        for bed in cfg.dashboard.get("beds", []):
+            moist_key = bed.get("sensors", {}).get("soil_moisture")
+            moist_row = by_key.get(moist_key) if moist_key else None
+            soil_moist = moist_row["value"] if moist_row else None
+            if soil_moist is None:
+                continue
+            line = _bed_drydown_line(bed, moist_key, soil_moist)
+            if line:
+                lines_drydown.append(line)
+        if lines_drydown:
+            lines.append("  --- drydown forecast ---")
+            lines.extend(lines_drydown)
+    except Exception:
+        log.debug("Drydown forecast skipped", exc_info=True)
 
     # Remaining sensors (not in priority or derived lists)
     skip = set(PRIORITY) | set(DERIVED)

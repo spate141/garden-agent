@@ -142,6 +142,16 @@ thresholds:
     rise_pct: 10       # alert if moisture rises this many % points in window_minutes (= watering event)
     window_minutes: 30
 
+  # Tuning for garden.derived.analyze_watering()/drydown_rate() — characterizes
+  # the full spike -> fallback -> drydown lifecycle behind the rapid_rise alert.
+  watering_lifecycle:
+    settle_window_minutes: 60      # spike+fallback region to exclude / plateau search
+    drydown_lookback_hours: 48     # series window for drydown_rate
+    noise_pct: 2.0                 # sensor-noise tolerance for baseline/settled medians
+    good_soak_min_pct: 5.0         # absorbed >= this -> good soak
+    runoff_max_pct: 2.0            # absorbed <= this -> runoff / hydrophobic soil
+    overshoot_frac_max: 0.6        # overshoot/(peak-baseline) above this weakens "good"
+
   battery_low:
     sensor_keys: [soilbatt1, soilbatt2, soilbatt3, soilbatt4]
     below: 1.1         # WH51 battery ~1.5V nominal; warn below 1.1V

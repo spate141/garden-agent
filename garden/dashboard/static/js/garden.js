@@ -1164,19 +1164,37 @@ document.getElementById('theme-toggle').addEventListener('click', function () {
    CHART FACTORY
    ════════════════════════════════════════════════════════════════════════════ */
 
+/* wateringEmoji plugin: marks each detected watering spike with a vertical
+   dashed line (top of chart down to the point) plus a "💦 time +X%" label,
+   instead of a bare droplet -- reads as one labeled event, not scattered
+   points. chart._wateringEvents : [{idx, deltaPct, timeLabel}]. */
 Chart.register({
   id: 'wateringEmoji',
   afterDraw(chart) {
-    const indices = chart._wateringIndices;
-    if (!indices || !indices.length) return;
-    const meta = chart.getDatasetMeta(0);
-    const ctx = chart.ctx;
+    const events = chart._wateringEvents;
+    if (!events || !events.length) return;
+    const meta   = chart.getDatasetMeta(0);
+    const yScale = chart.scales.y;
+    const ctx    = chart.ctx;
     ctx.save();
-    ctx.font = '14px serif';
-    ctx.textAlign = 'center';
-    indices.forEach(function(idx) {
-      const pt = meta.data[idx];
-      if (pt) ctx.fillText('💦', pt.x, pt.y - 10);
+    events.forEach(function (ev) {
+      const pt = meta.data[ev.idx];
+      if (!pt || !yScale) return;
+
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = 'rgba(59,130,246,0.45)';
+      ctx.lineWidth   = 1;
+      ctx.moveTo(pt.x, yScale.top);
+      ctx.lineTo(pt.x, pt.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const label = '💦 ' + ev.timeLabel + ' +' + ev.deltaPct.toFixed(0) + '%';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(59,130,246,0.9)';
+      ctx.fillText(label, pt.x, yScale.top + 10);
     });
     ctx.restore();
   }
@@ -1185,7 +1203,10 @@ Chart.register({
 /* thresholdBands plugin: draws filled zone boxes and dashed threshold lines behind
    the chart series. Charts set chart._bands and chart._lines before rendering.
    chart._bands : [{yMin, yMax, color}]   -- filled horizontal bands
-   chart._lines : [{y, color, label}]     -- dashed horizontal lines with optional label */
+   chart._lines : [{y, color, label}]     -- dashed horizontal lines with optional label
+   chart._projection : {fromIdx, toValue, days, color} -- faint sloped dashed
+     line from the last real point down to the dry threshold, drawn in afterDraw
+     so it layers over the series line (a projection, not a background zone). */
 Chart.register({
   id: 'thresholdBands',
   beforeDraw(chart) {
@@ -1241,6 +1262,39 @@ Chart.register({
     }
 
     ctx.restore();
+  },
+  afterDraw(chart) {
+    /* Drydown projection: faint dashed slope from the last real point down to
+       the dry threshold, labeled "~Nd to dry". Drawn after the series line so
+       it reads as a forward-looking projection, not a background zone. */
+    const proj = chart._projection;
+    if (!proj) return;
+    const yScale = chart.scales.y;
+    const meta   = chart.getDatasetMeta(0);
+    const fromPt = meta.data[proj.fromIdx];
+    if (!yScale || !fromPt) return;
+
+    const toY = yScale.getPixelForValue(proj.toValue);
+    const toX = fromPt.x + Math.min(chart.chartArea.right - fromPt.x, 60);
+
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = proj.color || 'rgba(148,163,184,0.7)';
+    ctx.lineWidth   = 1.5;
+    ctx.moveTo(fromPt.x, fromPt.y);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (proj.label) {
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = proj.color || 'rgba(148,163,184,0.9)';
+      ctx.fillText(proj.label, toX + 4, toY);
+    }
+    ctx.restore();
   }
 });
 
@@ -1278,7 +1332,10 @@ function makeChartOpts(color, opts) {
     },
     y: {
       grid:  { color: c.grid },
-      ticks: { color: c.ticks, font: { size: 10 } }
+      ticks: { color: c.ticks, font: { size: 10 } },
+      /* Headroom so the watering-event label (drawn just under the top edge
+         by the wateringEmoji plugin) never clips a data point near the max. */
+      grace: '8%'
     }
   };
   if (opts.dualAxis) {
@@ -1357,10 +1414,14 @@ function _renderChart(key, color, rows) {
   seriesCache[key] = rows;
   seriesCacheByRange[key + '|' + HOURS] = rows;
 
-  var wateringIndices = [];
+  /* Detect watering spikes (>=10% point-to-point jump) and label each one with
+     its time + magnitude, drawn by the wateringEmoji plugin as a vertical
+     marker instead of a bare droplet per point. */
+  var wateringEvents = [];
   if (key.startsWith('soilmoisture') && data.length > 1) {
     for (var i = 1; i < data.length; i++) {
-      if (data[i] - data[i - 1] >= 10) wateringIndices.push(i);
+      var delta = data[i] - data[i - 1];
+      if (delta >= 10) wateringEvents.push({ idx: i, deltaPct: delta, timeLabel: labels[i] });
     }
   }
 
@@ -1384,12 +1445,46 @@ function _renderChart(key, color, rows) {
     });
   }
 
+  /* Drydown projection: a lightweight client-side estimate (slope over the
+     tail since the last watering spike, or the whole series if none) of
+     when this bed reaches its crop's dry threshold. This is a visual hint
+     only -- the authoritative Theil-Sen estimate lives server-side in
+     garden.derived.drydown_rate() and drives the Telegram brief instead. */
+  var projection = null;
+  if (moistBand && data.length >= 4) {
+    var tailStart = wateringEvents.length ? wateringEvents[wateringEvents.length - 1].idx : 0;
+    var tail = rows.slice(tailStart).filter(function (r) { return r.value != null; });
+    if (tail.length >= 4) {
+      var t0 = new Date(tail[0].ts).getTime();
+      var tN = new Date(tail[tail.length - 1].ts).getTime();
+      var vN = tail[tail.length - 1].value;
+      var hoursSpan = (tN - t0) / 3600000;
+      if (hoursSpan > 0) {
+        var perHour = (tail[0].value - vN) / hoursSpan; /* positive = drying */
+        if (perHour > 0.01 && vN > moistBand.min) {
+          var hoursToDry = (vN - moistBand.min) / perHour;
+          var daysToDry  = hoursToDry / 24;
+          var projLabel  = hoursToDry < 24 ? ('~' + Math.round(hoursToDry) + 'h to dry')
+                          : daysToDry >= 14 ? '2+ wks to dry'
+                          : ('~' + Math.round(daysToDry) + 'd to dry');
+          projection = {
+            fromIdx: data.length - 1,
+            toValue: moistBand.min,
+            label: projLabel,
+            color: 'rgba(148,163,184,0.8)'
+          };
+        }
+      }
+    }
+  }
+
   if (instances[key]) {
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
-    instances[key]._wateringIndices       = wateringIndices;
+    instances[key]._wateringEvents        = wateringEvents;
     instances[key]._bands                 = bands;
     instances[key]._lines                 = lines;
+    instances[key]._projection            = projection;
     instances[key].update('none');
   } else {
     const canvas = document.getElementById('chart-' + key);
@@ -1397,9 +1492,10 @@ function _renderChart(key, color, rows) {
     instances[key] = new Chart(canvas, makeChartOpts(color));
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
-    instances[key]._wateringIndices       = wateringIndices;
+    instances[key]._wateringEvents        = wateringEvents;
     instances[key]._bands                 = bands;
     instances[key]._lines                 = lines;
+    instances[key]._projection            = projection;
     instances[key].update();
   }
 }
@@ -1527,7 +1623,8 @@ function _drawTrendGroupChart(g) {
   chart.data.datasets  = datasets;
   chart._bands         = bands;
   chart._lines         = [];
-  chart._wateringIndices = [];
+  chart._wateringEvents = [];
+  chart._projection    = null;
   chart.update('none');
 }
 
@@ -1969,7 +2066,8 @@ function _drawBedChart(bed) {
   chart.data.datasets[0].data = data;
   chart._bands                = bands;
   chart._lines                = [];
-  chart._wateringIndices      = [];
+  chart._wateringEvents       = [];
+  chart._projection           = null;
   chart.update('none');
 }
 

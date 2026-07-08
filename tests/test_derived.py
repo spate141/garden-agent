@@ -11,8 +11,12 @@ import pytest
 
 from garden.derived import (
     CROP_RANGES,
+    analyze_watering,
+    bed_moisture_band,
     bed_stress,
+    days_until_dry,
     dew_point_f,
+    drydown_rate,
     et0_water_balance,
     frost_risk,
     heat_index_f,
@@ -230,3 +234,224 @@ class TestBedStress:
         # All sprite names that can appear in config.yaml should be in CROP_RANGES
         for crop in ["tomato", "eggplant", "okra", "peas", "sweet_pepper", "hot_pepper", "zucchini"]:
             assert crop in CROP_RANGES, f"Missing crop: {crop}"
+
+
+# ── bed_moisture_band ────────────────────────────────────────────────────────
+
+class TestBedMoistureBand:
+    def test_single_crop(self):
+        assert bed_moisture_band(["tomato"]) == (50, 80)
+
+    def test_intersection_across_crops(self):
+        # okra (40,70) + peas (60,85) -> intersection (60,70)
+        assert bed_moisture_band(["okra", "peas"]) == (60, 70)
+
+    def test_unknown_plants_returns_none(self):
+        assert bed_moisture_band(["foobar"]) is None
+
+    def test_matches_bed_stress_thresholds(self):
+        # bed_stress's dry/ok boundary should agree with bed_moisture_band's min
+        moist_min, _ = bed_moisture_band(["tomato"])
+        just_below = bed_stress(["tomato"], soil_moist=moist_min - 1, air_temp_f=75.0)
+        just_at    = bed_stress(["tomato"], soil_moist=moist_min, air_temp_f=75.0)
+        assert just_below["status"] == "dry"
+        assert just_at["status"] == "ok"
+
+    def test_custom_ranges(self):
+        band = bed_moisture_band(["tomato"], custom_ranges={"tomato": {"moist": [70, 90]}})
+        assert band == (70, 90)
+
+
+# ── watering lifecycle: analyze_watering / drydown_rate / days_until_dry ──────
+
+def _watering_series(baseline=62.0, peak=81.0, settled=71.0,
+                      pre_pts=10, rise_pts=3, settle_pts=70,
+                      interval=60.0, start_t=0.0, decay=6.0):
+    """
+    Synthetic (epoch_seconds, moisture_pct) watering curve: flat baseline,
+    then a rise to `peak`, then an exponential fallback that plateaus at
+    `settled`. settle_pts * interval defaults to 4200s (> the 3600s default
+    settle window) so the plateau is fully captured (not "still settling").
+    """
+    samples = []
+    t = start_t
+    for _ in range(pre_pts):
+        samples.append((t, baseline))
+        t += interval
+    for i in range(1, rise_pts + 1):
+        v = baseline + (peak - baseline) * i / rise_pts
+        samples.append((t, v))
+        t += interval
+    for i in range(1, settle_pts + 1):
+        frac = i / settle_pts
+        v = settled + (peak - settled) * math.exp(-decay * frac)
+        samples.append((t, v))
+        t += interval
+    return samples
+
+
+def _linear_series(start_val, per_day_rate, hours, interval_s=600.0, start_t=0.0):
+    """(t, v) samples declining linearly at `per_day_rate` %/day over `hours`."""
+    n = int(hours * 3600 / interval_s)
+    samples = []
+    for i in range(n + 1):
+        t = start_t + i * interval_s
+        v = start_val - per_day_rate * (t - start_t) / 86400.0
+        samples.append((t, v))
+    return samples
+
+
+class TestAnalyzeWatering:
+    def test_good_soak_known_values(self):
+        samples = _watering_series(baseline=62.0, peak=81.0, settled=71.0)
+        result = analyze_watering(samples)
+        assert result["detected"] is True
+        assert result["quality"] == "good_soak"
+        assert abs(result["baseline"] - 62.0) < 0.5
+        assert abs(result["peak"] - 81.0) < 0.5
+        assert abs(result["settled"] - 71.0) < 1.0
+        assert abs(result["absorbed"] - 9.0) < 1.5
+        assert result["settling"] is False
+
+    def test_runoff_drains_to_baseline(self):
+        samples = _watering_series(baseline=62.0, peak=80.0, settled=63.0)
+        result = analyze_watering(samples)
+        assert result["detected"] is True
+        assert result["quality"] == "runoff"
+        assert "compact" in result["reason"].lower() or "ran off" in result["reason"].lower()
+
+    def test_partial_soak(self):
+        samples = _watering_series(baseline=60.0, peak=80.0, settled=63.5)
+        result = analyze_watering(samples)
+        assert result["detected"] is True
+        assert result["quality"] == "partial"
+
+    def test_no_event_flat(self):
+        samples = [(i * 60.0, 55.0 + (0.4 if i % 2 == 0 else -0.4)) for i in range(20)]
+        result = analyze_watering(samples)
+        assert result["detected"] is False
+
+    def test_no_event_gradual_drydown(self):
+        samples = _linear_series(70.0, per_day_rate=3.0, hours=24)
+        result = analyze_watering(samples)
+        assert result["detected"] is False
+
+    def test_too_few_points(self):
+        result = analyze_watering([(0, 60.0), (60, 61.0), (120, 62.0)])
+        assert result["detected"] is False
+
+    def test_noise_robustness(self):
+        base = _watering_series(baseline=62.0, peak=81.0, settled=71.0)
+        jitter = [1.4, -1.3, 0.9, -1.1, 1.2, -0.8]
+        noisy = [(t, v + jitter[i % len(jitter)]) for i, (t, v) in enumerate(base)]
+        result = analyze_watering(noisy)
+        assert result["detected"] is True
+        assert result["quality"] == "good_soak"
+        assert abs(result["settled"] - 71.0) < 2.5
+
+    def test_baseline_is_median_not_skewed_by_outlier(self):
+        samples = _watering_series(baseline=62.0, peak=81.0, settled=71.0, pre_pts=9)
+        # Inject one wild low dip in the middle of the pre-water baseline region
+        # (not at the very start, which would just become the rise's foot).
+        samples[4] = (samples[4][0], 10.0)
+        result = analyze_watering(samples)
+        assert result["detected"] is True
+        assert abs(result["baseline"] - 62.0) < 1.0
+
+    def test_latest_event_wins(self):
+        first  = _watering_series(baseline=40.0, peak=90.0, settled=60.0,
+                                   settle_pts=20, start_t=0.0)
+        gap_start = first[-1][0] + 60.0
+        second = _watering_series(baseline=60.0, peak=75.0, settled=68.0,
+                                   settle_pts=70, start_t=gap_start)
+        result = analyze_watering(first + second)
+        assert result["detected"] is True
+        assert result["peak_ts"] == second[9 + 3][0]  # second event's peak sample
+        assert abs(result["peak"] - 75.0) < 0.5
+
+
+class TestDrydownRate:
+    def test_linear_known_slope(self):
+        samples = _linear_series(70.0, per_day_rate=3.2, hours=48)
+        result = drydown_rate(samples)
+        assert result["per_day"] == pytest.approx(3.2, abs=0.05)
+
+    def test_per_hour_per_day_consistent(self):
+        samples = _linear_series(70.0, per_day_rate=4.0, hours=48)
+        result = drydown_rate(samples)
+        assert result["per_day"] == pytest.approx(result["per_hour"] * 24, rel=0.01)
+
+    def test_excludes_spike_and_fallback(self):
+        watering = _watering_series(baseline=62.0, peak=81.0, settled=71.0)
+        tail_start = watering[-1][0] + 60.0
+        tail = _linear_series(71.0, per_day_rate=2.5, hours=24, start_t=tail_start)
+        result = drydown_rate(watering + tail)
+        # If the steep fallback contaminated the fit, this would be far > 2.5/day.
+        assert result["per_day"] == pytest.approx(2.5, abs=0.3)
+
+    def test_noisy_monotone_robust(self):
+        base = _linear_series(70.0, per_day_rate=3.0, hours=48, interval_s=1800.0)
+        jitter = [0.4, -0.3, 0.2, -0.5]
+        noisy = [(t, v + jitter[i % len(jitter)]) for i, (t, v) in enumerate(base)]
+        result = drydown_rate(noisy)
+        assert result["per_day"] == pytest.approx(3.0, abs=0.4)
+
+    def test_single_outlier_robust(self):
+        base = _linear_series(70.0, per_day_rate=3.0, hours=48, interval_s=1800.0)
+        base[10] = (base[10][0], base[10][1] + 30.0)  # one wild outlier
+        result = drydown_rate(base)
+        assert result["per_day"] == pytest.approx(3.0, abs=0.5)
+
+    def test_rising_returns_zero(self):
+        samples = [(i * 600.0, 40.0 + i * 0.5) for i in range(10)]  # steadily rising
+        result = drydown_rate(samples)
+        assert result["per_day"] == 0.0
+        assert "rising" in result["reason"].lower()
+
+    def test_too_few_points(self):
+        result = drydown_rate([(0, 60.0), (600, 59.0)])
+        assert result["per_day"] is None
+        assert "few" in result["reason"].lower()
+
+    def test_flat(self):
+        samples = [(i * 600.0, 55.0) for i in range(10)]
+        result = drydown_rate(samples)
+        assert result["per_day"] == 0.0
+        assert "flat" in result["reason"].lower()
+
+
+class TestDaysUntilDry:
+    def test_known_projection(self):
+        result = days_until_dry(70.0, 4.0, 30.0)
+        assert result["days"] == pytest.approx(10.0)
+        assert result["label"] == "~10 days"
+
+    def test_already_dry(self):
+        result = days_until_dry(28.0, 4.0, 30.0)
+        assert result["days"] == 0.0
+        assert result["label"] == "today"
+
+    def test_not_drying_zero_rate(self):
+        result = days_until_dry(60.0, 0.0, 30.0)
+        assert result["days"] is None
+        assert result["label"] == "not drying"
+
+    def test_not_drying_negative_rate(self):
+        result = days_until_dry(60.0, -2.0, 30.0)
+        assert result["days"] is None
+
+    def test_sub_day_label(self):
+        result = days_until_dry(50.0, 40.0, 30.0)
+        assert result["days"] < 1.0
+        assert result["label"] == "today"
+
+    def test_far_horizon_clamp(self):
+        result = days_until_dry(80.0, 0.5, 30.0)
+        assert result["days"] > 14
+        assert result["label"] == "2+ weeks"
+
+    def test_label_pluralization(self):
+        one = days_until_dry(34.0, 4.0, 30.0)
+        two = days_until_dry(38.0, 4.0, 30.0)
+        assert one["label"] == "~1 day"
+        assert two["label"] == "~2 days"
