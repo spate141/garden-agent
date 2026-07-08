@@ -99,23 +99,23 @@ dashboard:
       name: "Bed 1"
       sensors: {soil_moisture: soilmoisture1, soil_battery: soilbatt1}
       plants: [tomato_cherry, tomato_roma, tomato_beefsteak, tomato_heirloom, tomato_grape, tomato_san_marzano]
-      planted_on: "2026-04-15"
+      planted_on: "2026-05-15"
     - id: bed2
       name: "Bed 2"
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
       plants: [eggplant, okra, okra, eggplant, okra, okra, okra, okra, okra, okra, okra, okra]
-      planted_on: "2026-04-15"
+      planted_on: "2026-05-15"
     - id: bed3
       name: "Bed 3"
       sensors: {soil_moisture: soilmoisture3, soil_battery: soilbatt3}
       plants: [sweet_pepper_red, sweet_pepper_yellow, sweet_pepper_green, sweet_pepper_orange]
-      planted_on: "2026-04-15"
+      planted_on: "2026-05-15"
     - id: bed4
       name: "Bed 4"
       sensors: {soil_moisture: soilmoisture4, soil_battery: soilbatt4}
       plants: [zucchini, eggplant]
       layout: vertical   # stack plants in a single column instead of side-by-side
-      planted_on: "2026-04-15"
+      planted_on: "2026-05-15"
   weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
   stat_groups:
     - name: "Bed 1"

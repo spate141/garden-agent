@@ -39,5 +39,5 @@ def test_agronomy_defaults():
 
 
 def test_bed_planted_on():
-    assert cfg.bed_planted_on("bed1") == "2026-04-15"
+    assert cfg.bed_planted_on("bed1") == "2026-05-15"
     assert cfg.bed_planted_on("no_such_bed") is None
