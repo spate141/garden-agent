@@ -88,6 +88,22 @@ class _Config:
         """Return the hex color for a sensor key, or a neutral grey fallback."""
         return self.sensors.get(key, {}).get("color", "#888888")
 
+    def bed_for_sensor(self, sensor_key: str) -> dict[str, Any] | None:
+        """Bed dict whose soil-moisture or battery sensor is `sensor_key`, else None."""
+        for bed in self.dashboard.get("beds", []):
+            s = bed.get("sensors", {})
+            if sensor_key and sensor_key in (s.get("soil_moisture"), s.get("soil_battery")):
+                return bed
+        return None
+
+    def bed_crops_label(self, sensor_key: str) -> str:
+        """Comma-joined crop families for the bed owning `sensor_key`, or '' if none (e.g. temp/gateway)."""
+        bed = self.bed_for_sensor(sensor_key)
+        if not bed:
+            return ""
+        from garden.derived import family_labels  # lazy import avoids any import cycle
+        return ", ".join(family_labels(bed.get("plants", [])))
+
 
 # Module-level singleton — import and use anywhere:
 #   from garden.config import cfg

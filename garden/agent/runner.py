@@ -89,12 +89,17 @@ def _inhibited_by_watering(result: RuleResult) -> bool:
 def _dispatch(result: RuleResult) -> None:
     """Fire the alert and update alert_state."""
     now = _now_iso()
-    log.info("Alert firing: %s — %s", result.rule_id, result.title)
+    # Bed-specific alerts get the bed's crops appended to the title (e.g. "· zucchini, eggplant")
+    # so the gardener doesn't have to remember what's planted where. Non-bed alerts (temp,
+    # gateway watchdog) get "" back and the title is left alone.
+    crops = cfg.bed_crops_label(result.sensor_key)
+    title = f"{result.title} · {crops}" if crops else result.title
+    log.info("Alert firing: %s — %s", result.rule_id, title)
     if result.rule_id.startswith("watchdog:"):
         body = result.body
     else:
-        body = llm.write_alert(result.rule_id, result.sensor_key, result.title, result.body)
-    tg(result.title, body)
+        body = llm.write_alert(result.rule_id, result.sensor_key, title, result.body)
+    tg(title, body)
     storage.set_alert_state(result.rule_id, result.sensor_key, active=True, last_fired_ts=now)
 
 

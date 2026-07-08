@@ -11,6 +11,7 @@ Public API:
   vpd_status(vpd, thresholds)      → (status_code, human_label)
   frost_risk(dewpoint_f, threshold) → (bool, message)
   bed_stress(plants, moist, temp)  → {status, reason, crops}
+  family_labels(plants)            → list of unique lowercase crop-family names
 
 CROP_RANGES — default ideal soil-moisture/temp ranges per vegetable type.
 """
@@ -179,6 +180,30 @@ CROP_RANGES: dict[str, dict[str, Any]] = {
     "hot_pepper":   {"moist": (45, 70), "temp": (65, 95),  "label": "Hot Pepper"},
     "zucchini":     {"moist": (55, 80), "temp": (60, 90),  "label": "Zucchini"},
 }
+
+
+def family_labels(plants: list[str]) -> list[str]:
+    """
+    Collapse a bed's plant list to unique lowercase crop-family labels, order preserved.
+
+    e.g. ['tomato_cherry', 'tomato_roma'] -> ['tomato']
+         ['zucchini', 'eggplant']         -> ['zucchini', 'eggplant']
+
+    Used to keep Telegram alert titles short — varieties (cherry/roma/heirloom...)
+    collapse to their shared family (tomato) instead of listing each one.
+    """
+    keys_by_len = sorted(CROP_RANGES, key=len)  # shortest key wins → family, not variant
+    out: list[str] = []
+    seen: set[str] = set()
+    for p in plants:
+        base = next((k for k in keys_by_len if p == k or p.startswith(k + "_")), None)
+        if base is None:
+            continue
+        label = CROP_RANGES[base]["label"].lower()
+        if label not in seen:
+            seen.add(label)
+            out.append(label)
+    return out
 
 
 def bed_stress(
