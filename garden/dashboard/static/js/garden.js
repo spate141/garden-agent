@@ -2072,6 +2072,11 @@ async function refresh() {
     updateStats(rows);    /* seriesCache is now populated — sparklines render */
     updateGarden(rows);
     if (LAST_INSIGHTS) {
+      /* loadInsights() may have rendered the climate strip before this fetch
+         set LATEST_UPDATED_TS (both run in parallel), leaving a one-cycle-stale
+         staleness read -- e.g. "data offline" flashing on first load until the
+         next refresh. Re-render now that the timestamp is actually current. */
+      renderClimateStrip(LAST_INSIGHTS);
       renderBedChips(LAST_INSIGHTS.beds);
       if (OPEN_BED) renderBedDetail();
     }
