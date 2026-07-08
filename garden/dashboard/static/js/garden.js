@@ -1540,6 +1540,66 @@ function renderBedMoistureCards() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+   PER-BED GDD ACCUMULATION ROW
+   Season-to-date cumulative Growing Degree Days per bed, from the new
+   bed_daily_agronomy history (garden/storage.py bed_agronomy_series()) --
+   a once-daily accumulator, not a live sensor series, so it's fetched from
+   its own endpoint and kept out of the 1h/3h/12h/24h/7d range control.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/** Cache of latest bed_daily_agronomy rows, keyed by bed id. */
+const agronomySeriesCache = {};
+
+/** Format a YYYY-MM-DD date string as "Jul 08" for chart axis ticks. */
+function fmtDate(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  return d.toLocaleDateString([], { month: 'short', day: '2-digit' });
+}
+
+/** Build the 4 per-bed GDD chart-cards (one row), mirroring renderBedMoistureCards(). */
+function renderBedGddCards() {
+  const grid = document.getElementById('bed-gdd-grid');
+  if (!grid || !BEDS.length) return;
+  grid.innerHTML = BEDS.map(function (bed) {
+    return (
+      '<div class="chart-card">' +
+        '<div class="chart-title">' + bedEmoji(bed.plants) + ' ' + bed.name + ' · GDD to date</div>' +
+        '<div class="chart-wrap"><canvas id="chart-gdd-' + bed.id + '"></canvas></div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+/** Fetches + draws one bed's cumulative-GDD chart from bed_daily_agronomy history. */
+async function loadAgronomyChart(bed) {
+  const resp = await fetch('/api/agronomy_series?bed=' + encodeURIComponent(bed.id) + '&days=120');
+  if (!resp.ok) return;
+  const rows = await resp.json();
+  agronomySeriesCache[bed.id] = rows;
+
+  const canvas = document.getElementById('chart-gdd-' + bed.id);
+  if (!canvas) return;
+
+  const labels = rows.map(function (r) { return fmtDate(r.local_date); });
+  const data   = rows.map(function (r) { return r.gdd_cumulative; });
+  const color  = cfg_moisture_color(bed);
+
+  const instKey = 'gdd-' + bed.id;
+  let chart = instances[instKey];
+  if (!chart) {
+    chart = new Chart(canvas, makeChartOpts(color));
+    instances[instKey] = chart;
+  }
+  chart.data.labels           = labels;
+  chart.data.datasets[0].data = data;
+  chart._bands                = [];
+  chart._lines                = [];
+  chart._wateringEvents       = [];
+  chart._projection           = null;
+  chart.update('none');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
    TRENDS — grouped climate charts (region D) — redesign.md §6
    Outdoor + gazebo series share one card/axis per family instead of a card
    each, roughly halving the chart count. Charted keys come straight from the
@@ -2187,6 +2247,7 @@ async function refresh() {
      so the chip always painted from the prior cycle's conditions. */
   var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
   chartLoads = chartLoads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
+  chartLoads = chartLoads.concat(BEDS.map(function (bed) { return loadAgronomyChart(bed); }));
   var insightsLoad = loadInsights();
   var results       = await Promise.all([fetch('/api/latest')].concat(chartLoads));
   var latestResp    = results[0];
@@ -2401,6 +2462,7 @@ function renderLoadingSkeletons() {
 /* ── Boot ── */
 renderBeds();
 renderBedMoistureCards();
+renderBedGddCards();
 renderLoadingSkeletons();
 _tickClock();
 setInterval(_tickClock, 15_000);

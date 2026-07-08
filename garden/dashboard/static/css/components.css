@@ -336,6 +336,18 @@
   .bed-moisture-row { grid-template-columns: 1fr; }
 }
 
+.bed-gdd-row {
+  grid-template-columns: repeat(4, 1fr);
+  padding-top: 0;
+}
+
+@media (max-width: 900px) {
+  .bed-gdd-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .bed-gdd-row { grid-template-columns: 1fr; }
+}
+
 /* ── EMPTY STATE ────────────────────────────────────────────────────── */
 
 .empty {

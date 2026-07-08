@@ -7,6 +7,7 @@ Routes:
   POST /api/ecowitt   — Ecowitt-protocol ingest from GW1200
   GET  /api/latest    — latest reading per sensor (JSON)
   GET  /api/series    — time-series for one sensor (JSON)
+  GET  /api/agronomy_series — daily GDD/water-balance history for one bed (JSON)
   POST /api/telegram  — inbound Telegram bot webhook (/bed1, /weather, ...)
 """
 
@@ -132,6 +133,22 @@ async def api_series(
     hours: int = Query(24, ge=1, le=168),
 ) -> JSONResponse:
     return JSONResponse(storage.series(sensor, hours))
+
+
+# ── GET /api/agronomy_series ──────────────────────────────────────────────────
+
+@app.get("/api/agronomy_series")
+async def api_agronomy_series(
+    bed: str = Query(..., description="bed id"),
+    days: int = Query(120, ge=1, le=365),
+) -> JSONResponse:
+    """
+    Daily GDD/water-balance history for one bed (one row/local day, from
+    bed_daily_agronomy). Powers the dashboard's per-bed GDD-accumulation
+    chart — a season-to-date series, unrelated to the 1h/3h/12h/24h/7d
+    Trends range control that drives /api/series.
+    """
+    return JSONResponse(storage.bed_agronomy_series(bed, days))
 
 
 # ── GET /api/insights ────────────────────────────────────────────────────────
