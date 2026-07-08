@@ -79,6 +79,23 @@ CREATE TABLE IF NOT EXISTS alert_state (
     active        INTEGER NOT NULL DEFAULT 0,   -- 1 = condition currently tripped
     last_fired_ts TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS bed_daily_agronomy (
+    bed_id                    TEXT NOT NULL,
+    local_date                TEXT NOT NULL,   -- YYYY-MM-DD in the configured timezone
+    tmax_f                    REAL,
+    tmin_f                    REAL,
+    gdd_daily                 REAL,
+    gdd_cumulative            REAL,
+    et0_in                    REAL,
+    etc_in                    REAL,
+    rain_in                   REAL,
+    irrigation_est_in         REAL,
+    water_balance_daily       REAL,
+    water_balance_cumulative  REAL,
+    reset_reason              TEXT NOT NULL DEFAULT '',  -- 'good_soak' when water_balance_cumulative reset that day
+    PRIMARY KEY (bed_id, local_date)
+);
 """
 
 
@@ -278,3 +295,67 @@ def set_alert_state(
             """,
             (rule_id, sensor_key, int(active), last_fired_ts),
         )
+
+
+# ── bed_daily_agronomy helpers (GDD + per-bed ET/water-balance accumulation) ──
+
+_AGRONOMY_COLUMNS = (
+    "tmax_f", "tmin_f", "gdd_daily", "gdd_cumulative",
+    "et0_in", "etc_in", "rain_in", "irrigation_est_in",
+    "water_balance_daily", "water_balance_cumulative", "reset_reason",
+)
+
+
+def get_bed_agronomy_latest(bed_id: str) -> dict[str, Any] | None:
+    """Most recent bed_daily_agronomy row for a bed, or None if it has none yet."""
+    with _conn() as con:
+        row = con.execute(
+            """
+            SELECT * FROM bed_daily_agronomy
+            WHERE bed_id = ?
+            ORDER BY local_date DESC LIMIT 1
+            """,
+            (bed_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def upsert_bed_agronomy(bed_id: str, local_date: str, **fields: Any) -> None:
+    """
+    Insert or overwrite the (bed_id, local_date) row. Only keys in
+    _AGRONOMY_COLUMNS are accepted, so callers must pass exactly the
+    expected fields (matches set_alert_state's ON CONFLICT upsert style).
+    """
+    unknown = set(fields) - set(_AGRONOMY_COLUMNS)
+    if unknown:
+        raise ValueError(f"Unknown bed_daily_agronomy column(s): {sorted(unknown)}")
+
+    columns = list(fields.keys())
+    values = [fields[c] for c in columns]
+    placeholders = ", ".join("?" for _ in columns)
+    update_clause = ", ".join(f"{c} = excluded.{c}" for c in columns)
+
+    with _conn() as con:
+        con.execute(
+            f"""
+            INSERT INTO bed_daily_agronomy(bed_id, local_date, {", ".join(columns)})
+            VALUES (?, ?, {placeholders})
+            ON CONFLICT(bed_id, local_date) DO UPDATE SET {update_clause}
+            """,
+            (bed_id, local_date, *values),
+        )
+
+
+def bed_agronomy_series(bed_id: str, days: int = 30) -> list[dict[str, Any]]:
+    """Trailing `days` calendar days of bed_daily_agronomy rows, oldest → newest."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    with _conn() as con:
+        rows = con.execute(
+            """
+            SELECT * FROM bed_daily_agronomy
+            WHERE bed_id = ? AND local_date >= ?
+            ORDER BY local_date ASC
+            """,
+            (bed_id, cutoff),
+        ).fetchall()
+    return [dict(r) for r in rows]

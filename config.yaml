@@ -91,23 +91,31 @@ sensors:
 #          | tomato_cherry | tomato_roma | tomato_beefsteak | tomato_heirloom | tomato_grape | tomato_san_marzano)
 dashboard:
   beds:
+    # planted_on: date the bed's crops went in — start of GDD accumulation
+    # (garden/agent/runner.py run_daily_agronomy_accumulation). One date per
+    # bed, matching how plants: is already treated as one shared-fate group.
+    # EDIT THESE to your actual planting dates.
     - id: bed1
       name: "Bed 1"
       sensors: {soil_moisture: soilmoisture1, soil_battery: soilbatt1}
       plants: [tomato_cherry, tomato_roma, tomato_beefsteak, tomato_heirloom, tomato_grape, tomato_san_marzano]
+      planted_on: "2026-04-15"
     - id: bed2
       name: "Bed 2"
       sensors: {soil_moisture: soilmoisture2, soil_battery: soilbatt2}
       plants: [eggplant, okra, okra, eggplant, okra, okra, okra, okra, okra, okra, okra, okra]
+      planted_on: "2026-04-15"
     - id: bed3
       name: "Bed 3"
       sensors: {soil_moisture: soilmoisture3, soil_battery: soilbatt3}
       plants: [sweet_pepper_red, sweet_pepper_yellow, sweet_pepper_green, sweet_pepper_orange]
+      planted_on: "2026-04-15"
     - id: bed4
       name: "Bed 4"
       sensors: {soil_moisture: soilmoisture4, soil_battery: soilbatt4}
       plants: [zucchini, eggplant]
       layout: vertical   # stack plants in a single column instead of side-by-side
+      planted_on: "2026-04-15"
   weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
   stat_groups:
     - name: "Bed 1"
@@ -243,3 +251,28 @@ crops:
   sweet_pepper_orange: {moist: [50, 75], temp: [65, 90]}
   hot_pepper:   {moist: [45, 70], temp: [65, 95]}
   zucchini:     {moist: [55, 80], temp: [60, 90]}
+
+# ── Agronomy: GDD + per-bed ET/water-balance accumulation ─────────────────────
+# Runs once/day at accumulation_hour_local (garden/agent/runner.py
+# run_daily_agronomy_accumulation) — deliberately a different hour from
+# daily_brief.hour_local so the two once-daily jobs don't compete for
+# attention in the same cron tick. All irrigation/root-zone figures are
+# MODELED ESTIMATES derived from soil-moisture-rise, not direct flow
+# measurements — see garden/derived.py estimated_irrigation_in() docstring.
+agronomy:
+  enabled: true
+  accumulation_hour_local: 23   # late in the day so temp range + forecast are ~final
+  gdd_temp_key: temp_f          # station outdoor sensor — NOT temp1_f (gazebo runs warm/sheltered)
+  # Per-bed root-zone depth (in) and soil available-water-capacity (in of
+  # water per in of soil depth) used by estimated_irrigation_in(). Defaults
+  # below are typical raised-bed potting-mix values; deeper-rooted crops
+  # (tomato/eggplant) can reasonably go 10-12in, shallow ones (peas) ~6in.
+  beds:
+    bed1: {root_zone_depth_in: 10.0, awc_in_per_in: 0.17}
+    bed2: {root_zone_depth_in: 9.0,  awc_in_per_in: 0.17}
+    bed3: {root_zone_depth_in: 8.0,  awc_in_per_in: 0.17}
+    bed4: {root_zone_depth_in: 9.0,  awc_in_per_in: 0.17}
+  # Optional overrides layered onto derived.py's GDD_BASE_F / KC_MID, same
+  # override pattern as the crops: block above / _merge_crop_ranges().
+  gdd_base_overrides: {}
+  kc_overrides: {}

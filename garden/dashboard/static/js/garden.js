@@ -2028,6 +2028,9 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
 
   const verdict = stale ? 'Check the sensor, no recent data' : _bedVerdict(stress ? stress.status : 'unknown', waterBalanceIn);
 
+  const gdd = LAST_INSIGHTS && LAST_INSIGHTS.gdd ? LAST_INSIGHTS.gdd[bed.id] : null;
+  const gddHTML = _buildGddLineHTML(gdd);
+
   return (
     '<div class="bed-detail-inner">' +
       '<div class="bed-detail-line">' + plainLine + '</div>' +
@@ -2037,9 +2040,33 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
         rangeHTML +
         rateHTML +
       '</div>' +
+      gddHTML +
       '<div class="bed-detail-chart"><canvas id="bed-detail-chart-' + bed.id + '"></canvas></div>' +
       '<div class="bed-detail-foot">' + battHTML + '</div>' +
       '<div class="bed-detail-verdict">' + verdict + '</div>' +
+    '</div>'
+  );
+}
+
+/** GDD / growth-stage / harvest-projection line for the bed-detail panel, or
+ *  '' when no accumulation row exists yet (new bed, cron hasn't run tonight). */
+function _buildGddLineHTML(gdd) {
+  if (!gdd || !gdd.stage) return '';
+
+  const STAGE_LABELS = {
+    germination: 'germination', vegetative: 'vegetative', flowering: 'flowering',
+    fruiting: 'fruiting', maturity: 'mature', unrecognized: null,
+  };
+  const stageLabel = STAGE_LABELS[gdd.stage.stage];
+  if (!stageLabel) return '';
+
+  const harvestBit = (gdd.harvest_projection && gdd.harvest_projection.label)
+    ? ' · harvest ' + gdd.harvest_projection.label
+    : '';
+
+  return (
+    '<div class="bed-detail-gdd" title="Cumulative Growing Degree Days since planting">' +
+      Math.round(gdd.cumulative) + ' GDD · ' + stageLabel + harvestBit +
     '</div>'
   );
 }
@@ -2095,10 +2122,14 @@ function renderBedDetail() {
 
   const byId = {};
   (LAST_INSIGHTS && LAST_INSIGHTS.beds || []).forEach(function (b) { byId[b.id] = b; });
-  const wb = LAST_INSIGHTS && LAST_INSIGHTS.forecast ? LAST_INSIGHTS.forecast.water_balance_in : null;
+  const bedInsight = byId[bed.id];
+  /* Prefer the bed's own accumulated water balance; fall back to the global
+     forecast-level figure for a brand-new bed before its first cron tick. */
+  const globalWb = LAST_INSIGHTS && LAST_INSIGHTS.forecast ? LAST_INSIGHTS.forecast.water_balance_in : null;
+  const wb = (bedInsight && bedInsight.water_balance) ? bedInsight.water_balance.cumulative_in : globalWb;
 
   panel.hidden = false;
-  panel.innerHTML = _buildBedDetailHTML(bed, byId[bed.id], wb);
+  panel.innerHTML = _buildBedDetailHTML(bed, bedInsight, wb);
   _drawBedChart(bed);
 }
 

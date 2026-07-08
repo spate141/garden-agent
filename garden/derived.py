@@ -16,8 +16,17 @@ Public API:
   analyze_watering(samples)        → {detected, baseline, peak, settled, quality, ...}
   drydown_rate(samples)            → {per_day, per_hour, n_points, reason}
   days_until_dry(moist, rate, dry_threshold) → {days, label}
+  gdd_daily(tmax_f, tmin_f, base_f)          → float (°F-days, never negative)
+  gdd_base_for_bed(plants)                   → (base_f, reference_crop) | None
+  gdd_growth_stage(cumulative_gdd, crop_key) → {stage, pct_to_maturity, ...}
+  project_harvest_date(cum_gdd, maturity, avg_rate, today) → {days, date, label}
+  etc_from_kc(et0_in, kc)                    → float (inches) — ETc = ET0 x Kc
+  estimated_irrigation_in(absorbed_pct, root_zone_in, awc) → float (inches, modeled estimate)
+  bed_water_balance(rain, irrigation, etc)   → float (inches, positive = surplus)
 
 CROP_RANGES — default ideal soil-moisture/temp ranges per vegetable type.
+GDD_BASE_F / GDD_STAGES / KC_MID — GDD base temps, growth-stage breakpoints,
+  and crop coefficients per vegetable type (see the GDD section below).
 
 Watering-lifecycle functions (analyze_watering/drydown_rate/days_until_dry) take
 samples as list[tuple[float, float]] of (epoch_seconds, moisture_pct), oldest→newest.
@@ -30,6 +39,7 @@ from __future__ import annotations
 
 import math
 import statistics
+from datetime import date, timedelta
 from typing import Any
 
 
@@ -191,6 +201,83 @@ CROP_RANGES: dict[str, dict[str, Any]] = {
     "hot_pepper":   {"moist": (45, 70), "temp": (65, 95),  "label": "Hot Pepper"},
     "zucchini":     {"moist": (55, 80), "temp": (60, 90),  "label": "Zucchini"},
 }
+
+
+# ── GDD (Growing Degree Day) reference data ───────────────────────────────────
+
+# Base temperature (Tbase, °F) below which a crop accrues no growth for the
+# day. Standard agronomic consensus values (NOAA/university-extension GDD
+# guides), one entry per CROP_RANGES key — variants share their family's
+# Tbase since base temperature doesn't vary by fruit color/variety:
+#   - Warm-season fruiting crops (tomato / eggplant / sweet & hot pepper): 50°F
+#   - Okra / zucchini (higher heat requirement): 55°F
+#   - Peas (cool-season legume): 40°F
+GDD_BASE_F: dict[str, float] = {
+    "tomato":             50.0,
+    "tomato_cherry":      50.0,
+    "tomato_roma":        50.0,
+    "tomato_beefsteak":   50.0,
+    "tomato_heirloom":    50.0,
+    "tomato_grape":       50.0,
+    "tomato_san_marzano": 50.0,
+    "eggplant":     50.0,
+    "okra":         55.0,
+    "peas":         40.0,
+    "sweet_pepper":        50.0,
+    "sweet_pepper_red":    50.0,
+    "sweet_pepper_green":  50.0,
+    "sweet_pepper_yellow": 50.0,
+    "sweet_pepper_orange": 50.0,
+    "hot_pepper":   50.0,
+    "zucchini":     55.0,
+}
+
+# Cumulative-GDD breakpoints (°F-days, base per GDD_BASE_F) marking the START
+# of each growth stage; "maturity" is the first-harvest target. One entry per
+# crop FAMILY (not variant, unlike CROP_RANGES/GDD_BASE_F) — stage-timing
+# research doesn't distinguish tomato colors. Sourced from typical extension-
+# service GDD-to-maturity tables; treat as rough midpoints for common
+# varieties, not variety-specific data — same "good enough, documented"
+# spirit as heat_index_f's regression validity bounds.
+GDD_STAGES: dict[str, dict[str, float]] = {
+    "tomato":       {"germination": 0, "vegetative": 90,  "flowering": 400, "fruiting": 700, "maturity": 1200},
+    "eggplant":     {"germination": 0, "vegetative": 100, "flowering": 450, "fruiting": 750, "maturity": 1300},
+    "okra":         {"germination": 0, "vegetative": 80,  "flowering": 350, "fruiting": 550, "maturity": 900},
+    "peas":         {"germination": 0, "vegetative": 60,  "flowering": 250, "fruiting": 400, "maturity": 600},
+    "sweet_pepper": {"germination": 0, "vegetative": 110, "flowering": 500, "fruiting": 800, "maturity": 1400},
+    "hot_pepper":   {"germination": 0, "vegetative": 110, "flowering": 500, "fruiting": 800, "maturity": 1500},
+    "zucchini":     {"germination": 0, "vegetative": 60,  "flowering": 200, "fruiting": 350, "maturity": 550},
+}
+_GDD_STAGE_ORDER = ("germination", "vegetative", "flowering", "fruiting", "maturity")
+
+# Flat FAO-56 mid-season crop coefficient (Kc) per crop family — a single
+# average value rather than staged Kc-ini/Kc-mid/Kc-late. Proportionate for a
+# home dashboard: slightly over-estimates ETc during germination and under-
+# estimates during late senescence, but avoids a full dual-crop-coefficient
+# model. (Staging Kc by gdd_growth_stage()'s result is a cheap v2 if needed.)
+KC_MID: dict[str, float] = {
+    "tomato":       1.15,
+    "eggplant":     1.05,
+    "okra":         1.05,
+    "peas":         1.15,
+    "sweet_pepper": 1.05,
+    "hot_pepper":   1.05,
+    "zucchini":     1.00,
+}
+
+
+def _gdd_family(crop_key: str) -> str | None:
+    """
+    Resolve a crop variant (e.g. 'tomato_cherry', 'sweet_pepper_red') to its
+    GDD_STAGES/KC_MID reference family key (e.g. 'tomato', 'sweet_pepper').
+    Returns None for unrecognised keys.
+    """
+    if crop_key in GDD_STAGES:
+        return crop_key
+    for fam in sorted(GDD_STAGES, key=len, reverse=True):
+        if crop_key.startswith(fam + "_"):
+            return fam
+    return None
 
 
 def family_labels(plants: list[str]) -> list[str]:
@@ -583,3 +670,205 @@ def days_until_dry(
         label = f"~{n} day" if n == 1 else f"~{n} days"
 
     return {"days": days, "label": label}
+
+
+# ── Growing Degree Days + per-bed ET/water balance ───────────────────────────
+
+def gdd_daily(tmax_f: float, tmin_f: float, base_temp_f: float) -> float:
+    """
+    Single-day Growing Degree Days: (Tmax+Tmin)/2 - Tbase.
+
+    Tmax/Tmin are floor-clamped to base_temp_f BEFORE averaging — the
+    standard agronomic convention (NOAA/extension-service GDD guides): a day
+    whose entire range sits below base contributes exactly 0, and a day
+    where only the low dips below base isn't artificially deflated by
+    averaging in a below-base low. Never negative.
+    """
+    tmax = max(tmax_f, base_temp_f)
+    tmin = max(tmin_f, base_temp_f)
+    return max(0.0, (tmax + tmin) / 2.0 - base_temp_f)
+
+
+def gdd_base_for_bed(
+    plants: list[str],
+    custom_bases: dict[str, float] | None = None,
+) -> tuple[float, str] | None:
+    """
+    (Tbase °F, reference crop key) for a bed's recognised crops.
+
+    Tbase is the HIGHEST base temperature among the bed's crops — the most
+    conservative choice (mirrors bed_moisture_band's intersection logic): no
+    GDD accrues on a day too cold for the pickiest crop in the bed. The crop
+    that produced that Tbase also doubles as the bed's reference crop for
+    gdd_growth_stage()/KC_MID lookups, since a mixed bed has no single true
+    growth curve — using the pickiest crop keeps both numbers consistent
+    with each other without a separate "primary crop" config field.
+
+    Returns None when no recognised crop is in `plants`.
+    """
+    bases = dict(GDD_BASE_F)
+    if custom_bases:
+        bases.update(custom_bases)
+
+    candidates = [(bases[p], p) for p in plants if p in bases]
+    if not candidates:
+        return None
+    base_f, crop_key = max(candidates, key=lambda c: c[0])
+    return base_f, crop_key
+
+
+def gdd_growth_stage(cumulative_gdd: float, crop_key: str) -> dict[str, Any]:
+    """
+    Classify a bed's cumulative GDD into a growth stage for `crop_key`
+    (resolved to its GDD_STAGES family via _gdd_family — pass either a
+    variant like 'tomato_cherry' or a family key like 'tomato').
+
+    Returns:
+      {
+        "stage":             "germination"|"vegetative"|"flowering"|"fruiting"|"maturity"|"unrecognized",
+        "pct_to_maturity":   0-100+ (can exceed 100 once past maturity), or None if unrecognized,
+        "gdd_into_stage":    GDD accrued since this stage's breakpoint, or None if unrecognized,
+        "gdd_to_next_stage": GDD remaining to the next breakpoint, or None at/after maturity/unrecognized,
+      }
+    """
+    fam = _gdd_family(crop_key)
+    if fam is None:
+        return {
+            "stage": "unrecognized",
+            "pct_to_maturity": None,
+            "gdd_into_stage": None,
+            "gdd_to_next_stage": None,
+        }
+
+    breakpoints = GDD_STAGES[fam]
+    maturity = breakpoints["maturity"]
+    pct = round((cumulative_gdd / maturity) * 100.0, 1) if maturity else None
+
+    stage = _GDD_STAGE_ORDER[0]
+    next_gdd: float | None = None
+    for i, name in enumerate(_GDD_STAGE_ORDER):
+        if cumulative_gdd >= breakpoints[name]:
+            stage = name
+            next_gdd = (
+                breakpoints[_GDD_STAGE_ORDER[i + 1]]
+                if i + 1 < len(_GDD_STAGE_ORDER) else None
+            )
+        else:
+            break
+
+    gdd_into_stage = cumulative_gdd - breakpoints[stage]
+    gdd_to_next_stage = (next_gdd - cumulative_gdd) if next_gdd is not None else None
+
+    return {
+        "stage": stage,
+        "pct_to_maturity": pct,
+        "gdd_into_stage": round(gdd_into_stage, 1),
+        "gdd_to_next_stage": round(gdd_to_next_stage, 1) if gdd_to_next_stage is not None else None,
+    }
+
+
+def project_harvest_date(
+    cumulative_gdd: float,
+    maturity_gdd: float,
+    avg_gdd_per_day: float | None,
+    today: date,
+) -> dict[str, Any]:
+    """
+    Project the harvest (maturity) date from the current GDD pace.
+
+    Mirrors days_until_dry()'s shape/philosophy: {days, date, label}. days is
+    None (label "not enough data") when avg_gdd_per_day is None/zero/negative.
+    Already-mature beds return {"days": 0.0, ..., "label": "ready"}. Far
+    projections (>=60 days out) clamp to a "60+ days" label rather than a
+    false-precise date, same spirit as days_until_dry's "2+ weeks" clamp.
+    """
+    remaining = maturity_gdd - cumulative_gdd
+    if remaining <= 0:
+        return {"days": 0.0, "date": today.isoformat(), "label": "ready"}
+
+    if avg_gdd_per_day is None or avg_gdd_per_day <= 0:
+        return {"days": None, "date": None, "label": "not enough data"}
+
+    days = remaining / avg_gdd_per_day
+
+    if days >= 60:
+        return {"days": days, "date": None, "label": "60+ days"}
+
+    harvest_date = today + timedelta(days=round(days))
+    n = round(days)
+    label = f"~{n} day" if n == 1 else f"~{n} days"
+    return {"days": days, "date": harvest_date.isoformat(), "label": label}
+
+
+def maturity_gdd_for_crop(crop_key: str) -> float | None:
+    """
+    Cumulative GDD (°F-days) at maturity/first-harvest for `crop_key`
+    (resolved via _gdd_family — accepts a variant like 'tomato_cherry' or a
+    family key like 'tomato'). Returns None for unrecognised crops.
+    """
+    fam = _gdd_family(crop_key)
+    if fam is None:
+        return None
+    return GDD_STAGES[fam]["maturity"]
+
+
+def kc_for_crop(crop_key: str, custom_kc: dict[str, float] | None = None) -> float | None:
+    """
+    FAO-56 mid-season crop coefficient for `crop_key` (resolved via
+    _gdd_family — accepts a variant like 'tomato_cherry' or a family key
+    like 'tomato'). Returns None for unrecognised crops.
+    """
+    kc_table = dict(KC_MID)
+    if custom_kc:
+        kc_table.update(custom_kc)
+    fam = _gdd_family(crop_key)
+    if fam is None:
+        return None
+    return kc_table.get(fam)
+
+
+def etc_from_kc(et0_in: float, kc: float) -> float:
+    """
+    Crop evapotranspiration (FAO-56): ETc = ET0 x Kc.
+
+    et0_in: reference evapotranspiration in inches (e.g. Open-Meteo's
+            et0_fao_evapotranspiration — already the Penman-Monteith standard).
+    kc: crop coefficient, e.g. from KC_MID.
+    """
+    return et0_in * kc
+
+
+def estimated_irrigation_in(
+    absorbed_moisture_pct: float,
+    root_zone_depth_in: float,
+    awc_in_per_in: float,
+) -> float:
+    """
+    MODELED ESTIMATE of irrigation applied, not a direct measurement — there
+    is no flow meter or rain gauge on the beds. Converts a soil-moisture-%
+    rise (analyze_watering()'s `absorbed` field, from the WH51 sensor) into
+    an inches-of-water equivalent, assuming the rise is uniform across the
+    effective root zone:
+
+      inches = (absorbed_pct / 100) * root_zone_depth_in * awc_in_per_in
+
+    awc_in_per_in: available water capacity of the soil, inches of water per
+                   inch of soil depth. Typical raised-bed potting-mix blends
+                   run ~0.15-0.20 in/in.
+    root_zone_depth_in: effective root zone depth in inches (shallower for
+                   peas ~6in, deeper for tomato/eggplant ~10-12in).
+
+    Clamped to >= 0 — a moisture drop is not negative irrigation.
+    """
+    absorbed = max(0.0, absorbed_moisture_pct)
+    return (absorbed / 100.0) * root_zone_depth_in * awc_in_per_in
+
+
+def bed_water_balance(rain_in: float, irrigation_in: float, etc_in: float) -> float:
+    """
+    Net daily per-bed water balance in inches: rain + irrigation - ETc.
+
+    Same sign convention as et0_water_balance(): positive = surplus (bed
+    received more water than it used), negative = deficit (needs watering).
+    """
+    return rain_in + irrigation_in - etc_in

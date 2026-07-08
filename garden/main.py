@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import json
 import logging
+import statistics
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
@@ -53,6 +56,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="garden-agent", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
+
+
+def _local_today():
+    """Today's date in the configured timezone (for GDD harvest projections)."""
+    tz_name = cfg.location.get("timezone", "UTC")
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+    return datetime.now(tz).date()
 
 
 # ── /health ───────────────────────────────────────────────────────────────────
@@ -199,7 +212,9 @@ async def api_insights() -> JSONResponse:
     air_temp_f   = air_temp_row["value"] if air_temp_row else None
 
     bed_results: list[dict[str, Any]] = []
+    gdd_results: dict[str, Any] = {}
     for bed in cfg.dashboard.get("beds", []):
+        bed_id = bed.get("id")
         moist_key = bed.get("sensors", {}).get("soil_moisture")
         moist_row = latest_map.get(moist_key) if moist_key else None
         soil_moist = moist_row["value"] if moist_row else None
@@ -219,13 +234,49 @@ async def api_insights() -> JSONResponse:
                 "crops": [],
             }
 
+        agro = storage.get_bed_agronomy_latest(bed_id) if bed_id else None
+
+        water_balance = None
+        if agro is not None:
+            wb_cum = agro["water_balance_cumulative"]
+            water_balance = {
+                "etc_in":            agro.get("etc_in"),
+                "irrigation_est_in": agro.get("irrigation_est_in"),
+                "rain_in":           agro.get("rain_in"),
+                "cumulative_in":     wb_cum,
+                "status": "Surplus" if wb_cum > 0.05 else "Deficit" if wb_cum < -0.05 else "Even",
+            }
+
         bed_results.append({
-            "id":   bed.get("id"),
+            "id":   bed_id,
             "name": bed.get("name"),
             **stress,
+            "water_balance": water_balance,
         })
 
+        if agro is not None:
+            base = drv.gdd_base_for_bed(bed.get("plants", []), cfg.agronomy.get("gdd_base_overrides"))
+            ref_crop = base[1] if base else None
+            stage = drv.gdd_growth_stage(agro["gdd_cumulative"], ref_crop) if ref_crop else None
+
+            harvest = None
+            if ref_crop:
+                maturity = drv.maturity_gdd_for_crop(ref_crop)
+                if maturity:
+                    trailing = storage.bed_agronomy_series(bed_id, days=7)
+                    rates = [r["gdd_daily"] for r in trailing if r.get("gdd_daily") is not None]
+                    avg_rate = statistics.mean(rates) if rates else None
+                    harvest = drv.project_harvest_date(agro["gdd_cumulative"], maturity, avg_rate, _local_today())
+
+            gdd_results[bed_id] = {
+                "cumulative":         round(agro["gdd_cumulative"], 1),
+                "stage":              stage,
+                "harvest_projection": harvest,
+                "planted_on":         cfg.bed_planted_on(bed_id),
+            }
+
     insights["beds"] = bed_results
+    insights["gdd"] = gdd_results
 
     # ── 24h min/max stats — scoped to only the sensors the UI actually renders ──
     stat_keys: set[str] = {"vpd_kpa"}

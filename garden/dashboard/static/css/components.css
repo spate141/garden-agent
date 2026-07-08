@@ -437,6 +437,12 @@ footer {
 .bed-detail-rate.is-down { color: var(--accent); }
 .bed-detail-rate.is-flat { color: var(--text-faint); }
 
+.bed-detail-gdd {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
 .bed-detail-chart {
   position: relative;
   height: 84px;

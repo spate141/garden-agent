@@ -30,3 +30,14 @@ def test_daily_brief_defaults():
 def test_timezone_set():
     # Confirm the env-var timezone is forwarded into cfg.location
     assert cfg.location["timezone"] == "America/Chicago"
+
+
+def test_agronomy_defaults():
+    assert cfg.agronomy.get("enabled", True) is True
+    assert cfg.agronomy.get("gdd_temp_key", "temp_f") == "temp_f"
+    assert cfg.agronomy.get("accumulation_hour_local", 23) != cfg.daily_brief.get("hour_local", 7)
+
+
+def test_bed_planted_on():
+    assert cfg.bed_planted_on("bed1") == "2026-04-15"
+    assert cfg.bed_planted_on("no_such_bed") is None

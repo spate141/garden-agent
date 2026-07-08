@@ -72,6 +72,7 @@ class _Config:
         self.daily_brief: dict[str, Any] = raw.get("daily_brief", {})
         self.derived: dict[str, Any] = raw.get("derived", {})
         self.crops: dict[str, Any] = raw.get("crops", {})
+        self.agronomy: dict[str, Any] = raw.get("agronomy", {})
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -107,6 +108,13 @@ class _Config:
             return ""
         from garden.derived import family_labels  # lazy import avoids any import cycle
         return ", ".join(family_labels(bed.get("plants", [])))
+
+    def bed_planted_on(self, bed_id: str) -> str | None:
+        """planted_on date string ("YYYY-MM-DD") for a bed, or None if unset."""
+        for bed in self.dashboard.get("beds", []):
+            if bed.get("id") == bed_id:
+                return bed.get("planted_on")
+        return None
 
 
 # Module-level singleton — import and use anywhere:

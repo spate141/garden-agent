@@ -116,3 +116,52 @@ class TestSeries:
         assert 0 < len(rows) < 480
         # Endpoints of the window are still represented.
         assert rows[0]["ts"] < rows[-1]["ts"]
+
+
+class TestBedDailyAgronomy:
+    def test_no_rows_returns_none(self, db):
+        assert db.get_bed_agronomy_latest("bed1") is None
+
+    def test_upsert_then_read_latest(self, db):
+        db.upsert_bed_agronomy(
+            "bed1", "2026-07-07",
+            tmax_f=90.0, tmin_f=65.0, gdd_daily=27.5, gdd_cumulative=27.5,
+            et0_in=0.2, etc_in=0.23, rain_in=0.0, irrigation_est_in=0.0,
+            water_balance_daily=-0.23, water_balance_cumulative=-0.23,
+            reset_reason="",
+        )
+        row = db.get_bed_agronomy_latest("bed1")
+        assert row["local_date"] == "2026-07-07"
+        assert row["gdd_cumulative"] == 27.5
+        assert row["water_balance_cumulative"] == -0.23
+
+    def test_latest_picks_most_recent_date(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-06", gdd_daily=20.0, gdd_cumulative=20.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=25.0, gdd_cumulative=45.0)
+        row = db.get_bed_agronomy_latest("bed1")
+        assert row["local_date"] == "2026-07-07"
+        assert row["gdd_cumulative"] == 45.0
+
+    def test_upsert_overwrites_same_day_not_duplicates(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=10.0, gdd_cumulative=10.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=12.0, gdd_cumulative=12.0)
+        series = db.bed_agronomy_series("bed1", days=30)
+        assert len(series) == 1
+        assert series[0]["gdd_cumulative"] == 12.0
+
+    def test_beds_are_independent(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_cumulative=10.0)
+        db.upsert_bed_agronomy("bed2", "2026-07-07", gdd_cumulative=99.0)
+        assert db.get_bed_agronomy_latest("bed1")["gdd_cumulative"] == 10.0
+        assert db.get_bed_agronomy_latest("bed2")["gdd_cumulative"] == 99.0
+
+    def test_unknown_column_rejected(self, db):
+        with pytest.raises(ValueError):
+            db.upsert_bed_agronomy("bed1", "2026-07-07", not_a_real_column=1.0)
+
+    def test_series_ordered_oldest_to_newest(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-05", gdd_daily=5.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=7.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-06", gdd_daily=6.0)
+        series = db.bed_agronomy_series("bed1", days=30)
+        assert [r["local_date"] for r in series] == ["2026-07-05", "2026-07-06", "2026-07-07"]

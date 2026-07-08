@@ -6,6 +6,7 @@ regressed.  No I/O, no config, no DB — garden.derived is pure.
 """
 
 import math
+from datetime import date
 
 import pytest
 
@@ -14,12 +15,21 @@ from garden.derived import (
     analyze_watering,
     bed_moisture_band,
     bed_stress,
+    bed_water_balance,
     days_until_dry,
     dew_point_f,
     drydown_rate,
+    estimated_irrigation_in,
     et0_water_balance,
+    etc_from_kc,
     frost_risk,
+    gdd_base_for_bed,
+    gdd_daily,
+    gdd_growth_stage,
     heat_index_f,
+    kc_for_crop,
+    maturity_gdd_for_crop,
+    project_harvest_date,
     vpd_kpa,
     vpd_status,
 )
@@ -455,3 +465,179 @@ class TestDaysUntilDry:
         two = days_until_dry(38.0, 4.0, 30.0)
         assert one["label"] == "~1 day"
         assert two["label"] == "~2 days"
+
+
+# ── gdd_daily ─────────────────────────────────────────────────────────────────
+
+class TestGddDaily:
+    def test_known_value(self):
+        # (90+60)/2 - 50 = 25.0
+        assert gdd_daily(90.0, 60.0, 50.0) == pytest.approx(25.0)
+
+    def test_entire_range_below_base(self):
+        # Both tmax/tmin below base -> clamped to base -> 0 GDD
+        assert gdd_daily(45.0, 30.0, 50.0) == pytest.approx(0.0)
+
+    def test_low_only_below_base_clamped(self):
+        # tmin clamped to base before averaging: (80+50)/2 - 50 = 15.0, not (80+30)/2-50=5.0
+        assert gdd_daily(80.0, 30.0, 50.0) == pytest.approx(15.0)
+
+    def test_never_negative(self):
+        assert gdd_daily(20.0, 10.0, 50.0) >= 0.0
+
+
+# ── gdd_base_for_bed ──────────────────────────────────────────────────────────
+
+class TestGddBaseForBed:
+    def test_picks_highest_base(self):
+        # eggplant (50) + okra (55) -> okra's higher base wins
+        result = gdd_base_for_bed(["eggplant", "okra", "okra"])
+        assert result == (55.0, "okra")
+
+    def test_variants_resolve_to_family_base(self):
+        result = gdd_base_for_bed(["tomato_cherry", "tomato_roma"])
+        assert result == (50.0, "tomato_cherry") or result == (50.0, "tomato_roma")
+        assert result[0] == 50.0
+
+    def test_no_recognised_crops(self):
+        assert gdd_base_for_bed(["unknown_plant"]) is None
+
+    def test_custom_base_override(self):
+        result = gdd_base_for_bed(["eggplant", "okra"], custom_bases={"eggplant": 60.0})
+        assert result == (60.0, "eggplant")
+
+
+# ── gdd_growth_stage ──────────────────────────────────────────────────────────
+
+class TestGddGrowthStage:
+    def test_germination(self):
+        result = gdd_growth_stage(50.0, "tomato")
+        assert result["stage"] == "germination"
+        assert result["gdd_into_stage"] == pytest.approx(50.0)
+        assert result["gdd_to_next_stage"] == pytest.approx(40.0)
+
+    def test_flowering(self):
+        result = gdd_growth_stage(500.0, "tomato")
+        assert result["stage"] == "flowering"
+        assert result["gdd_into_stage"] == pytest.approx(100.0)
+        assert result["gdd_to_next_stage"] == pytest.approx(200.0)
+        assert result["pct_to_maturity"] == pytest.approx(500.0 / 1200 * 100, abs=0.1)
+
+    def test_variant_resolves_to_family(self):
+        result = gdd_growth_stage(500.0, "tomato_cherry")
+        assert result["stage"] == "flowering"
+
+    def test_at_maturity(self):
+        result = gdd_growth_stage(1200.0, "tomato")
+        assert result["stage"] == "maturity"
+        assert result["gdd_to_next_stage"] is None
+        assert result["pct_to_maturity"] == pytest.approx(100.0)
+
+    def test_past_maturity(self):
+        result = gdd_growth_stage(1500.0, "tomato")
+        assert result["stage"] == "maturity"
+        assert result["pct_to_maturity"] > 100.0
+
+    def test_unrecognized_crop(self):
+        result = gdd_growth_stage(500.0, "unknown_plant")
+        assert result["stage"] == "unrecognized"
+        assert result["pct_to_maturity"] is None
+
+
+# ── project_harvest_date ──────────────────────────────────────────────────────
+
+class TestProjectHarvestDate:
+    def test_known_projection(self):
+        result = project_harvest_date(700.0, 1200.0, 10.0, date(2026, 7, 8))
+        assert result["days"] == pytest.approx(50.0)
+        assert result["label"] == "~50 days"
+        assert result["date"] == "2026-08-27"
+
+    def test_already_mature(self):
+        result = project_harvest_date(1300.0, 1200.0, 10.0, date(2026, 7, 8))
+        assert result["days"] == 0.0
+        assert result["label"] == "ready"
+        assert result["date"] == "2026-07-08"
+
+    def test_no_rate_data(self):
+        result = project_harvest_date(500.0, 1200.0, None, date(2026, 7, 8))
+        assert result["days"] is None
+        assert result["label"] == "not enough data"
+
+    def test_zero_rate(self):
+        result = project_harvest_date(500.0, 1200.0, 0.0, date(2026, 7, 8))
+        assert result["days"] is None
+
+    def test_far_horizon_clamp(self):
+        result = project_harvest_date(100.0, 1200.0, 5.0, date(2026, 7, 8))
+        assert result["days"] >= 60
+        assert result["label"] == "60+ days"
+        assert result["date"] is None
+
+
+# ── maturity_gdd_for_crop ─────────────────────────────────────────────────────
+
+class TestMaturityGddForCrop:
+    def test_family_key(self):
+        assert maturity_gdd_for_crop("tomato") == 1200
+
+    def test_variant_resolves_to_family(self):
+        assert maturity_gdd_for_crop("sweet_pepper_yellow") == 1400
+
+    def test_unrecognized_returns_none(self):
+        assert maturity_gdd_for_crop("unknown_plant") is None
+
+
+# ── kc_for_crop ───────────────────────────────────────────────────────────────
+
+class TestKcForCrop:
+    def test_family_key(self):
+        assert kc_for_crop("tomato") == pytest.approx(1.15)
+
+    def test_variant_resolves_to_family(self):
+        assert kc_for_crop("tomato_cherry") == pytest.approx(1.15)
+        assert kc_for_crop("sweet_pepper_red") == pytest.approx(1.05)
+
+    def test_unrecognized_returns_none(self):
+        assert kc_for_crop("unknown_plant") is None
+
+    def test_custom_override(self):
+        assert kc_for_crop("tomato", custom_kc={"tomato": 1.3}) == pytest.approx(1.3)
+
+
+# ── etc_from_kc ───────────────────────────────────────────────────────────────
+
+class TestEtcFromKc:
+    def test_known_value(self):
+        assert etc_from_kc(0.2, 1.15) == pytest.approx(0.23)
+
+    def test_zero_et0(self):
+        assert etc_from_kc(0.0, 1.15) == pytest.approx(0.0)
+
+
+# ── estimated_irrigation_in ───────────────────────────────────────────────────
+
+class TestEstimatedIrrigationIn:
+    def test_known_value(self):
+        # 20% absorbed, 9in root zone, 0.17 in/in AWC -> 0.306in
+        assert estimated_irrigation_in(20.0, 9.0, 0.17) == pytest.approx(0.306)
+
+    def test_zero_absorbed(self):
+        assert estimated_irrigation_in(0.0, 9.0, 0.17) == pytest.approx(0.0)
+
+    def test_negative_absorbed_clamped(self):
+        assert estimated_irrigation_in(-5.0, 9.0, 0.17) == pytest.approx(0.0)
+
+
+# ── bed_water_balance ─────────────────────────────────────────────────────────
+
+class TestBedWaterBalance:
+    def test_surplus(self):
+        # 0.1 rain + 0.3 irrigation - 0.25 etc = 0.15 surplus
+        assert bed_water_balance(0.1, 0.3, 0.25) == pytest.approx(0.15)
+
+    def test_deficit(self):
+        assert bed_water_balance(0.0, 0.0, 0.25) == pytest.approx(-0.25)
+
+    def test_even(self):
+        assert bed_water_balance(0.1, 0.0, 0.1) == pytest.approx(0.0)

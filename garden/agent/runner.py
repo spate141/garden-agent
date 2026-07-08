@@ -5,7 +5,8 @@ Two entry points:
   evaluate_instant(snap_id, ts, metrics) — called inline on every POST
   run_cron_tick()                        — called by the systemd timer every 15 min
 
-The cron tick also handles the daily morning brief (replaces the old heartbeat).
+The cron tick also handles the daily morning brief (replaces the old
+heartbeat) and the once-daily GDD/water-balance accumulation.
 """
 
 from __future__ import annotations
@@ -144,6 +145,11 @@ def run_cron_tick() -> None:
         _maybe_daily_brief()
     except Exception:
         log.exception("Daily brief failed")
+
+    try:
+        _maybe_daily_agronomy_accumulation()
+    except Exception:
+        log.exception("Daily agronomy accumulation failed")
 
     log.info("Cron tick complete")
 
@@ -336,6 +342,132 @@ def _maybe_daily_brief() -> None:
     send_daily_brief(force=False)
 
 
+# ── Daily agronomy accumulation (GDD + per-bed ET/water balance) ─────────────
+#
+# Once per local day, persist each bed's GDD and water-balance figures to
+# bed_daily_agronomy (see garden/storage.py). Same once-per-day idempotency
+# pattern as send_daily_brief/_already_sent_today above, keyed by its own
+# alert_state rule_id per bed so it can't collide with the brief's dedup.
+
+_AGRONOMY_RULE_PREFIX = "agronomy_accum"
+
+
+def _agronomy_already_run_today(bed_id: str, local_now: datetime) -> bool:
+    state = storage.get_alert_state(f"{_AGRONOMY_RULE_PREFIX}_{bed_id}")
+    last_fired = state.get("last_fired_ts", "")
+    if not last_fired:
+        return False
+    try:
+        last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
+        tz_name = cfg.location.get("timezone", "UTC")
+        try:
+            tz = ZoneInfo(tz_name)
+        except ZoneInfoNotFoundError:
+            tz = ZoneInfo("UTC")
+        return last_dt.astimezone(tz).date() == local_now.astimezone(tz).date()
+    except Exception:
+        return False
+
+
+def run_daily_agronomy_accumulation(force: bool = False) -> None:
+    """
+    Once per local day (config: agronomy.accumulation_hour_local, default 23
+    — late enough that the day's temp range and forecast snapshot are close
+    to final), compute and persist each bed's GDD + water-balance row.
+
+    Called by run_cron_tick(); mirrors send_daily_brief's force/hour/dedup shape.
+    """
+    if not cfg.agronomy.get("enabled", True):
+        return
+
+    local_now = _local_now()
+    if not force:
+        hour_local = cfg.agronomy.get("accumulation_hour_local", 23)
+        if local_now.hour != hour_local:
+            return
+
+    today_str = local_now.date().isoformat()
+    fc = get_forecast()
+    temp_key = cfg.agronomy.get("gdd_temp_key", "temp_f")
+    gdd_base_overrides = cfg.agronomy.get("gdd_base_overrides") or {}
+    kc_overrides = cfg.agronomy.get("kc_overrides") or {}
+    beds_cfg = cfg.agronomy.get("beds", {})
+
+    for bed in cfg.dashboard.get("beds", []):
+        bed_id = bed.get("id")
+        if not bed_id:
+            continue
+        if not force and _agronomy_already_run_today(bed_id, local_now):
+            continue
+
+        temp_stats = storage.stats(temp_key, hours=24)
+        if temp_stats is None:
+            log.debug("Agronomy accumulation: no %s data yet for %s, skipping", temp_key, bed_id)
+            continue
+
+        base = derived.gdd_base_for_bed(bed.get("plants", []), gdd_base_overrides)
+        if base is None:
+            continue  # no recognised crops in this bed
+        base_f, ref_crop = base
+
+        gdd_today = derived.gdd_daily(temp_stats["max"], temp_stats["min"], base_f)
+
+        # Irrigation estimate from a recent soil-moisture rise (module docstring:
+        # analyze_watering() wants a narrow window, <=2h, to avoid bucket smearing).
+        moist_key = bed.get("sensors", {}).get("soil_moisture")
+        watering: dict = {}
+        if moist_key:
+            rows = storage.series(moist_key, hours=2)
+            samples = [
+                (datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp(), r["value"])
+                for r in rows
+            ]
+            watering = derived.analyze_watering(samples)
+
+        bed_agro_cfg = beds_cfg.get(bed_id, {})
+        root_zone_in = bed_agro_cfg.get("root_zone_depth_in", 9.0)
+        awc = bed_agro_cfg.get("awc_in_per_in", 0.17)
+        irrigation_in = (
+            derived.estimated_irrigation_in(watering["absorbed"], root_zone_in, awc)
+            if watering.get("detected") else 0.0
+        )
+
+        kc = derived.kc_for_crop(ref_crop, kc_overrides) or 1.0
+        et0_in = fc.get("et0_in") if fc else None
+        rain_in = (fc.get("precip_in") if fc else None) or 0.0
+        etc_in = derived.etc_from_kc(et0_in, kc) if et0_in is not None else 0.0
+        wb_daily = derived.bed_water_balance(rain_in, irrigation_in, etc_in)
+
+        prev = storage.get_bed_agronomy_latest(bed_id)
+        is_good_soak = watering.get("quality") == "good_soak"
+
+        # GDD is a phenology clock tied to planted_on -- it always accumulates,
+        # never resets on a watering event. Water balance resets to just
+        # today's value on a good soak (re-anchors "deficit since last real
+        # recharge"), same spirit as drydown_rate's post-watering re-anchor.
+        gdd_cum = gdd_today + (prev["gdd_cumulative"] if prev else 0.0)
+        wb_cum = wb_daily if (prev is None or is_good_soak) else prev["water_balance_cumulative"] + wb_daily
+
+        storage.upsert_bed_agronomy(
+            bed_id, today_str,
+            tmax_f=temp_stats["max"], tmin_f=temp_stats["min"],
+            gdd_daily=gdd_today, gdd_cumulative=gdd_cum,
+            et0_in=et0_in, etc_in=etc_in,
+            rain_in=rain_in, irrigation_est_in=irrigation_in,
+            water_balance_daily=wb_daily, water_balance_cumulative=wb_cum,
+            reset_reason="good_soak" if is_good_soak else "",
+        )
+        storage.set_alert_state(f"{_AGRONOMY_RULE_PREFIX}_{bed_id}", "", active=False, last_fired_ts=_now_iso())
+        log.info(
+            "Agronomy accumulation %s: +%.1f GDD (%.1f total), water balance %+.2fin (%+.2fin total)",
+            bed_id, gdd_today, gdd_cum, wb_daily, wb_cum,
+        )
+
+
+def _maybe_daily_agronomy_accumulation() -> None:
+    run_daily_agronomy_accumulation(force=False)
+
+
 # ── CLI entry point (used by garden-cron.service) ────────────────────────────
 
 if __name__ == "__main__":
@@ -344,12 +476,16 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description="garden-agent cron runner")
-    parser.add_argument("--cron",  action="store_true", help="Run cron tick (rules + brief)")
+    parser.add_argument("--cron",  action="store_true", help="Run cron tick (rules + brief + agronomy)")
     parser.add_argument("--brief", action="store_true", help="Force-send morning brief now (ignores hour/dedup)")
+    parser.add_argument("--agronomy", action="store_true", help="Force-run GDD/water-balance accumulation now (ignores hour/dedup)")
     args = parser.parse_args()
 
     if args.brief:
         storage.init_db()
         send_daily_brief(force=True)
+    elif args.agronomy:
+        storage.init_db()
+        run_daily_agronomy_accumulation(force=True)
     elif args.cron:
         run_cron_tick()
