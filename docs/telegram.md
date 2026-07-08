@@ -77,3 +77,67 @@ A message should appear on your phone within a few seconds.
 Once you have the bot token and chat ID, add them to `secrets.env`.
 The `tg_test.sh` script will confirm delivery end-to-end.
 No further input needed — the Telegram code is already written.
+
+---
+
+## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief)
+
+The bot can also answer commands on demand — tap `/bed4` in Telegram and get a
+summary of Bed 4's moisture, battery, and crops back within a second. This needs
+one more secret and a public URL Telegram can reach; the app already exposes one
+via Cloudflare Tunnel (`docs/deploy.md`).
+
+### Setup
+
+1. Generate a webhook secret:
+   ```bash
+   openssl rand -hex 16
+   ```
+2. Add to `secrets.env`:
+   ```
+   TELEGRAM_WEBHOOK_SECRET=<the hex string>
+   GARDEN_PUBLIC_URL=https://garden.snehal.ai
+   ```
+3. Register the webhook + command menu with Telegram:
+   ```bash
+   uv run python -m garden.bot --setup
+   ```
+   This is idempotent — safe to re-run any time (e.g. after adding/renaming a bed
+   in `config.yaml`, to refresh the command menu). `deploy.sh` runs it automatically
+   on every deploy once both env vars above are set.
+
+### Using it
+
+Open the bot's chat in Telegram and tap the **menu button** (bottom-left, next to
+the message box) to see all commands, or type them directly:
+
+| Command | Reply |
+|---|---|
+| `/bed1` … `/bedN` | That bed's moisture %, crop-stress status, battery, last-updated |
+| `/beds` | One-line summary per bed |
+| `/weather` | Today's forecast + current conditions |
+| `/air` | VPD, dew point / frost risk, feels-like |
+| `/brief` | Sends the morning brief immediately (bypasses the 7am schedule) |
+| `/help` | Lists all available commands |
+
+### How it works
+
+Telegram POSTs each command to `/api/telegram` on the running app (`garden/main.py`).
+That route is disabled (404) unless `TELEGRAM_WEBHOOK_SECRET` is set, and only
+accepts requests carrying Telegram's own secret-token header — a second check in
+`garden/bot.py` also drops anything not from `TELEGRAM_CHAT_ID`, so no one else can
+use the bot even if they find the webhook URL. Reply logic lives in `garden/bot.py`
+and reuses the same storage/derived/weather helpers as the dashboard and alerts —
+no separate data path to keep in sync.
+
+### Troubleshooting
+
+- Command menu not showing / stale after editing beds in `config.yaml`: re-run
+  `uv run python -m garden.bot --setup`.
+- No reply at all: check `sudo journalctl -u garden-agent -n 50` on the VM for
+  `garden.bot` / `garden.telegram` log lines; confirm `curl -sf https://garden.snehal.ai/health`
+  works (the webhook route depends on the same running service).
+- `getWebhookInfo` shows the currently registered webhook + any delivery errors:
+  ```bash
+  curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo" | python3 -m json.tool
+  ```

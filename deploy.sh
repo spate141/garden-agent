@@ -77,7 +77,15 @@ HEALTH=$(curl -s http://localhost:8001/health || echo "(no response — service 
 echo "$HEALTH"
 echo ""
 
-# ── 6. Status summary ─────────────────────────────────────────────────────────
+# ── 6. Telegram bot webhook + command menu (guarded, idempotent) ────────────
+if grep -qE '^TELEGRAM_WEBHOOK_SECRET=\S' "$APP_DIR/secrets.env" && grep -qE '^GARDEN_PUBLIC_URL=\S' "$APP_DIR/secrets.env"; then
+    echo "==> Registering Telegram bot webhook + command menu..."
+    cd "$APP_DIR" && uv run python -m garden.bot --setup
+else
+    echo "==> Telegram bot commands not configured (TELEGRAM_WEBHOOK_SECRET / GARDEN_PUBLIC_URL unset) — skipping"
+fi
+
+# ── 7. Status summary ─────────────────────────────────────────────────────────
 echo "==> Service status:"
 sudo systemctl is-active --quiet garden-agent      && echo "    garden-agent      : active" || echo "    garden-agent      : FAILED"
 sudo systemctl is-active --quiet garden-cron.timer    && echo "    garden-cron.timer    : active" || echo "    garden-cron.timer    : FAILED"

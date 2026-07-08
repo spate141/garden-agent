@@ -44,6 +44,10 @@ class _Config:
         self.ingest_passkey: str = self._require("INGEST_PASSKEY")
         self.telegram_token: str = self._require("TELEGRAM_BOT_TOKEN")
         self.telegram_chat_id: str = self._require("TELEGRAM_CHAT_ID")
+        # Inbound bot commands (/bed1, /weather, …) — optional. Both must be set to
+        # enable the webhook route; see garden/bot.py and docs/telegram.md.
+        self.telegram_webhook_secret: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+        self.public_base_url: str = os.getenv("GARDEN_PUBLIC_URL", "").rstrip("/")
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
         self.db_path: Path = Path(os.getenv("DB_PATH", "garden.sqlite3"))
         self.dry_run: bool = os.getenv("GARDEN_DRY_RUN", "").strip().lower() in ("1", "true", "yes")

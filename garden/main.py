@@ -7,6 +7,7 @@ Routes:
   POST /api/ecowitt   — Ecowitt-protocol ingest from GW1200
   GET  /api/latest    — latest reading per sensor (JSON)
   GET  /api/series    — time-series for one sensor (JSON)
+  POST /api/telegram  — inbound Telegram bot webhook (/bed1, /weather, ...)
 """
 
 from __future__ import annotations
@@ -17,11 +18,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Query, Request
+from fastapi import BackgroundTasks, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from garden import bot
 from garden import derived as drv
 from garden import storage
 from garden.agent import runner as agent_runner
@@ -75,6 +77,31 @@ async def ecowitt_ingest(request: Request) -> JSONResponse:
     snap_id = storage.write_snapshot(ts, metrics, raw)
     agent_runner.evaluate_instant(snap_id, ts, metrics)
     return JSONResponse({"ok": True, "snapshot_id": snap_id, "metrics": len(metrics)})
+
+
+# ── POST /api/telegram (inbound bot commands) ─────────────────────────────────
+
+@app.post("/api/telegram")
+async def telegram_webhook(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
+    """
+    Telegram webhook target for inbound bot commands (/bed1, /weather, ...).
+
+    Disabled (404) unless TELEGRAM_WEBHOOK_SECRET is configured. Requests must
+    carry Telegram's secret-token header matching that value; handle_update()
+    provides a second layer of defense by only acting on the owner's chat_id.
+    Always returns 200 quickly — Telegram expects a fast ack — and processes
+    the update in the background so an outbound reply never blocks this request.
+    """
+    if not cfg.telegram_webhook_secret:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    header_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if header_secret != cfg.telegram_webhook_secret:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    update = await request.json()
+    background_tasks.add_task(bot.handle_update, update)
+    return JSONResponse({"ok": True})
 
 
 # ── GET /api/latest ───────────────────────────────────────────────────────────
