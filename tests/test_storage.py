@@ -165,3 +165,65 @@ class TestBedDailyAgronomy:
         db.upsert_bed_agronomy("bed1", "2026-07-06", gdd_daily=6.0)
         series = db.bed_agronomy_series("bed1", days=30)
         assert [r["local_date"] for r in series] == ["2026-07-05", "2026-07-06", "2026-07-07"]
+
+
+class TestBedGddCumulativeBefore:
+    def test_no_rows_returns_zero(self, db):
+        assert db.bed_gdd_cumulative_before("bed1", "2026-07-07") == 0.0
+
+    def test_sums_strictly_before_date(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-05", gdd_daily=10.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-06", gdd_daily=15.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=20.0)
+        # 2026-07-07 itself is excluded -- "before", not "on or before"
+        assert db.bed_gdd_cumulative_before("bed1", "2026-07-07") == 25.0
+
+    def test_idempotent_under_reprocessing_same_day(self, db):
+        # Reprocessing 2026-07-07 (e.g. a forced rerun) must not change what
+        # bed_gdd_cumulative_before("2026-07-07") returns -- it only sums
+        # STRICTLY earlier days, so today's own (repeated) row is irrelevant.
+        db.upsert_bed_agronomy("bed1", "2026-07-06", gdd_daily=15.0)
+        before_first_run = db.bed_gdd_cumulative_before("bed1", "2026-07-07")
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=20.0, gdd_cumulative=35.0)
+        db.upsert_bed_agronomy("bed1", "2026-07-07", gdd_daily=20.0, gdd_cumulative=35.0)  # rerun
+        after_rerun = db.bed_gdd_cumulative_before("bed1", "2026-07-07")
+        assert before_first_run == after_rerun == 15.0
+
+
+class TestBedWaterBalanceCumulativeSinceReset:
+    def test_no_rows_returns_zero(self, db):
+        assert db.bed_water_balance_cumulative_since_reset("bed1", "2026-07-07") == 0.0
+
+    def test_sums_from_start_of_history_when_no_reset(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-05", water_balance_daily=-0.1, reset_reason="")
+        db.upsert_bed_agronomy("bed1", "2026-07-06", water_balance_daily=-0.2, reset_reason="")
+        assert db.bed_water_balance_cumulative_since_reset("bed1", "2026-07-07") == pytest.approx(-0.3)
+
+    def test_sums_only_since_most_recent_reset(self, db):
+        db.upsert_bed_agronomy("bed1", "2026-07-04", water_balance_daily=-0.5, reset_reason="")
+        db.upsert_bed_agronomy("bed1", "2026-07-05", water_balance_daily=0.3, reset_reason="good_soak")
+        db.upsert_bed_agronomy("bed1", "2026-07-06", water_balance_daily=-0.1, reset_reason="")
+        # The 07-04 deficit is behind the 07-05 reset -- must not be included.
+        assert db.bed_water_balance_cumulative_since_reset("bed1", "2026-07-07") == pytest.approx(-0.1)
+
+
+class TestDayStats:
+    def test_no_readings_returns_none(self, db):
+        assert db.day_stats("temp_f", "2026-07-01T00:00:00+00:00", "2026-07-02T00:00:00+00:00") is None
+
+    def test_reading_in_window_included(self, db):
+        db.write_snapshot("2026-07-01T12:00:00+00:00", {"temp_f": (70.0, "F")}, {"raw": True})
+        db.write_snapshot("2026-07-01T18:00:00+00:00", {"temp_f": (85.0, "F")}, {"raw": True})
+        s = db.day_stats("temp_f", "2026-07-01T00:00:00+00:00", "2026-07-02T00:00:00+00:00")
+        assert s["min"] == 70.0
+        assert s["max"] == 85.0
+        assert s["n"] == 2
+
+    def test_reading_outside_window_excluded(self, db):
+        db.write_snapshot("2026-06-30T23:00:00+00:00", {"temp_f": (40.0, "F")}, {"raw": True})  # before window
+        db.write_snapshot("2026-07-01T12:00:00+00:00", {"temp_f": (70.0, "F")}, {"raw": True})  # in window
+        db.write_snapshot("2026-07-02T01:00:00+00:00", {"temp_f": (90.0, "F")}, {"raw": True})  # after window
+        s = db.day_stats("temp_f", "2026-07-01T00:00:00+00:00", "2026-07-02T00:00:00+00:00")
+        assert s["min"] == 70.0
+        assert s["max"] == 70.0
+        assert s["n"] == 1

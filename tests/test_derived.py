@@ -490,9 +490,20 @@ class TestGddDaily:
 
 class TestGddBaseForBed:
     def test_picks_highest_base(self):
-        # eggplant (50) + okra (55) -> okra's higher base wins
+        # eggplant (50) + okra (55) -> okra's higher base wins for Tbase.
+        # But eggplant takes far longer to mature (1300 vs okra's 900 GDD),
+        # so eggplant -- not okra -- is the reference crop for growth-stage/
+        # harvest-date reporting. See test_reference_crop_uses_longest_maturity.
         result = gdd_base_for_bed(["eggplant", "okra", "okra"])
-        assert result == (55.0, "okra")
+        assert result == (55.0, "eggplant")
+
+    def test_reference_crop_uses_longest_maturity_not_highest_base(self):
+        # Tbase and reference crop can be different crops: okra sets the
+        # (higher, more conservative) Tbase, but eggplant -- the slower,
+        # "bottleneck" crop -- is the reference for stage/harvest reporting.
+        result = gdd_base_for_bed(["eggplant", "okra"])
+        assert result[0] == 55.0  # okra's Tbase, still the conservative max
+        assert result[1] == "eggplant"  # eggplant's longer maturity wins reference-crop
 
     def test_variants_resolve_to_family_base(self):
         result = gdd_base_for_bed(["tomato_cherry", "tomato_roma"])

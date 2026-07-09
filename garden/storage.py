@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from pathlib import Path
 from typing import Any, Generator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 log = logging.getLogger("garden.storage")
 
@@ -346,9 +347,86 @@ def upsert_bed_agronomy(bed_id: str, local_date: str, **fields: Any) -> None:
         )
 
 
+def bed_gdd_cumulative_before(bed_id: str, local_date: str) -> float:
+    """
+    Sum of gdd_daily for all rows strictly before local_date (0.0 if none).
+
+    Recomputing cumulative GDD this way, rather than reading the previous
+    row's stored cumulative and adding today's delta, makes writing a given
+    day's row idempotent: re-processing the same local_date (e.g. a forced
+    --agronomy rerun) recomputes the same total instead of compounding a
+    double-count on top of a value that already includes today's contribution.
+    """
+    with _conn() as con:
+        row = con.execute(
+            "SELECT COALESCE(SUM(gdd_daily), 0.0) as total FROM bed_daily_agronomy "
+            "WHERE bed_id = ? AND local_date < ?",
+            (bed_id, local_date),
+        ).fetchone()
+    return row["total"]
+
+
+def bed_water_balance_cumulative_since_reset(bed_id: str, local_date: str) -> float:
+    """
+    Sum of water_balance_daily since the most recent good_soak reset strictly
+    before local_date (or since the start of history if there's no reset yet),
+    exclusive of local_date itself. 0.0 if no rows.
+
+    Same idempotency rationale as bed_gdd_cumulative_before(): recomputed from
+    the row history each time rather than chained off a stored running total.
+    """
+    with _conn() as con:
+        reset_row = con.execute(
+            "SELECT local_date FROM bed_daily_agronomy "
+            "WHERE bed_id = ? AND local_date < ? AND reset_reason = 'good_soak' "
+            "ORDER BY local_date DESC LIMIT 1",
+            (bed_id, local_date),
+        ).fetchone()
+        since = reset_row["local_date"] if reset_row else None
+        if since:
+            row = con.execute(
+                "SELECT COALESCE(SUM(water_balance_daily), 0.0) as total FROM bed_daily_agronomy "
+                "WHERE bed_id = ? AND local_date > ? AND local_date < ?",
+                (bed_id, since, local_date),
+            ).fetchone()
+        else:
+            row = con.execute(
+                "SELECT COALESCE(SUM(water_balance_daily), 0.0) as total FROM bed_daily_agronomy "
+                "WHERE bed_id = ? AND local_date < ?",
+                (bed_id, local_date),
+            ).fetchone()
+    return row["total"]
+
+
+def day_stats(sensor_key: str, start_ts_utc: str, end_ts_utc: str) -> dict[str, Any] | None:
+    """
+    Min/max/count for one arbitrary UTC time window [start_ts_utc, end_ts_utc).
+
+    Generalizes stats()'s "trailing N hours from now" into an explicit bounded
+    window, so a caller can ask about any past calendar day (e.g. to backfill
+    GDD for days before this feature was first deployed). Returns None when
+    there are zero readings for this sensor_key in the window.
+    """
+    with _conn() as con:
+        row = con.execute(
+            "SELECT MIN(value) as min, MAX(value) as max, COUNT(*) as n FROM readings "
+            "WHERE sensor_key = ? AND ts >= ? AND ts < ?",
+            (sensor_key, start_ts_utc, end_ts_utc),
+        ).fetchone()
+    if row is None or row["n"] == 0:
+        return None
+    return {"min": row["min"], "max": row["max"], "n": row["n"]}
+
+
 def bed_agronomy_series(bed_id: str, days: int = 30) -> list[dict[str, Any]]:
     """Trailing `days` calendar days of bed_daily_agronomy rows, oldest → newest."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    from garden.config import cfg
+    try:
+        tz = ZoneInfo(cfg.location.get("timezone", "UTC"))
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+    today_local = datetime.now(tz).date()
+    cutoff = (today_local - timedelta(days=days)).isoformat()
     with _conn() as con:
         rows = con.execute(
             """

@@ -698,11 +698,16 @@ def gdd_base_for_bed(
 
     Tbase is the HIGHEST base temperature among the bed's crops — the most
     conservative choice (mirrors bed_moisture_band's intersection logic): no
-    GDD accrues on a day too cold for the pickiest crop in the bed. The crop
-    that produced that Tbase also doubles as the bed's reference crop for
-    gdd_growth_stage()/KC_MID lookups, since a mixed bed has no single true
-    growth curve — using the pickiest crop keeps both numbers consistent
-    with each other without a separate "primary crop" config field.
+    GDD accrues on a day too cold for the pickiest crop in the bed.
+
+    The reference crop (used for gdd_growth_stage()/kc_for_crop()/
+    maturity_gdd_for_crop() lookups) is a SEPARATE choice: the crop with the
+    LONGEST maturity_gdd_for_crop() among the bed's recognised crops — the
+    "bottleneck" crop. A mixed bed has no single true growth curve, so
+    reporting progress off whichever crop happens to be fastest would show
+    the bed as further along (or "ready to harvest") the moment that one
+    crop matures, even if a slower co-planted crop is still mid-season.
+    Tbase and the reference crop can therefore be different crops.
 
     Returns None when no recognised crop is in `plants`.
     """
@@ -710,11 +715,13 @@ def gdd_base_for_bed(
     if custom_bases:
         bases.update(custom_bases)
 
-    candidates = [(bases[p], p) for p in plants if p in bases]
+    candidates = list(dict.fromkeys(p for p in plants if p in bases))
     if not candidates:
         return None
-    base_f, crop_key = max(candidates, key=lambda c: c[0])
-    return base_f, crop_key
+
+    base_f = max(bases[p] for p in candidates)
+    reference_crop = max(candidates, key=lambda p: maturity_gdd_for_crop(p) or 0.0)
+    return base_f, reference_crop
 
 
 def gdd_growth_stage(cumulative_gdd: float, crop_key: str) -> dict[str, Any]:

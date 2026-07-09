@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from garden import derived, storage
@@ -283,9 +283,13 @@ def _local_now() -> datetime:
     return datetime.now(tz)
 
 
-def _already_sent_today(local_now: datetime) -> bool:
-    """True if the brief was already sent today (local date)."""
-    state = storage.get_alert_state(_BRIEF_RULE_ID)
+def _rule_already_fired_today(rule_id: str, local_now: datetime) -> bool:
+    """
+    True if alert_state[rule_id].last_fired_ts falls on local_now's local
+    date. Shared once-per-local-day dedup check -- used by both the daily
+    brief and the agronomy accumulation job, each with their own rule_id.
+    """
+    state = storage.get_alert_state(rule_id)
     last_fired = state.get("last_fired_ts", "")
     if not last_fired:
         return False
@@ -295,12 +299,16 @@ def _already_sent_today(local_now: datetime) -> bool:
         try:
             tz = ZoneInfo(tz_name)
         except ZoneInfoNotFoundError:
-            log.warning("Unknown timezone %r in _already_sent_today, falling back to UTC", tz_name)
+            log.warning("Unknown timezone %r in _rule_already_fired_today, falling back to UTC", tz_name)
             tz = ZoneInfo("UTC")
-        last_local = last_dt.astimezone(tz)
-        return last_local.date() == local_now.astimezone(tz).date()
+        return last_dt.astimezone(tz).date() == local_now.astimezone(tz).date()
     except Exception:
         return False
+
+
+def _already_sent_today(local_now: datetime) -> bool:
+    """True if the brief was already sent today (local date)."""
+    return _rule_already_fired_today(_BRIEF_RULE_ID, local_now)
 
 
 def send_daily_brief(force: bool = False) -> None:
@@ -350,23 +358,63 @@ def _maybe_daily_brief() -> None:
 # alert_state rule_id per bed so it can't collide with the brief's dedup.
 
 _AGRONOMY_RULE_PREFIX = "agronomy_accum"
+_MAX_BACKFILL_DAYS = 366  # defensive cap in case planted_on is garbage/far in the past
 
 
 def _agronomy_already_run_today(bed_id: str, local_now: datetime) -> bool:
-    state = storage.get_alert_state(f"{_AGRONOMY_RULE_PREFIX}_{bed_id}")
-    last_fired = state.get("last_fired_ts", "")
-    if not last_fired:
-        return False
+    return _rule_already_fired_today(f"{_AGRONOMY_RULE_PREFIX}_{bed_id}", local_now)
+
+
+def _local_day_bounds_utc(day: date, tz: ZoneInfo) -> tuple[str, str]:
+    """UTC ISO bounds [start, end) for one local calendar day."""
+    start_local = datetime(day.year, day.month, day.day, tzinfo=tz)
+    end_local = start_local + timedelta(days=1)
+    start_utc = start_local.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+    end_utc = end_local.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+    return start_utc, end_utc
+
+
+def _backfill_gdd(bed_id: str, base_f: float, temp_key: str, tz: ZoneInfo, today: date) -> None:
+    """
+    On a bed's first accumulation run, backfill gdd_daily/gdd_cumulative for
+    every day from planted_on up to (not including) today, using whatever
+    local sensor history already exists for temp_key. Without this, GDD
+    would silently start counting from whichever day the cron first ran
+    instead of the actual planting date.
+
+    Water balance is intentionally NOT backfilled -- weather.py only caches
+    TODAY's Open-Meteo forecast in-process, nothing historical is persisted,
+    so there's no accurate past rain/ET0 to backfill from. It simply starts
+    accruing from today forward; a documented gap, not a bug.
+
+    Days with no sensor history (e.g. before the station was recording) are
+    skipped silently -- they contribute 0 GDD rather than crashing.
+    """
+    planted_str = cfg.bed_planted_on(bed_id)
     try:
-        last_dt = datetime.fromisoformat(last_fired.replace("Z", "+00:00"))
-        tz_name = cfg.location.get("timezone", "UTC")
-        try:
-            tz = ZoneInfo(tz_name)
-        except ZoneInfoNotFoundError:
-            tz = ZoneInfo("UTC")
-        return last_dt.astimezone(tz).date() == local_now.astimezone(tz).date()
-    except Exception:
-        return False
+        day = date.fromisoformat(planted_str) if planted_str else today
+    except ValueError:
+        log.warning("Bed %s has an unparseable planted_on %r, skipping GDD backfill", bed_id, planted_str)
+        return
+
+    n = 0
+    while day < today and n < _MAX_BACKFILL_DAYS:
+        day_str = day.isoformat()
+        start_utc, end_utc = _local_day_bounds_utc(day, tz)
+        day_temp = storage.day_stats(temp_key, start_utc, end_utc)
+        if day_temp is not None:
+            day_gdd = derived.gdd_daily(day_temp["max"], day_temp["min"], base_f)
+            gdd_cum = storage.bed_gdd_cumulative_before(bed_id, day_str) + day_gdd
+            storage.upsert_bed_agronomy(
+                bed_id, day_str,
+                tmax_f=day_temp["max"], tmin_f=day_temp["min"],
+                gdd_daily=day_gdd, gdd_cumulative=gdd_cum,
+            )
+        day += timedelta(days=1)
+        n += 1
+
+    if n:
+        log.info("Backfilled GDD for %s: %d day(s) from %s", bed_id, n, planted_str or today.isoformat())
 
 
 def run_daily_agronomy_accumulation(force: bool = False) -> None:
@@ -386,12 +434,26 @@ def run_daily_agronomy_accumulation(force: bool = False) -> None:
         if local_now.hour != hour_local:
             return
 
-    today_str = local_now.date().isoformat()
+    today = local_now.date()
+    today_str = today.isoformat()
     fc = get_forecast()
     temp_key = cfg.agronomy.get("gdd_temp_key", "temp_f")
     gdd_base_overrides = cfg.agronomy.get("gdd_base_overrides") or {}
     kc_overrides = cfg.agronomy.get("kc_overrides") or {}
     beds_cfg = cfg.agronomy.get("beds", {})
+
+    tz_name = cfg.location.get("timezone", "UTC")
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+
+    # gdd_temp_key is one global config value, not per-bed -- fetch once
+    # rather than re-querying the same stats identically for every bed.
+    temp_stats = storage.stats(temp_key, hours=24)
+    if temp_stats is None:
+        log.debug("Agronomy accumulation: no %s data yet, skipping all beds", temp_key)
+        return
 
     for bed in cfg.dashboard.get("beds", []):
         bed_id = bed.get("id")
@@ -400,24 +462,27 @@ def run_daily_agronomy_accumulation(force: bool = False) -> None:
         if not force and _agronomy_already_run_today(bed_id, local_now):
             continue
 
-        temp_stats = storage.stats(temp_key, hours=24)
-        if temp_stats is None:
-            log.debug("Agronomy accumulation: no %s data yet for %s, skipping", temp_key, bed_id)
-            continue
-
         base = derived.gdd_base_for_bed(bed.get("plants", []), gdd_base_overrides)
         if base is None:
             continue  # no recognised crops in this bed
         base_f, ref_crop = base
 
+        if storage.get_bed_agronomy_latest(bed_id) is None:
+            _backfill_gdd(bed_id, base_f, temp_key, tz, today)
+
         gdd_today = derived.gdd_daily(temp_stats["max"], temp_stats["min"], base_f)
 
-        # Irrigation estimate from a recent soil-moisture rise (module docstring:
-        # analyze_watering() wants a narrow window, <=2h, to avoid bucket smearing).
+        # Irrigation estimate from the day's soil-moisture rise. A 24h window
+        # here (not the <=2h analyze_watering()'s docstring recommends for
+        # precise spike CHARACTERIZATION) is deliberate: this only needs
+        # "did watering happen at all today," so a bed watered in the
+        # morning isn't invisible to this nightly job. Bucket smearing at
+        # 24h is mild (~4min buckets vs the ~60s ingest interval) compared
+        # to the multi-hour smearing a week-long window would cause.
         moist_key = bed.get("sensors", {}).get("soil_moisture")
         watering: dict = {}
         if moist_key:
-            rows = storage.series(moist_key, hours=2)
+            rows = storage.series(moist_key, hours=24)
             samples = [
                 (datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp(), r["value"])
                 for r in rows
@@ -438,15 +503,23 @@ def run_daily_agronomy_accumulation(force: bool = False) -> None:
         etc_in = derived.etc_from_kc(et0_in, kc) if et0_in is not None else 0.0
         wb_daily = derived.bed_water_balance(rain_in, irrigation_in, etc_in)
 
-        prev = storage.get_bed_agronomy_latest(bed_id)
         is_good_soak = watering.get("quality") == "good_soak"
 
-        # GDD is a phenology clock tied to planted_on -- it always accumulates,
-        # never resets on a watering event. Water balance resets to just
-        # today's value on a good soak (re-anchors "deficit since last real
+        # Cumulative totals are recomputed from row history via SQL SUM each
+        # time (storage.bed_gdd_cumulative_before /
+        # bed_water_balance_cumulative_since_reset), not chained off a
+        # stored running total -- so reprocessing today (e.g. a forced
+        # --agronomy rerun) recomputes the same value instead of double-
+        # counting today's contribution on top of itself. GDD always
+        # accumulates from planted_on and never resets on a watering event
+        # (it's a phenology clock); water balance resets to just today's
+        # value on a good soak (re-anchors "deficit since last real
         # recharge"), same spirit as drydown_rate's post-watering re-anchor.
-        gdd_cum = gdd_today + (prev["gdd_cumulative"] if prev else 0.0)
-        wb_cum = wb_daily if (prev is None or is_good_soak) else prev["water_balance_cumulative"] + wb_daily
+        gdd_cum = storage.bed_gdd_cumulative_before(bed_id, today_str) + gdd_today
+        wb_cum = (
+            wb_daily if is_good_soak
+            else storage.bed_water_balance_cumulative_since_reset(bed_id, today_str) + wb_daily
+        )
 
         storage.upsert_bed_agronomy(
             bed_id, today_str,

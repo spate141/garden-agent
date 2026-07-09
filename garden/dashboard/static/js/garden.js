@@ -2269,7 +2269,9 @@ async function refresh() {
      so the chip always painted from the prior cycle's conditions. */
   var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
   chartLoads = chartLoads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
-  chartLoads.push(loadAgronomyChart());
+  /* NOT loadAgronomyChart() here -- bed_daily_agronomy only changes once a
+     day server-side, so fetching it on this 60s cycle would be 1440x more
+     often than useful; it gets its own much slower interval at boot instead. */
   var insightsLoad = loadInsights();
   var results       = await Promise.all([fetch('/api/latest')].concat(chartLoads));
   var latestResp    = results[0];
@@ -2490,3 +2492,5 @@ _tickClock();
 setInterval(_tickClock, 15_000);
 refresh();
 setInterval(refresh, 60_000);
+loadAgronomyChart();
+setInterval(loadAgronomyChart, 30 * 60_000);  /* daily-changing data -- 30min is plenty fresh */
