@@ -1540,11 +1540,12 @@ function renderBedMoistureCards() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   PER-BED GDD ACCUMULATION ROW
-   Season-to-date cumulative Growing Degree Days per bed, from the new
-   bed_daily_agronomy history (garden/storage.py bed_agronomy_series()) --
-   a once-daily accumulator, not a live sensor series, so it's fetched from
-   its own endpoint and kept out of the 1h/3h/12h/24h/7d range control.
+   GDD ACCUMULATION CHART
+   Season-to-date cumulative Growing Degree Days, one line per bed on a
+   single chart, from the bed_daily_agronomy history (garden/storage.py
+   bed_agronomy_series()) -- a once-daily accumulator, not a live sensor
+   series, so it's fetched from its own endpoint and kept out of the
+   1h/3h/12h/24h/7d range control.
    ════════════════════════════════════════════════════════════════════════════ */
 
 /** Cache of latest bed_daily_agronomy rows, keyed by bed id. */
@@ -1556,46 +1557,68 @@ function fmtDate(isoDate) {
   return d.toLocaleDateString([], { month: 'short', day: '2-digit' });
 }
 
-/** Build the 4 per-bed GDD chart-cards (one row), mirroring renderBedMoistureCards(). */
+/** Build the single GDD chart-card. */
 function renderBedGddCards() {
   const grid = document.getElementById('bed-gdd-grid');
-  if (!grid || !BEDS.length) return;
-  grid.innerHTML = BEDS.map(function (bed) {
-    return (
-      '<div class="chart-card">' +
-        '<div class="chart-title">' + bedEmoji(bed.plants) + ' ' + bed.name + ' · GDD to date</div>' +
-        '<div class="chart-wrap"><canvas id="chart-gdd-' + bed.id + '"></canvas></div>' +
-      '</div>'
-    );
-  }).join('');
+  if (!grid) return;
+  grid.innerHTML =
+    '<div class="chart-card">' +
+      '<div class="chart-title">GDD to date · all beds</div>' +
+      '<div class="chart-wrap"><canvas id="chart-gdd-all"></canvas></div>' +
+    '</div>';
 }
 
-/** Fetches + draws one bed's cumulative-GDD chart from bed_daily_agronomy history. */
-async function loadAgronomyChart(bed) {
-  const resp = await fetch('/api/agronomy_series?bed=' + encodeURIComponent(bed.id) + '&days=120');
-  if (!resp.ok) return;
-  const rows = await resp.json();
-  agronomySeriesCache[bed.id] = rows;
+/** Fetches every bed's GDD history and draws them as one multi-line chart
+ *  (one dataset per bed, same pattern _drawTrendGroupChart uses for the
+ *  multi-line Temperature chart), instead of a separate card per bed. */
+async function loadAgronomyChart() {
+  const results = await Promise.all(BEDS.map(function (bed) {
+    return fetch('/api/agronomy_series?bed=' + encodeURIComponent(bed.id) + '&days=120')
+      .then(function (resp) { return resp.ok ? resp.json() : []; })
+      .then(function (rows) { return { bed: bed, rows: rows }; });
+  }));
 
-  const canvas = document.getElementById('chart-gdd-' + bed.id);
+  Object.keys(agronomySeriesCache).forEach(function (k) { delete agronomySeriesCache[k]; });
+  results.forEach(function (r) { agronomySeriesCache[r.bed.id] = r.rows; });
+
+  const canvas = document.getElementById('chart-gdd-all');
   if (!canvas) return;
 
-  const labels = rows.map(function (r) { return fmtDate(r.local_date); });
-  const data   = rows.map(function (r) { return r.gdd_cumulative; });
-  const color  = cfg_moisture_color(bed);
+  /* Union of every date seen across beds, sorted -- a bed's row is missing
+     on any day its accumulation job didn't run (no sensor data yet, etc). */
+  const dateSet = {};
+  results.forEach(function (r) { r.rows.forEach(function (row) { dateSet[row.local_date] = true; }); });
+  const dates = Object.keys(dateSet).sort();
+  if (!dates.length) return;
 
-  const instKey = 'gdd-' + bed.id;
-  let chart = instances[instKey];
+  const datasets = results.map(function (r) {
+    const byDate = {};
+    r.rows.forEach(function (row) { byDate[row.local_date] = row.gdd_cumulative; });
+    return {
+      label:       r.bed.name,
+      data:        dates.map(function (d) { return Object.prototype.hasOwnProperty.call(byDate, d) ? byDate[d] : null; }),
+      borderColor: cfg_moisture_color(r.bed),
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension:     0.3,
+      fill:        false,
+      spanGaps:    true,
+    };
+  });
+
+  const labels = dates.map(fmtDate);
+
+  let chart = instances['gdd-all'];
   if (!chart) {
-    chart = new Chart(canvas, makeChartOpts(color));
-    instances[instKey] = chart;
+    chart = new Chart(canvas, makeChartOpts(datasets[0].borderColor, { datasets: datasets, legend: true }));
+    instances['gdd-all'] = chart;
   }
-  chart.data.labels           = labels;
-  chart.data.datasets[0].data = data;
-  chart._bands                = [];
-  chart._lines                = [];
-  chart._wateringEvents       = [];
-  chart._projection           = null;
+  chart.data.labels     = labels;
+  chart.data.datasets   = datasets;
+  chart._bands          = [];
+  chart._lines          = [];
+  chart._wateringEvents = [];
+  chart._projection     = null;
   chart.update('none');
 }
 
@@ -1608,10 +1631,9 @@ async function loadAgronomyChart(bed) {
    ════════════════════════════════════════════════════════════════════════════ */
 
 const TRENDS_GROUPS = [
-  { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f'] },
-  { id: 'humidity',    title: 'Humidity',            keys: ['humidity', 'humidity1'] },
-  { id: 'vpd',         title: 'VPD',                 keys: ['vpd_kpa'], vpdBand: true },
-  { id: 'pressure',    title: 'Pressure & dew point', keys: ['baromrel_inhg', 'dewpoint_f'], dualAxis: true },
+  { id: 'temperature', title: 'Temperature', keys: ['temp_f', 'temp1_f'] },
+  { id: 'humidity',    title: 'Humidity',    keys: ['humidity', 'humidity1'] },
+  { id: 'vpd',         title: 'VPD',         keys: ['vpd_kpa'], vpdBand: true },
 ];
 
 /** Builds the grouped climate chart cards once, then (re)draws each on every
@@ -2247,7 +2269,7 @@ async function refresh() {
      so the chip always painted from the prior cycle's conditions. */
   var chartLoads = CHARTS.map(function (c) { return loadChart(c.key, c.color); });
   chartLoads = chartLoads.concat(MOISTURE_GROUP.map(function (m) { return loadChart(m.key, m.color); }));
-  chartLoads = chartLoads.concat(BEDS.map(function (bed) { return loadAgronomyChart(bed); }));
+  chartLoads.push(loadAgronomyChart());
   var insightsLoad = loadInsights();
   var results       = await Promise.all([fetch('/api/latest')].concat(chartLoads));
   var latestResp    = results[0];

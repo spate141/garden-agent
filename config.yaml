@@ -42,7 +42,7 @@ sensors:
   baromrel_inhg:
     label: "Pressure"
     color: "#a78bfa"
-    chart: true
+    chart: false    # stat-strip only — already live in the hero sky-strip chip; dropped its Trends chart to declutter
   baromabs_inhg:
     label: "Abs. pressure"
     color: "#8b5cf6"
@@ -79,7 +79,7 @@ sensors:
   dewpoint_f:
     label: "Dew point"
     color: "#38bdf8"
-    chart: true
+    chart: false    # stat-strip only — dropped its Trends chart to declutter; frost-risk alerting is unaffected (server-side, not dashboard-driven)
   heatindex_f:
     label: "Feels like"
     color: "#ef4444"
