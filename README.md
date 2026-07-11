@@ -26,6 +26,33 @@ Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway
 
 </details>
 
+## Dashboard: metrics & sensor data
+
+Everything on the dashboard traces back to `config.yaml` (`sensors:`, `dashboard.beds`, `thresholds:`) — add a sensor or bed there and it shows up with no code changes.
+
+**Bed status chips** — one per bed, computed by `garden/derived.py:bed_stress()`:
+- **Dry / OK / Wet**, judged against each bed's own moisture band — self-learned from that bed's last 7 days of watering cycles (`learned_moisture_band`), falling back to a crop-derived range (e.g. tomato 50–80%) until a bed has enough history. This keeps compaction differences between beds (loose new soil reads lower than settled old soil for the same actual water) from producing a false "Dry" reading.
+- **Cold / Heat** stress, from outdoor air temp vs. each bed's crop temperature range.
+- Battery-low warning per bed (WH51 soil sensor voltage).
+
+**"When to water next"** — per-bed forecast card (`garden/main.py:_bed_watering_forecast`):
+- Projects each bed's current drydown rate (`derived.drydown_rate`, a Theil-Sen slope over the trailing 48h, excluding watering spikes) forward to that bed's own dry threshold (`derived.days_until_dry`).
+- Shows `~N days` / `today` / `just watered` (while a recent watering event is still draining) plus a ☔ badge when rain is forecast in the next 12h and a bed is due soon.
+
+**Per-bed soil-moisture trend charts** (1h/3h/12h/24h/7d) — raw `soilmoisture1..4` readings, with a green "healthy" band and a red "too wet" line drawn from the same self-learned/crop band the chips use.
+
+**Climate strip** — one verdict sentence + three headline stats:
+- **VPD** (vapor-pressure deficit, kPa) — classified low / healthy / high / very-high stress via `derived.vpd_status()` against `derived.thresholds` in `config.yaml`.
+- **Feels-like temp** — NWS heat-index formula (`derived.heat_index_f`).
+- **Water balance** — daily rainfall minus reference evapotranspiration (ET₀) from the Open-Meteo forecast (`derived.et0_water_balance`); negative means the garden is running a deficit.
+- Frost risk is flagged from dew point (`derived.frost_risk`) whenever it's near/below freezing.
+
+**Grouped trend charts** — Temperature (outdoor + gazebo), Humidity (outdoor + gazebo), and VPD (with its low/healthy/high/very-high zone bands). Any sensor with `chart: true` in `config.yaml` can be added to a group in `garden.js`'s `TRENDS_GROUPS`.
+
+**Stat groups** (compact numeric tiles, no chart) — Bed 1–4 (moisture + battery), Gazebo (temp/humidity), Station (outdoor + indoor temp/humidity, barometric pressure), Air (VPD, dew point, feels-like).
+
+**Sky/garden hero animation** — sun/moon position and cloud state driven by Open-Meteo sunrise/sunset and current conditions, purely visual (no metric backing it beyond what's already in the climate strip).
+
 ## Requirements
 
 - Python 3.11+
@@ -294,3 +321,4 @@ Full step-by-step setup guide (including troubleshooting): [docs/hardware-setup.
 | `POST` | `/api/ecowitt` | Ecowitt-protocol ingest |
 | `GET` | `/api/latest` | Latest value per sensor (JSON array) |
 | `GET` | `/api/series?sensor=soilmoisture1&hours=24` | Time-series for one sensor |
+| `GET` | `/api/insights` | Derived metrics: VPD, dew point/frost risk, heat index, water balance, per-bed stress + watering forecast |

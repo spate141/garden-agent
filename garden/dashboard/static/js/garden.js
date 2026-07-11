@@ -1551,7 +1551,9 @@ const TRENDS_GROUPS = [
   { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f'] },
   { id: 'humidity',    title: 'Humidity',            keys: ['humidity', 'humidity1'] },
   { id: 'vpd',         title: 'VPD',                 keys: ['vpd_kpa'], vpdBand: true },
-  { id: 'pressure',    title: 'Pressure & dew point', keys: ['baromrel_inhg', 'dewpoint_f'], dualAxis: true },
+  /* Pressure & dew point were dropped — neither drives a gardening decision on
+     its own. Replaced by the "When to water next" card (renderWateringForecast,
+     below), a snapshot forecast rather than a time-range line chart. */
 ];
 
 /** Builds the grouped climate chart cards once, then (re)draws each on every
@@ -1956,6 +1958,64 @@ function renderBedChips(insightBeds) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+   WATERING FORECAST — "when does each bed need water next?"
+   A snapshot card fed by /api/insights.watering (garden.main._bed_watering_
+   forecast), which projects each bed's OWN drydown to ITS OWN self-learned/
+   crop-fallback dry threshold (same band the Dry/OK/Wet chips use) — replaces
+   the old Pressure & dew point trend card, neither of which drove a watering
+   decision. Unlike the line-chart cards below it, this is a point-in-time
+   forecast, so it intentionally ignores the 1h-7d Trends range selector.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/** Urgency color for a bed's projected days-until-dry: healthy/warn/critical,
+ *  matching the semantics _moistureFillColor uses for the bed chips. */
+function _wateringUrgencyColor(days) {
+  if (days == null) return 'var(--text-faint)';
+  if (days <= 0.5) return 'var(--crit)';
+  if (days <= 3)   return 'var(--warn)';
+  return 'var(--fill-healthy)';
+}
+
+/** Renders the per-bed "when to water next" rows from the latest /api/insights
+ *  payload. Safe to call every refresh tick (same pattern as renderBedChips). */
+function renderWateringForecast() {
+  const el = document.getElementById('watering-forecast');
+  if (!el || !LAST_INSIGHTS) return;
+
+  const byId = {};
+  (LAST_INSIGHTS.watering || []).forEach(function (w) { byId[w.id] = w; });
+
+  const fc = LAST_INSIGHTS.forecast;
+  const rainPct  = fc ? fc.next_12h_peak_rain_pct : null;
+  const rainSoon = rainPct != null && rainPct >= (G.rainLookaheadPct || 40);
+
+  const rows = BEDS.map(function (bed) {
+    const w = byId[bed.id];
+    if (!w) return '';
+
+    const pct   = w.remaining != null ? Math.round(w.remaining * 100) : 0;
+    const color = _wateringUrgencyColor(w.days);
+    const dueSoon = w.days != null && w.days <= 1;
+    const badge = (rainSoon && dueSoon)
+      ? '<span class="watering-rain-badge" title="Rain expected in the next 12h — consider holding off">☔</span>'
+      : '';
+
+    return (
+      '<div class="watering-row">' +
+        '<span class="watering-bed-name">' + bed.name + '</span>' +
+        '<span class="watering-bar-track" aria-hidden="true">' +
+          '<span class="watering-bar-fill" style="width:' + pct + '%; background:' + color + '"></span>' +
+        '</span>' +
+        '<span class="watering-label" style="color:' + color + '">' + w.label + '</span>' +
+        badge +
+      '</div>'
+    );
+  }).join('');
+
+  el.innerHTML = '<div class="chart-title">When to water next</div>' + rows;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
    BED DETAIL (inline expand) — redesign.md §4.1
    Shown directly beneath the bed chip row instead of a side drawer. The old
    drawer's Climate tab was dropped entirely: that ground is already covered
@@ -2142,6 +2202,7 @@ async function loadInsights() {
     renderBedChips(data.beds);
     if (OPEN_BED) renderBedDetail();
   }
+  renderWateringForecast();  /* doesn't depend on LATEST_TS staleness — safe here */
 }
 
 /** Single fetch feeds both the stat strip and the garden */
@@ -2177,6 +2238,7 @@ async function refresh() {
       renderClimateStrip(LAST_INSIGHTS);
       renderBedChips(LAST_INSIGHTS.beds);
       if (OPEN_BED) renderBedDetail();
+      renderWateringForecast();
     }
   } else {
     _updateConnDot(null);

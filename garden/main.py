@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -160,6 +161,60 @@ def _effective_bed_band(bed: dict[str, Any]) -> tuple[float, float] | None:
     )
 
 
+def _bed_watering_forecast(bed: dict[str, Any], soil_moist: float | None) -> dict[str, Any]:
+    """
+    Project a bed's own drydown to ITS OWN dry point ("days until it needs
+    water"), using the same self-learned/crop-fallback band as bed_stress and
+    the dashboard chips (see _effective_bed_band) so the forecast agrees with
+    what's already on screen — unlike the daily-brief version of this same
+    idea (runner.py:_bed_drydown_line), which still uses the flat crop band.
+
+    Returns:
+      {
+        "days":      float | None — projected days until dry (None = not drying / unknown),
+        "label":     "~N days" | "today" | "2+ weeks" | "just watered" | "learning" | "unknown",
+        "per_day":   drydown rate in %/day (0.0 when flat/rising/unknown),
+        "remaining": 0..1 fraction of the bed's own wet->dry range left, or None,
+        "settling":  True if a recent watering event hasn't finished draining yet
+                     (forecast suppressed/labeled "just watered" until then).
+      }
+    """
+    moist_key = bed.get("sensors", {}).get("soil_moisture")
+    band = _effective_bed_band(bed)
+
+    if not moist_key or band is None or soil_moist is None:
+        return {"days": None, "label": "unknown", "per_day": 0.0, "remaining": None, "settling": False}
+
+    dry_threshold, field_capacity = band
+    lifecycle_cfg = cfg.thresholds.get("watering_lifecycle", {})
+    settle_window_s = lifecycle_cfg.get("settle_window_minutes", 60) * 60
+    lookback_hours = lifecycle_cfg.get("drydown_lookback_hours", 48)
+
+    rows = storage.series(moist_key, hours=lookback_hours)
+    samples = [
+        (datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp(), r["value"])
+        for r in rows
+    ]
+
+    event = drv.analyze_watering(samples, settle_window_s=settle_window_s)
+    settling = bool(event.get("detected") and event.get("settling"))
+
+    rate = drv.drydown_rate(samples, settle_window_s=settle_window_s)
+    dtd = drv.days_until_dry(soil_moist, rate["per_day"], dry_threshold)
+
+    remaining = None
+    if field_capacity > dry_threshold:
+        remaining = max(0.0, min(1.0, (soil_moist - dry_threshold) / (field_capacity - dry_threshold)))
+
+    return {
+        "days":      dtd["days"],
+        "label":     "just watered" if settling else dtd["label"],
+        "per_day":   round(rate["per_day"], 1),
+        "remaining": remaining,
+        "settling":  settling,
+    }
+
+
 # ── GET /api/insights ────────────────────────────────────────────────────────
 
 @app.get("/api/insights")
@@ -238,6 +293,7 @@ async def api_insights() -> JSONResponse:
     air_temp_f   = air_temp_row["value"] if air_temp_row else None
 
     bed_results: list[dict[str, Any]] = []
+    watering_results: list[dict[str, Any]] = []
     for bed in cfg.dashboard.get("beds", []):
         moist_key = bed.get("sensors", {}).get("soil_moisture")
         moist_row = latest_map.get(moist_key) if moist_key else None
@@ -265,7 +321,14 @@ async def api_insights() -> JSONResponse:
             **stress,
         })
 
+        watering_results.append({
+            "id":   bed.get("id"),
+            "name": bed.get("name"),
+            **_bed_watering_forecast(bed, soil_moist),
+        })
+
     insights["beds"] = bed_results
+    insights["watering"] = watering_results
 
     # ── 24h min/max stats — scoped to only the sensors the UI actually renders ──
     stat_keys: set[str] = {"vpd_kpa"}

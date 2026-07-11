@@ -27,7 +27,11 @@
     </div>
     <!-- per-bed soil moisture small-multiples, one row of 4 -->
     <div class="charts bed-moisture-row" id="bed-moisture-grid"></div>
-    <!-- grouped climate charts: Temperature / Humidity / VPD / Pressure+Dew point -->
+    <!-- "When to water next" — a snapshot forecast (renderWateringForecast in
+         garden.js), NOT a time-range line chart, so it intentionally ignores
+         the 1h-7d buttons above. Replaces the old Pressure & dew point card. -->
+    <div class="watering-forecast" id="watering-forecast"></div>
+    <!-- grouped climate charts: Temperature / Humidity / VPD -->
     <div class="charts trends-climate-grid" id="trends-climate-grid"></div>
   </div>
 </section>

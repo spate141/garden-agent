@@ -324,6 +324,67 @@
   height: 140px;
 }
 
+/* ── WATERING FORECAST ("when to water next") ──────────────────────── */
+/* One card, one row per bed — not a chart-card grid, since there's no
+   time axis (see garden.js renderWateringForecast). Sits between the
+   per-bed moisture charts and the climate trend grid. */
+
+.watering-forecast {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 18px 18px 8px;
+  margin: 0 24px 16px;
+}
+@media (max-width: 720px) {
+  .watering-forecast { margin: 0 16px 12px; padding: 14px 14px 6px; }
+}
+
+.watering-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--hairline);
+}
+.watering-row:first-of-type { border-top: none; }
+
+.watering-bed-name {
+  flex: 0 0 64px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.watering-bar-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.watering-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.watering-label {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  min-width: 84px;
+  text-align: right;
+}
+
+.watering-rain-badge {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .bed-moisture-row {
   grid-template-columns: repeat(4, 1fr);
   padding-bottom: 0;
