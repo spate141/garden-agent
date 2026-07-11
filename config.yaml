@@ -152,6 +152,24 @@ thresholds:
     runoff_max_pct: 2.0            # absorbed <= this -> runoff / hydrophobic soil
     overshoot_frac_max: 0.6        # overshoot/(peak-baseline) above this weakens "good"
 
+  # Self-learned per-bed moisture band (garden.derived.learned_moisture_band):
+  # a capacitive sensor reads soil dielectric, so loose/fresh soil reads lower
+  # % than compacted soil at the same plant-available water. Instead of one
+  # fixed crop range for every bed, each bed learns its own wet/dry envelope
+  # from its recent sawtooth (post-water plateau ~= field capacity, pre-water
+  # low ~= dry point), so soil compaction differences cancel out. Falls back
+  # to the crop-derived band (then to soil_moisture_low.below) until a bed
+  # has enough history to trust.
+  moisture_learning:
+    enabled: true
+    learn_days: 7        # history window fed to learned_moisture_band (matches the 7D trend view)
+    min_points: 200       # need at least this many readings before trusting the learned band
+    min_spread_pct: 8     # need a real wet<->dry swing (p90 - p10) to trust the learned band
+    dry_pctile: 10        # robust stand-in for "driest observed"
+    wet_pctile: 90        # robust stand-in for "field capacity"
+    dry_frac: 0.30        # cutoff for "dry" as a fraction of the observed [floor, fc] envelope
+    wet_frac: 0.90        # cutoff for "wet" / the "too wet" chart line, same envelope
+
   battery_low:
     sensor_keys: [soilbatt1, soilbatt2, soilbatt3, soilbatt4]
     below: 1.1         # WH51 battery ~1.5V nominal; warn below 1.1V

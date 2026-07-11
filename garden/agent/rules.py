@@ -33,21 +33,65 @@ def _iso_now() -> str:
 
 # ── soil moisture low ─────────────────────────────────────────────────────────
 
+def _bed_dry_threshold(bed: dict, fallback: float) -> float:
+    """
+    The moisture % below which `bed` is considered dry: its self-learned band
+    minimum when there's enough history, else its crop-derived band minimum,
+    else `fallback` (the flat config.yaml threshold).
+
+    Mirrors garden.main._effective_bed_band so the "time to water" alert
+    agrees with the dashboard's Dry/OK/Wet chip for the same bed — without
+    this, a bed with unusually loose or compacted soil could show "Dry" on
+    the dashboard while never tripping (or always tripping) this alert.
+    """
+    moist_key = bed.get("sensors", {}).get("soil_moisture")
+    plants = bed.get("plants", [])
+    learn_cfg = cfg.thresholds.get("moisture_learning", {})
+
+    band = None
+    if moist_key and learn_cfg.get("enabled", True):
+        hours = int(learn_cfg.get("learn_days", 7)) * 24
+        values = [r["value"] for r in storage.series(moist_key, hours)]
+        band = derived.effective_moisture_band(
+            values, plants, cfg.crops,
+            learning_kwargs={
+                "min_points":  learn_cfg.get("min_points", 200),
+                "min_spread":  learn_cfg.get("min_spread_pct", 8),
+                "dry_pctile":  learn_cfg.get("dry_pctile", 10),
+                "wet_pctile":  learn_cfg.get("wet_pctile", 90),
+                "dry_frac":    learn_cfg.get("dry_frac", 0.30),
+                "wet_frac":    learn_cfg.get("wet_frac", 0.90),
+            },
+        )
+    else:
+        band = derived.bed_moisture_band(plants, cfg.crops)
+
+    return band[0] if band else fallback
+
+
 def check_soil_moisture_low() -> list[RuleResult]:
     t = cfg.thresholds.get("soil_moisture_low", {})
     keys = t.get("sensor_keys", [])
-    threshold = t.get("below", 30)
+    flat_threshold = t.get("below", 30)
     consecutive = t.get("consecutive", 3)
+
+    beds_by_key = {
+        bed.get("sensors", {}).get("soil_moisture"): bed
+        for bed in cfg.dashboard.get("beds", [])
+    }
 
     results = []
     for key in keys:
         label = cfg.sensor_label(key)
+        bed = beds_by_key.get(key)
+        threshold = _bed_dry_threshold(bed, flat_threshold) if bed else flat_threshold
+
         recent = storage.recent_values(key, consecutive)
         fired = len(recent) == consecutive and all(v < threshold for v in recent)
         if fired:
             latest = recent[0]
             body = (
-                f"{label} has been below {threshold}% for {consecutive} consecutive readings "
+                f"{label} has been below {threshold:.0f}% for {consecutive} consecutive readings "
                 f"(current: {latest:.0f}%). Time to water."
             )
         else:

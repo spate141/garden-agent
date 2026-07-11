@@ -121,6 +121,45 @@ async def api_series(
     return JSONResponse(storage.series(sensor, hours))
 
 
+# ── Per-bed moisture band (self-learned, crop-band fallback) ─────────────────
+
+def _effective_bed_band(bed: dict[str, Any]) -> tuple[float, float] | None:
+    """
+    A bed's effective (min%, max%) moisture band: self-learned from its own
+    recent history when there's enough of it, else the crop-derived band.
+
+    Shared by /api/insights (per-bed stress) and the / dashboard handler
+    (chart green band + "Too wet" line) so both agree on what "dry"/"wet"
+    means for a given bed. See derived.effective_moisture_band for why a
+    fixed crop range can permanently misjudge a bed with unusually
+    loose/compacted soil.
+    """
+    moist_key = bed.get("sensors", {}).get("soil_moisture")
+    if not moist_key:
+        return None
+
+    learn_cfg = cfg.thresholds.get("moisture_learning", {})
+    if not learn_cfg.get("enabled", True):
+        return drv.bed_moisture_band(bed.get("plants", []), cfg.crops)
+
+    hours = int(learn_cfg.get("learn_days", 7)) * 24
+    values = [r["value"] for r in storage.series(moist_key, hours)]
+
+    return drv.effective_moisture_band(
+        values,
+        bed.get("plants", []),
+        cfg.crops,
+        learning_kwargs={
+            "min_points":  learn_cfg.get("min_points", 200),
+            "min_spread":  learn_cfg.get("min_spread_pct", 8),
+            "dry_pctile":  learn_cfg.get("dry_pctile", 10),
+            "wet_pctile":  learn_cfg.get("wet_pctile", 90),
+            "dry_frac":    learn_cfg.get("dry_frac", 0.30),
+            "wet_frac":    learn_cfg.get("wet_frac", 0.90),
+        },
+    )
+
+
 # ── GET /api/insights ────────────────────────────────────────────────────────
 
 @app.get("/api/insights")
@@ -210,6 +249,7 @@ async def api_insights() -> JSONResponse:
                 soil_moist,
                 air_temp_f,
                 cfg.crops,
+                band_override=_effective_bed_band(bed),
             )
         else:
             stress = {
@@ -319,12 +359,21 @@ async def dashboard(request: Request):
         _unique = list(dict.fromkeys(p for p in _plants if p in _ranges))
         if not _unique:
             continue
-        _moist_min = max(_ranges[p]["moist"][0] for p in _unique)
-        _moist_max = min(_ranges[p]["moist"][1] for p in _unique)
         _crop_labels = [_ranges[p]["label"] for p in _unique]
+
+        # Prefer the bed's self-learned band (compaction-adjusted) over the
+        # flat crop range, so the green healthy band + "Too wet" line match
+        # what /api/insights uses to label this bed dry/ok/wet.
+        _band = _effective_bed_band(_bed)
+        if _band is None:
+            _band = (
+                max(_ranges[p]["moist"][0] for p in _unique),
+                min(_ranges[p]["moist"][1] for p in _unique),
+            )
+
         _moisture_bands[_sensor_key] = {
-            "min":   _moist_min,
-            "max":   _moist_max,
+            "min":   _band[0],
+            "max":   _band[1],
             "label": _bed.get("name", _sensor_key),
             "crops": ", ".join(_crop_labels),
         }

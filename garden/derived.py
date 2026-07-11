@@ -12,6 +12,8 @@ Public API:
   frost_risk(dewpoint_f, threshold) → (bool, message)
   bed_stress(plants, moist, temp)  → {status, reason, crops}
   bed_moisture_band(plants)        → (min%, max%) | None
+  learned_moisture_band(values)    → (min%, max%) | None — self-calibrated from a bed's own history
+  effective_moisture_band(...)     → learned band, falling back to the crop band
   family_labels(plants)            → list of unique lowercase crop-family names
   analyze_watering(samples)        → {detected, baseline, peak, settled, quality, ...}
   drydown_rate(samples)            → {per_day, per_hour, n_points, reason}
@@ -261,11 +263,109 @@ def bed_moisture_band(
     return (moist_min, moist_max)
 
 
+def learned_moisture_band(
+    values: list[float],
+    crop_band: tuple[float, float] | None,
+    *,
+    min_points: int = 200,
+    min_spread: float = 8.0,
+    dry_pctile: float = 10.0,
+    wet_pctile: float = 90.0,
+    dry_frac: float = 0.30,
+    wet_frac: float = 0.90,
+) -> tuple[float, float] | None:
+    """
+    Self-calibrated (min%, max%) soil-moisture band for a bed, learned from its
+    OWN recent readings rather than an absolute crop range.
+
+    Rationale: a capacitive soil sensor reads the soil's dielectric, so loose
+    fresh soil (more air pockets) reads a lower % than compacted soil at the
+    same plant-available water. A fixed crop band (e.g. tomato 50-80%) can
+    permanently misjudge a bed whose soil never reaches that absolute range.
+    Instead, each watering cycle traces a sawtooth: the top of the post-water
+    plateau approximates that bed's field capacity ("wet"), and the pre-water
+    low approximates its dry point — both intrinsically compaction-adjusted.
+
+    values:     recent moisture % readings for one bed's sensor, most-recent
+                window first or in any order (order doesn't matter here).
+    crop_band:  the bed's crop-derived (min, max) from bed_moisture_band(),
+                unused by the math but accepted so callers can pass it through
+                one call site; NOT used as a fallback here (see
+                effective_moisture_band for that).
+    min_points: minimum sample count required to trust the learned band —
+                below this, historical coverage is too thin (e.g. a bed just
+                added this season).
+    min_spread: minimum (wet_pctile - dry_pctile) percentage-point spread
+                required — guards against a flatlined/stuck sensor or a bed
+                that's never actually dried down, where percentiles collapse
+                and would produce a meaninglessly narrow band.
+    dry_pctile/wet_pctile: robust (outlier-resistant) stand-ins for "driest
+                observed" / "field capacity", using percentiles instead of
+                min/max so a single sensor glitch doesn't skew the band.
+    dry_frac/wet_frac: where within the observed [floor, fc] envelope the
+                effective dry/wet cutoffs sit (30%/90% by default — "dry"
+                trips a bit above the true floor so an alert has lead time;
+                "wet" sits near field capacity).
+
+    Returns None when there isn't enough history or spread to trust the
+    result — callers should fall back to the crop-derived band in that case
+    (see effective_moisture_band).
+    """
+    if len(values) < min_points:
+        return None
+
+    floor = _percentile(values, dry_pctile)
+    fc    = _percentile(values, wet_pctile)
+    spread = fc - floor
+    if spread < min_spread:
+        return None
+
+    moist_min = floor + dry_frac * spread
+    moist_max = floor + wet_frac * spread
+    return (moist_min, moist_max)
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolated percentile (0-100), no numpy dependency."""
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 1:
+        return ordered[0]
+    rank = (pct / 100.0) * (n - 1)
+    lo = math.floor(rank)
+    hi = math.ceil(rank)
+    if lo == hi:
+        return ordered[int(rank)]
+    frac = rank - lo
+    return ordered[lo] + (ordered[hi] - ordered[lo]) * frac
+
+
+def effective_moisture_band(
+    values: list[float],
+    plants: list[str],
+    custom_ranges: dict[str, Any] | None = None,
+    learning_kwargs: dict[str, Any] | None = None,
+) -> tuple[float, float] | None:
+    """
+    The band bed_stress should actually use for a bed: self-learned from its
+    own history when there's enough of it, otherwise the crop-derived band.
+
+    values:          recent moisture % readings for the bed's sensor.
+    plants/custom_ranges: forwarded to bed_moisture_band() for the fallback.
+    learning_kwargs: forwarded to learned_moisture_band() (min_points,
+                     min_spread, dry_pctile, wet_pctile, dry_frac, wet_frac).
+    """
+    crop_band = bed_moisture_band(plants, custom_ranges)
+    learned = learned_moisture_band(values, crop_band, **(learning_kwargs or {}))
+    return learned or crop_band
+
+
 def bed_stress(
     plants: list[str],
     soil_moist: float,
     air_temp_f: float,
     custom_ranges: dict[str, Any] | None = None,
+    band_override: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
     """
     Assess the stress state of a raised bed.
@@ -275,6 +375,11 @@ def bed_stress(
     air_temp_f:    outdoor air temperature °F.
     custom_ranges: optional per-crop overrides from config.yaml crops: block
                    (each value may contain 'moist' and/or 'temp' lists).
+    band_override: optional (min%, max%) to use for the moisture check instead
+                    of the crop-derived band — pass a bed's self-learned band
+                    (see learned_moisture_band/effective_moisture_band) so the
+                    dry/wet call reflects that bed's own soil, not a one-size
+                    crop range. Temperature-stress logic is unaffected.
 
     When a bed holds multiple crop types, we use the intersection of their ideal
     ranges (most conservative), since they share one soil sensor.
@@ -297,8 +402,9 @@ def bed_stress(
             "crops": [],
         }
 
-    # Aggregate range: intersection (strictest min and max across crops)
-    moist_min, moist_max = bed_moisture_band(plants, custom_ranges)
+    # Aggregate range: intersection (strictest min and max across crops),
+    # unless the caller supplied a self-learned band for this specific bed.
+    moist_min, moist_max = band_override or bed_moisture_band(plants, custom_ranges)
     temp_min  = max(ranges[p]["temp"][0] for p in unique)
     temp_max  = min(ranges[p]["temp"][1] for p in unique)
     labels    = [ranges[p]["label"] for p in unique]

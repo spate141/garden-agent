@@ -17,9 +17,11 @@ from garden.derived import (
     days_until_dry,
     dew_point_f,
     drydown_rate,
+    effective_moisture_band,
     et0_water_balance,
     frost_risk,
     heat_index_f,
+    learned_moisture_band,
     vpd_kpa,
     vpd_status,
 )
@@ -260,6 +262,107 @@ class TestBedMoistureBand:
     def test_custom_ranges(self):
         band = bed_moisture_band(["tomato"], custom_ranges={"tomato": {"moist": [70, 90]}})
         assert band == (70, 90)
+
+
+# ── learned_moisture_band / effective_moisture_band ───────────────────────────
+#
+# A capacitive sensor reads soil dielectric, so loose/fresh soil reads a lower
+# % than compacted soil at the same plant-available water. These tests model
+# that: one bed's sawtooth rides low (35-58%, fresh loose soil), another rides
+# high (60-85%, old compacted soil) — the learned band should track each bed's
+# own envelope rather than a single crop-derived absolute range.
+
+def _sawtooth(low: float, high: float, cycles: int = 12, points_per_cycle: int = 30) -> list[float]:
+    """Repeating spike-then-gradual-decay cycles between low and high."""
+    vals: list[float] = []
+    for _ in range(cycles):
+        vals += [high - (high - low) * i / (points_per_cycle - 1) for i in range(points_per_cycle)]
+    return vals
+
+
+class TestLearnedMoistureBand:
+    def test_cold_start_too_few_points(self):
+        # Plenty of spread, but below min_points -> not enough history yet.
+        values = _sawtooth(35, 58, cycles=3, points_per_cycle=10)  # 30 points
+        assert learned_moisture_band(values, crop_band=(50, 80), min_points=200) is None
+
+    def test_flat_sensor_insufficient_spread(self):
+        # Enough points, but the bed never dries down (or a stuck sensor) ->
+        # spread guard should refuse to trust a near-zero envelope.
+        values = [65.0 + (i % 3) * 0.1 for i in range(250)]
+        band = learned_moisture_band(values, crop_band=(50, 80), min_points=200, min_spread=8.0)
+        assert band is None
+
+    def test_loose_soil_bed_learns_its_own_low_band(self):
+        values = _sawtooth(35, 58, cycles=12, points_per_cycle=30)
+        band = learned_moisture_band(values, crop_band=(50, 80), min_points=200, min_spread=8.0)
+        assert band is not None
+        moist_min, moist_max = band
+        # Learned band should sit within the bed's own observed range, well
+        # below the crop-derived 50% floor that would otherwise flag it "dry".
+        assert 34.0 <= moist_min < moist_max <= 59.0
+        assert moist_min < 50.0
+
+    def test_compact_soil_bed_learns_its_own_high_band(self):
+        values = _sawtooth(60, 85, cycles=12, points_per_cycle=30)
+        band = learned_moisture_band(values, crop_band=(50, 80), min_points=200, min_spread=8.0)
+        assert band is not None
+        moist_min, moist_max = band
+        assert 59.0 <= moist_min < moist_max <= 86.0
+
+
+class TestEffectiveMoistureBand:
+    def test_falls_back_to_crop_band_without_history(self):
+        band = effective_moisture_band([], ["tomato"], learning_kwargs={"min_points": 200})
+        assert band == bed_moisture_band(["tomato"])
+
+    def test_falls_back_when_unrecognized_crop_and_no_history(self):
+        assert effective_moisture_band([], ["foobar"]) is None
+
+    def test_uses_learned_band_when_history_is_sufficient(self):
+        values = _sawtooth(35, 58, cycles=12, points_per_cycle=30)
+        crop_band = bed_moisture_band(["tomato"])  # (50, 80)
+        band = effective_moisture_band(
+            values, ["tomato"],
+            learning_kwargs={"min_points": 200, "min_spread": 8.0},
+        )
+        assert band != crop_band
+        assert band[0] < crop_band[0]
+
+    def test_compaction_cancels_out_between_two_beds(self):
+        # Same watering regimen, different soil compaction -> different raw
+        # readings, but each bed should read "ok" for ITS OWN soil once the
+        # band is learned, matching the real dashboard symptom this fixes.
+        loose = _sawtooth(35, 58, cycles=12, points_per_cycle=30)
+        compact = _sawtooth(60, 85, cycles=12, points_per_cycle=30)
+        knobs = {"min_points": 200, "min_spread": 8.0}
+
+        loose_band = effective_moisture_band(loose, ["tomato"], learning_kwargs=knobs)
+        compact_band = effective_moisture_band(compact, ["tomato"], learning_kwargs=knobs)
+
+        loose_status = bed_stress(["tomato"], soil_moist=48.0, air_temp_f=75.0, band_override=loose_band)
+        compact_status = bed_stress(["tomato"], soil_moist=62.0, air_temp_f=75.0, band_override=compact_band)
+
+        assert loose_status["status"] == "ok"       # would be "dry" under the flat crop band (min 50)
+        assert compact_status["status"] == "dry"     # dry relative to ITS OWN higher envelope
+
+
+# ── bed_stress band_override ──────────────────────────────────────────────────
+
+class TestBedStressBandOverride:
+    def test_override_replaces_crop_band_for_moisture_check(self):
+        # Crop band for tomato is (50, 80); override to (30, 55) and confirm
+        # the moisture verdict follows the override, not the crop default.
+        result = bed_stress(["tomato"], soil_moist=40.0, air_temp_f=75.0, band_override=(30, 55))
+        assert result["status"] == "ok"
+
+    def test_override_does_not_affect_temperature_stress(self):
+        result = bed_stress(["tomato"], soil_moist=40.0, air_temp_f=45.0, band_override=(30, 55))
+        assert result["status"] == "cold"
+
+    def test_no_override_falls_back_to_crop_band(self):
+        result = bed_stress(["tomato"], soil_moist=40.0, air_temp_f=75.0)
+        assert result["status"] == "dry"
 
 
 # ── watering lifecycle: analyze_watering / drydown_rate / days_until_dry ──────

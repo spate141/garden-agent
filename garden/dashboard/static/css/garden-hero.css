@@ -430,20 +430,72 @@
   bottom: 0;
   height: 0;
   border-radius: 5px;
-  background: var(--g-stake-ok);
+  background-color: var(--g-stake-ok);
+  /* glass-tube depth: a bright edge on one side, a soft shadow on the other --
+     gives the fill body volume instead of reading as a flat color swatch */
+  box-shadow:
+    inset 1px 0 0 rgba(255,255,255,0.28),
+    inset -1px 0 2px rgba(0,0,0,0.22);
   transition: height 1.2s ease, background-color 1.2s ease;
+  overflow: hidden;
 }
-.g-stake--dry  .g-stake-fill { background: var(--g-stake-dry); }
-.g-stake--ok   .g-stake-fill { background: var(--g-stake-ok); }
-.g-stake--wet  .g-stake-fill { background: var(--g-stake-wet); }
+/* Slow light glint drifting up/down the column -- like light playing on a
+   water surface. Soft and low-contrast by design, not a hard pattern. */
+.g-stake-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(200deg,
+    rgba(255,255,255,0.3) 0%,
+    rgba(255,255,255,0) 24%,
+    rgba(255,255,255,0) 68%,
+    rgba(255,255,255,0.12) 100%);
+  background-size: 100% 220%;
+  animation: g-stake-glint 6s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Wavy surface crest -- a thin sine-topped strip in the fill's own color,
+   overlapping the fill's top edge so it reads as the water's own surface.
+   Sways gently side to side (not a scrolling loop) for a subtle slosh. */
+.g-stake-fill::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: -2px;
+  height: 5px;
+  background: inherit;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6'%3E%3Cpath d='M0 6 L0 3.5 Q4 1.5 8 3.5 T16 3.5 L16 6 Z' fill='%23fff'/%3E%3C/svg%3E") repeat-x;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6'%3E%3Cpath d='M0 6 L0 3.5 Q4 1.5 8 3.5 T16 3.5 L16 6 Z' fill='%23fff'/%3E%3C/svg%3E") repeat-x;
+  -webkit-mask-size: 16px 6px;
+          mask-size: 16px 6px;
+  animation: g-stake-wave 4s ease-in-out infinite;
+  z-index: 1;
+}
+.g-stake--dry  .g-stake-fill { background-color: var(--g-stake-dry); }
+.g-stake--ok   .g-stake-fill { background-color: var(--g-stake-ok); }
+.g-stake--wet  .g-stake-fill { background-color: var(--g-stake-wet); }
 .g-stake--asleep {
   filter: grayscale(0.85);
   opacity: 0.4;
 }
-.g-stake--asleep .g-stake-fill { background: var(--g-stake-asleep); }
+.g-stake--asleep .g-stake-fill { background-color: var(--g-stake-asleep); }
+
+@keyframes g-stake-wave {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-8px); }
+}
+
+@keyframes g-stake-glint {
+  0%, 100% { background-position: 0 0%; }
+  50%      { background-position: 0 100%; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .g-stake-fill { transition: none; }
+  .g-stake-fill::before,
+  .g-stake-fill::after { animation: none; }
 }
 
 /* Front rail -- overlaps soil bottom so plants sit inside the bed */
