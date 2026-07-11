@@ -2527,12 +2527,588 @@ document.getElementById('garden-beds').addEventListener('click', function (e) {
     const emoji = PLANT_EMOJI[type] || PLANT_EMOJI.unknown;
     explodeEmoji(emoji, plant.getBoundingClientRect());
     eggTapState.delete(plant);   /* re-arm immediately for another round */
+    /* Let the burst read as the game's "launch" flourish, then cut in --
+       see GARDEN NINJA below. Guarded there against a game already running.
+       Unlock audio here (synchronously, inside the click gesture) rather
+       than inside the delayed startNinjaGame() -- Safari's autoplay policy
+       won't grant an AudioContext created from a setTimeout callback. */
+    ninjaAudio.unlock();
+    setTimeout(startNinjaGame, 550);
     return;
   }
 
   const timer = setTimeout(function () { eggTapState.delete(plant); }, EGG_TAP_WINDOW);
   eggTapState.set(plant, { count: count, timer: timer });
 });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GARDEN NINJA — fruit-slicing mini-game, launched from the tap-4x easter egg.
+   Single-file, no build step, no external assets: canvas game field + a small
+   WebAudio synth for sound effects. Lazily built on first launch and reused
+   on subsequent launches (mirrors getEggLayer()'s lazy-singleton pattern).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/** Slice-able produce pool (weighted plain), the golden bonus wrapper, and the
+ *  one hazard. Reuses PLANT_EMOJI's veg where it makes sense, plus a few extra
+ *  garden fruits for visual variety -- purely decorative, no gameplay meaning
+ *  beyond "bonus" scoring more. */
+const NINJA_FRUIT   = ['🍅', '🍆', '🌶️', '🫑', '🥒', '🫛', '🍓', '🫐', '🌽', '🎃', '🥕'];
+const NINJA_BOMB     = '💣';
+
+const NINJA_MISS_LIMIT   = 3;     /* uncut fruit allowed before game over */
+const NINJA_MAX_ALIVE    = 10;    /* hard cap on simultaneous airborne entities */
+const NINJA_RAMP_MS      = 60000; /* time to reach fastest spawn rate + full speed */
+const NINJA_SPAWN_START  = 1400;  /* ms between spawns at t=0 -- deliberately gentle */
+const NINJA_SPAWN_END    = 350;   /* ms between spawns once fully ramped */
+const NINJA_GRAVITY      = 1500;  /* px/s^2, at full speed (t=1) */
+/* Motion "slow-motion" factor applied to both velocity and gravity together,
+   so flight *duration* stays reasonable even at low speed -- only how high/
+   fast things move scales down. Ramps 0.5 -> 1.05 over NINJA_RAMP_MS. */
+const NINJA_SPEED_START  = 0.5;
+const NINJA_SPEED_END    = 1.05;
+
+const ninja = {
+  active: false,
+  paused: false,
+  layer: null, canvas: null, ctx: null, hud: null,
+  scoreEl: null, livesEl: null, hintEl: null, gameoverEl: null,
+  dpr: 1, w: 0, h: 0,
+  entities: [],   /* airborne fruit/bombs */
+  juice: [],      /* splatter particles */
+  popups: [],     /* floating +score text */
+  trail: [],      /* recent pointer points for the slice trail */
+  score: 0,
+  lives: NINJA_MISS_LIMIT,
+  startedAt: 0,
+  lastTs: 0,
+  spawnAt: 0,
+  rafId: null,
+  reduced: false,
+};
+
+function _ninjaBest() {
+  return parseInt(localStorage.getItem('gardenNinjaBest') || '0', 10) || 0;
+}
+
+/* ── tiny WebAudio synth: no asset files, created lazily on first user gesture ── */
+const ninjaAudio = {
+  ctx: null,
+  muted: localStorage.getItem('gardenNinjaMuted') === '1',
+  unlock: function () {
+    /* Must run synchronously inside a user-gesture handler (click/tap) --
+       Safari and other strict autoplay policies won't grant audio to a
+       context created from inside a setTimeout/async callback. */
+    if (!this.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this.ctx = new Ctx();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  toggleMute: function () {
+    this.muted = !this.muted;
+    localStorage.setItem('gardenNinjaMuted', this.muted ? '1' : '0');
+    return this.muted;
+  },
+  _tone: function (freq, dur, type, gain) {
+    if (this.muted || !this.ctx) return;
+    const t0  = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g   = this.ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain || 0.16, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  },
+  swoosh: function () {
+    if (this.muted || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const bufSize = Math.floor(this.ctx.sampleRate * 0.18);
+    const buf  = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = this.ctx.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.setValueAtTime(1800, t0);
+    filt.frequency.exponentialRampToValueAtTime(500, t0 + 0.18);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.14, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+    src.connect(filt).connect(g).connect(this.ctx.destination);
+    src.start(t0);
+  },
+  pop: function (bonus) { this._tone(bonus ? 920 : 660, 0.12, 'triangle', 0.18); },
+  boom: function () {
+    if (this.muted || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g   = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, t0);
+    osc.frequency.exponentialRampToValueAtTime(30, t0 + 0.5);
+    g.gain.setValueAtTime(0.3, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.6);
+  },
+  over: function () {
+    if (this.muted || !this.ctx) return;
+    const notes = [440, 349, 262];
+    const self = this;
+    notes.forEach(function (f, i) {
+      setTimeout(function () { self._tone(f, 0.22, 'square', 0.14); }, i * 110);
+    });
+  },
+};
+
+function _ninjaBuildOverlay() {
+  if (ninja.layer) return;
+
+  const layer = document.createElement('div');
+  layer.className = 'g-ninja-layer';
+  layer.setAttribute('role', 'dialog');
+  layer.setAttribute('aria-label', 'Garden Ninja mini-game');
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'g-ninja-canvas';
+  layer.appendChild(canvas);
+
+  const hud = document.createElement('div');
+  hud.className = 'g-ninja-hud';
+  hud.innerHTML =
+    '<div class="g-ninja-score"><span class="g-ninja-score-label">Score</span>' +
+      '<span class="g-ninja-score-value">0</span></div>' +
+    '<div class="g-ninja-lives" aria-hidden="true"></div>' +
+    '<div class="g-ninja-controls">' +
+      '<button type="button" class="g-ninja-btn g-ninja-mute" aria-label="Toggle sound"></button>' +
+      '<button type="button" class="g-ninja-btn g-ninja-close" aria-label="Close game">✕</button>' +
+    '</div>';
+  layer.appendChild(hud);
+
+  const hint = document.createElement('div');
+  hint.className = 'g-ninja-hint';
+  hint.textContent = '🔪 Slide to slice! Avoid the 💣';
+  layer.appendChild(hint);
+
+  const gameover = document.createElement('div');
+  gameover.className = 'g-ninja-gameover';
+  gameover.innerHTML =
+    '<div class="g-ninja-panel">' +
+      '<h2>Game Over</h2>' +
+      '<p class="g-ninja-reason"></p>' +
+      '<div class="g-ninja-stats">' +
+        '<div class="g-ninja-stat"><div class="g-ninja-stat-value g-ninja-final-score">0</div>' +
+          '<div class="g-ninja-stat-label">Score</div></div>' +
+        '<div class="g-ninja-stat"><div class="g-ninja-stat-value g-ninja-best-score">0</div>' +
+          '<div class="g-ninja-stat-label">Best</div></div>' +
+      '</div>' +
+      '<div class="g-ninja-panel-actions">' +
+        '<button type="button" class="g-ninja-close-btn">Close</button>' +
+        '<button type="button" class="g-ninja-primary g-ninja-again">Play again</button>' +
+      '</div>' +
+    '</div>';
+  layer.appendChild(gameover);
+
+  document.body.appendChild(layer);
+
+  ninja.layer = layer;
+  ninja.canvas = canvas;
+  ninja.ctx = canvas.getContext('2d');
+  ninja.hud = hud;
+  ninja.scoreEl = hud.querySelector('.g-ninja-score-value');
+  ninja.livesEl = hud.querySelector('.g-ninja-lives');
+  ninja.hintEl = hint;
+  ninja.gameoverEl = gameover;
+
+  hud.querySelector('.g-ninja-close').addEventListener('click', function () { _ninjaClose(); });
+  hud.querySelector('.g-ninja-mute').addEventListener('click', function () {
+    const muted = ninjaAudio.toggleMute();
+    this.textContent = muted ? '🔇' : '🔊';
+  });
+  gameover.querySelector('.g-ninja-close-btn').addEventListener('click', function () { _ninjaClose(); });
+  gameover.querySelector('.g-ninja-again').addEventListener('click', function () { startNinjaGame(); });
+
+  canvas.addEventListener('pointerdown', _ninjaPointerDown);
+  canvas.addEventListener('pointermove', _ninjaPointerMove);
+  canvas.addEventListener('pointerup', _ninjaPointerUp);
+  canvas.addEventListener('pointercancel', _ninjaPointerUp);
+
+  window.addEventListener('resize', _ninjaResize);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ninja.active) _ninjaClose();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!ninja.active) return;
+    if (document.hidden) _ninjaPause(); else _ninjaResume();
+  });
+}
+
+function _ninjaResize() {
+  if (!ninja.canvas) return;
+  ninja.dpr = window.devicePixelRatio || 1;
+  ninja.w = window.innerWidth;
+  ninja.h = window.innerHeight;
+  ninja.canvas.width = Math.floor(ninja.w * ninja.dpr);
+  ninja.canvas.height = Math.floor(ninja.h * ninja.dpr);
+  ninja.ctx.setTransform(ninja.dpr, 0, 0, ninja.dpr, 0, 0);
+}
+
+function _ninjaRenderLives() {
+  ninja.livesEl.innerHTML = '';
+  for (let i = 0; i < NINJA_MISS_LIMIT; i++) {
+    const span = document.createElement('span');
+    span.className = 'g-ninja-life' + (i < ninja.lives ? '' : ' is-lost');
+    span.textContent = '❤️';
+    ninja.livesEl.appendChild(span);
+  }
+}
+
+function startNinjaGame() {
+  if (ninja.active) return;
+  _ninjaBuildOverlay();
+  ninjaAudio.unlock();
+
+  ninja.active = true;
+  ninja.paused = false;
+  ninja.entities = [];
+  ninja.juice = [];
+  ninja.popups = [];
+  ninja.trail = [];
+  ninja.score = 0;
+  ninja.lives = NINJA_MISS_LIMIT;
+  ninja.startedAt = performance.now();
+  ninja.lastTs = ninja.startedAt;
+  ninja.spawnAt = ninja.startedAt + 250;
+  ninja.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  ninja.scoreEl.textContent = '0';
+  _ninjaRenderLives();
+  ninja.gameoverEl.classList.remove('is-visible');
+  ninja.hud.querySelector('.g-ninja-mute').textContent = ninjaAudio.muted ? '🔇' : '🔊';
+
+  _ninjaResize();
+  ninja.layer.classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+
+  ninja.hintEl.classList.remove('is-showing');
+  void ninja.hintEl.offsetWidth; /* restart the hint animation each round */
+  ninja.hintEl.classList.add('is-showing');
+
+  if (ninja.rafId) cancelAnimationFrame(ninja.rafId);
+  ninja.rafId = requestAnimationFrame(_ninjaTick);
+}
+
+function _ninjaPause() {
+  ninja.paused = true;
+  if (ninja.rafId) { cancelAnimationFrame(ninja.rafId); ninja.rafId = null; }
+}
+function _ninjaResume() {
+  if (!ninja.active || !ninja.paused) return;
+  ninja.paused = false;
+  ninja.lastTs = performance.now();
+  ninja.spawnAt = ninja.lastTs + 300;
+  ninja.rafId = requestAnimationFrame(_ninjaTick);
+}
+
+function _ninjaClose() {
+  ninja.active = false;
+  ninja.paused = false;
+  if (ninja.rafId) { cancelAnimationFrame(ninja.rafId); ninja.rafId = null; }
+  if (ninja.layer) ninja.layer.classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+function _ninjaGameOver(reason) {
+  if (!ninja.active) return;
+  ninja.active = false;
+  if (ninja.rafId) { cancelAnimationFrame(ninja.rafId); ninja.rafId = null; }
+  ninjaAudio.over();
+
+  const best = Math.max(_ninjaBest(), ninja.score);
+  localStorage.setItem('gardenNinjaBest', String(best));
+
+  ninja.gameoverEl.querySelector('.g-ninja-reason').textContent =
+    reason === 'bomb' ? 'Boom! You sliced a bomb.' : 'Out of lives -- too many slipped by.';
+  ninja.gameoverEl.querySelector('.g-ninja-final-score').textContent = String(ninja.score);
+  ninja.gameoverEl.querySelector('.g-ninja-best-score').textContent = String(best);
+  ninja.gameoverEl.classList.add('is-visible');
+}
+
+/** Fruit size scales off the viewport's smaller dimension so touch targets
+ *  stay comfortable on phones and fruit isn't lost as a speck on wide desktop
+ *  screens. Clamped to a sane range either way. */
+function _ninjaFruitRadius() {
+  const minDim = Math.min(ninja.w, ninja.h);
+  return Math.max(30, Math.min(48, minDim * 0.06));
+}
+
+/** 0..1 progress through the difficulty ramp window. */
+function _ninjaRampT(elapsed) {
+  return Math.min(1, elapsed / NINJA_RAMP_MS);
+}
+
+/** Slow-motion factor applied to both velocity and gravity together, so
+ *  flight *duration* stays reasonable even when things start slow -- only
+ *  how high/fast fruit moves scales down, not how long it hangs in the air. */
+function _ninjaSpeedFactor(elapsed) {
+  const t = _ninjaRampT(elapsed);
+  return NINJA_SPEED_START + (NINJA_SPEED_END - NINJA_SPEED_START) * t;
+}
+
+/* ── entity spawning ── */
+function _ninjaSpawn(elapsed) {
+  if (ninja.entities.length >= NINJA_MAX_ALIVE) return;
+
+  const fromLeft = Math.random() < 0.5;
+  const roll = Math.random();
+  let kind = 'fruit', emoji, bonus = false;
+  if (roll < 0.10) {
+    kind = 'bomb'; emoji = NINJA_BOMB;
+  } else if (roll < 0.20) {
+    bonus = true; emoji = NINJA_FRUIT[Math.floor(Math.random() * NINJA_FRUIT.length)];
+  } else {
+    emoji = NINJA_FRUIT[Math.floor(Math.random() * NINJA_FRUIT.length)];
+  }
+
+  const speed = _ninjaSpeedFactor(elapsed);
+  const x = fromLeft ? -20 : ninja.w + 20;
+  const y = ninja.h + 30;
+  const targetX = ninja.w * (0.28 + Math.random() * 0.44); /* aim toward center-ish */
+  /* Peak (apex of the arc) always lands at or above screen middle (0.5h),
+     with some flying higher for variety -- guarantees every toss actually
+     reaches the middle instead of falling short. */
+  const peakHeight = ninja.h * (0.30 + Math.random() * 0.20);
+  /* base vx/vy tuned for full speed (factor 1); scaling both them and
+     gravity by the same factor keeps time-in-air roughly constant while
+     the toss height and horizontal drift shrink at low speed. */
+  const vx = ((targetX - x) / 1.1) * speed;
+  const vy = -Math.sqrt(2 * NINJA_GRAVITY * (ninja.h - peakHeight)) * speed;
+
+  ninja.entities.push({
+    emoji: emoji, kind: kind, bonus: bonus,
+    x: x, y: y, vx: vx, vy: vy,
+    gravity: NINJA_GRAVITY * speed,
+    rot: Math.random() * Math.PI * 2,
+    vr: (Math.random() - 0.5) * 4,
+    radius: _ninjaFruitRadius(),
+    sliced: false,
+  });
+}
+
+function _ninjaSpawnInterval(elapsed) {
+  const t = _ninjaRampT(elapsed);
+  return NINJA_SPAWN_START + (NINJA_SPAWN_END - NINJA_SPAWN_START) * t;
+}
+
+/* ── juice / popup particles ── */
+const NINJA_JUICE_COLOR = {
+  '🍅': '#e0503f', '🍆': '#5a3f8a', '🌶️': '#c0503f', '🫑': '#4a9c5a',
+  '🥒': '#6fa64c', '🫛': '#7ab04a', '🍓': '#e0475f', '🫐': '#4a4a9c',
+  '🌽': '#e0b83c', '🎃': '#e08a2b', '🥕': '#e08a2b',
+};
+function _ninjaJuiceBurst(x, y, emoji) {
+  const color = NINJA_JUICE_COLOR[emoji] || '#9c7350';
+  const count = ninja.reduced ? 4 : 12;
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 220;
+    ninja.juice.push({
+      x: x, y: y,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 60,
+      life: 0, maxLife: 0.45 + Math.random() * 0.25,
+      r: 2 + Math.random() * 3.5, color: color,
+    });
+  }
+}
+/** Canvas fillStyle can't resolve CSS custom properties (var(--accent)
+ *  is silently ignored, not an error) -- read the theme's actual computed
+ *  color instead so popups stay on-brand across light/dark. */
+function _ninjaAccentColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#57b874';
+}
+function _ninjaPopup(x, y, text, color) {
+  ninja.popups.push({ x: x, y: y, text: text, life: 0, maxLife: 0.7, color: color || _ninjaAccentColor() });
+}
+
+/* ── slicing ── */
+function _ninjaPointerDown(e) {
+  if (!ninja.active) return;
+  ninja.trail = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+}
+function _ninjaPointerUp() {
+  ninja.trail = [];
+}
+function _ninjaPointerMove(e) {
+  if (!ninja.active || ninja.paused) return;
+  const now = performance.now();
+  const pt = { x: e.clientX, y: e.clientY, t: now };
+  const prev = ninja.trail.length ? ninja.trail[ninja.trail.length - 1] : null;
+  ninja.trail.push(pt);
+  while (ninja.trail.length > 14) ninja.trail.shift();
+
+  if (!prev) return;
+  const dist = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+  if (dist < 4) return; /* ignore jitter/hover noise */
+
+  for (let i = 0; i < ninja.entities.length; i++) {
+    const ent = ninja.entities[i];
+    if (ent.sliced) continue;
+    if (_ninjaSegmentHitsCircle(prev.x, prev.y, pt.x, pt.y, ent.x, ent.y, ent.radius)) {
+      _ninjaSlice(ent);
+    }
+  }
+}
+function _ninjaSegmentHitsCircle(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 === 0 ? 0 : ((cx - x1) * dx + (cy - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const px = x1 + t * dx, py = y1 + t * dy;
+  return Math.hypot(cx - px, cy - py) <= r;
+}
+
+function _ninjaSlice(ent) {
+  ent.sliced = true;
+  if (ent.kind === 'bomb') {
+    ninjaAudio.boom();
+    if (!ninja.reduced) _ninjaShake();
+    _ninjaJuiceBurst(ent.x, ent.y, '💣');
+    _ninjaGameOver('bomb');
+    return;
+  }
+  const gained = ent.bonus ? 3 : 1;
+  ninja.score += gained;
+  ninja.scoreEl.textContent = String(ninja.score);
+  ninjaAudio.pop(ent.bonus);
+  _ninjaJuiceBurst(ent.x, ent.y, ent.emoji);
+  _ninjaPopup(ent.x, ent.y, '+' + gained, ent.bonus ? '#e0a44a' : null);
+}
+
+function _ninjaShake() {
+  ninja.layer.classList.remove('is-shaking');
+  void ninja.layer.offsetWidth;
+  ninja.layer.classList.add('is-shaking');
+}
+
+function _ninjaMiss(ent) {
+  ninja.lives--;
+  _ninjaRenderLives();
+  if (!ninja.reduced) _ninjaShake();
+  if (ninja.lives <= 0) _ninjaGameOver('miss');
+}
+
+/* ── main loop ── */
+function _ninjaTick(ts) {
+  if (!ninja.active || ninja.paused) return;
+  const dt = Math.min(0.05, (ts - ninja.lastTs) / 1000); /* clamp to avoid huge steps on tab-back */
+  ninja.lastTs = ts;
+  const elapsed = ts - ninja.startedAt;
+
+  if (ts >= ninja.spawnAt) {
+    _ninjaSpawn(elapsed);
+    /* occasional quick volley once the game has ramped up a bit */
+    if (elapsed > NINJA_RAMP_MS * 0.65 && Math.random() < 0.22) _ninjaSpawn(elapsed);
+    ninja.spawnAt = ts + _ninjaSpawnInterval(elapsed);
+  }
+
+  /* physics */
+  for (let i = ninja.entities.length - 1; i >= 0; i--) {
+    const ent = ninja.entities[i];
+    ent.vy += ent.gravity * dt;
+    ent.x += ent.vx * dt;
+    ent.y += ent.vy * dt;
+    ent.rot += ent.vr * dt;
+    const gone = ent.y > ninja.h + 60 || ent.x < -80 || ent.x > ninja.w + 80;
+    if (ent.sliced || gone) {
+      if (gone && !ent.sliced && ent.kind !== 'bomb') _ninjaMiss(ent);
+      ninja.entities.splice(i, 1);
+    }
+  }
+  for (let i = ninja.juice.length - 1; i >= 0; i--) {
+    const p = ninja.juice[i];
+    p.life += dt;
+    if (p.life >= p.maxLife) { ninja.juice.splice(i, 1); continue; }
+    p.vy += NINJA_GRAVITY * 0.5 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  for (let i = ninja.popups.length - 1; i >= 0; i--) {
+    const p = ninja.popups[i];
+    p.life += dt;
+    if (p.life >= p.maxLife) { ninja.popups.splice(i, 1); continue; }
+    p.y -= 40 * dt;
+  }
+
+  _ninjaDraw();
+  if (ninja.active) ninja.rafId = requestAnimationFrame(_ninjaTick);
+}
+
+function _ninjaDraw() {
+  const ctx = ninja.ctx;
+  ctx.clearRect(0, 0, ninja.w, ninja.h);
+
+  /* slice trail */
+  if (ninja.trail.length > 1) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < ninja.trail.length; i++) {
+      const a = ninja.trail[i - 1], b = ninja.trail[i];
+      const alpha = i / ninja.trail.length;
+      ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.85).toFixed(2) + ')';
+      ctx.lineWidth = 2 + alpha * 4;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* entities */
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ninja.entities.forEach(function (ent) {
+    ctx.save();
+    ctx.translate(ent.x, ent.y);
+    ctx.rotate(ent.rot);
+    if (ent.bonus) {
+      ctx.shadowColor = '#f4c542';
+      ctx.shadowBlur = 22;
+    }
+    ctx.font = (ent.radius * 1.6) + 'px serif';
+    ctx.fillText(ent.emoji, 0, 0);
+    ctx.restore();
+  });
+
+  /* juice splatter */
+  ninja.juice.forEach(function (p) {
+    const alpha = 1 - p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  /* score popups */
+  ctx.font = '700 20px sans-serif';
+  ninja.popups.forEach(function (p) {
+    const alpha = 1 - p.life / p.maxLife;
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillStyle = p.color || '#57b874';
+    ctx.fillText(p.text, p.x, p.y);
+  });
+  ctx.globalAlpha = 1;
+}
 
 /** Soft skeleton placeholders for the chip row + climate stats while the
  *  first /api/latest + /api/insights round trip is in flight (redesign.md

@@ -13,16 +13,9 @@ Self-hosted pipeline: ingests Ecowitt soil/air sensor data from a GW1200 gateway
 ## Dashboard Screenshots
 
 <details>
-<summary>Light mode</summary>
+<summary>Click here to see screenshot...</summary>
 
 ![Dashboard – light mode](docs/light.png)
-
-</details>
-
-<details>
-<summary>Night mode</summary>
-
-![Dashboard – night mode](docs/night.png)
 
 </details>
 
