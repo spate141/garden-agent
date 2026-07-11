@@ -15,9 +15,13 @@
   display: flex;
   flex-direction: column;
   touch-action: none; /* swiping the game must not scroll the page */
+  /* Stays in the DOM between rounds (lazy singleton) -- without this it
+     would silently swallow every dashboard tap/swipe even while invisible. */
+  pointer-events: none;
 }
 .g-ninja-layer.is-open {
   opacity: 1;
+  pointer-events: auto;
 }
 @media (prefers-reduced-motion: no-preference) {
   .g-ninja-layer {

@@ -2883,18 +2883,16 @@ function _ninjaSpawn(elapsed) {
   const targetX = ninja.w * (0.28 + Math.random() * 0.44); /* aim toward center-ish */
   /* Peak (apex of the arc) always lands at or above screen middle (0.5h),
      with some flying higher for variety -- guarantees every toss actually
-     reaches the middle instead of falling short. */
+     reaches the middle instead of falling short. Vertical physics use the
+     constant NINJA_GRAVITY always (not scaled by `speed`) so this guarantee
+     holds even at game start; only horizontal drift ramps up over time. */
   const peakHeight = ninja.h * (0.30 + Math.random() * 0.20);
-  /* base vx/vy tuned for full speed (factor 1); scaling both them and
-     gravity by the same factor keeps time-in-air roughly constant while
-     the toss height and horizontal drift shrink at low speed. */
   const vx = ((targetX - x) / 1.1) * speed;
-  const vy = -Math.sqrt(2 * NINJA_GRAVITY * (ninja.h - peakHeight)) * speed;
+  const vy = -Math.sqrt(2 * NINJA_GRAVITY * (ninja.h - peakHeight));
 
   ninja.entities.push({
     emoji: emoji, kind: kind, bonus: bonus,
     x: x, y: y, vx: vx, vy: vy,
-    gravity: NINJA_GRAVITY * speed,
     rot: Math.random() * Math.PI * 2,
     vr: (Math.random() - 0.5) * 4,
     radius: _ninjaFruitRadius(),
@@ -3021,7 +3019,7 @@ function _ninjaTick(ts) {
   /* physics */
   for (let i = ninja.entities.length - 1; i >= 0; i--) {
     const ent = ninja.entities[i];
-    ent.vy += ent.gravity * dt;
+    ent.vy += NINJA_GRAVITY * dt;
     ent.x += ent.vx * dt;
     ent.y += ent.vy * dt;
     ent.rot += ent.vr * dt;
