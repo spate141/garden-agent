@@ -48,6 +48,12 @@ let SKY = window.GARDEN_CONFIG.SKY;
  *  { conditions, weather_code, rain_in, cloud_cover_pct, is_raining, intensity } */
 let CURRENT = null;
 
+/** Today's peak wind (mph), from /api/insights.forecast.wind_max_mph.
+ *  Drives the full-page sky backdrop's rain-streak slant + cloud speed
+ *  (sky-backdrop.css / _addSkyRainDrops). null until first insights load,
+ *  or if weather is unavailable -- visuals just fall back to no wind. */
+let WIND_MAX_MPH = null;
+
 /** Latest reading per sensor_key, refreshed each poll — feeds the climate strip. */
 let LATEST_READINGS = {};
 /** Latest reading timestamp per sensor_key, same cadence — feeds chip staleness. */
@@ -203,27 +209,34 @@ function tod() {
    ════════════════════════════════════════════════════════════════════════════ */
 
 /**
- * Returns the position of a celestial body along a parabolic arc over the sky strip.
+ * Returns the position of a celestial body along a parabolic arc.
+ *
+ * peakTop/lowTop are fixed pixel offsets from the top of the viewport, not
+ * derived from the sky element's height: the full-page backdrop's .sky-band
+ * is tall (60vh) so the *visual* horizon (grass/treeline in the hero, which
+ * sits a fixed ~150px down: header 52px + hero margin 16px + sky-strip
+ * ~86px) is only a small sliver near the top of that band. Rise/set should
+ * land there, and the peak only a bit higher, in the open-sky strip above
+ * the hero -- not stretched across the whole band down to its bottom, which
+ * would sink the sun into the page content mid-arc.
  *
  * @param {number} nowSec   – current time, UTC epoch seconds
  * @param {number} riseSec  – rise time, UTC epoch seconds
  * @param {number} setSec   – set time, UTC epoch seconds
- * @param {number} skyH     – sky strip height in px (from clientHeight)
- * @param {number} bodyH    – body element height in px (used to keep it inside the strip)
+ * @param {number} peakTop  – px from viewport top at the highest point (noon/lunar transit)
+ * @param {number} lowTop   – px from viewport top at rise/set (near the horizon)
  * @returns {object} left_pct, top_px, up
  */
-function celestialPos(nowSec, riseSec, setSec, skyH, bodyH) {
+function celestialPos(nowSec, riseSec, setSec, peakTop, lowTop) {
   var up   = (nowSec >= riseSec && nowSec < setSec);
   var frac = up ? Math.max(0, Math.min(1, (nowSec - riseSec) / (setSec - riseSec))) : 0;
 
   /* horizontal: 4 % inset on each side so the body doesn't clip the edge */
   var left_pct = 4 + frac * 92;
 
-  /* vertical parabola: body sits near the horizon at rise/set, peaks near the top */
-  var MARGIN  = 4;
-  var peakTop = MARGIN;
-  var lowTop  = Math.max(MARGIN + bodyH, skyH - bodyH - MARGIN);
-  var top_px  = lowTop - 4 * frac * (1 - frac) * (lowTop - peakTop);
+  /* vertical parabola: body sits at lowTop (horizon) at rise/set, peaks at
+     peakTop around solar/lunar noon */
+  var top_px = lowTop - 4 * frac * (1 - frac) * (lowTop - peakTop);
 
   return { left_pct: left_pct, top_px: top_px, up: up };
 }
@@ -399,6 +412,25 @@ function _skyCondition(current, hum, pres) {
   if (cf > 1.5) return 'overcast';
   if (cf > 1.0) return 'partly-cloudy';
   return 'clear';
+}
+
+/* WMO codes for fog/freezing fog and snow -- mirrors _RAIN_CODES/_HEAVY_CODES
+ * in garden/agent/weather.py (kept in sync manually; small fixed sets). */
+const _FOG_CODES  = new Set([45, 48]);
+const _SNOW_CODES = new Set([71, 73, 75, 77, 85, 86]);
+
+/** Extended weather "mood" for the full-page sky backdrop -- adds
+ *  storm/fog/snow on top of the clear/partly-cloudy/overcast/rain buckets
+ *  `_skyCondition` already produces for the bed rain-sheen + chips. Written
+ *  onto <html data-weather> so sky-backdrop.css can react per-mood. */
+function _skyWeatherMood(current, cond) {
+  if (current) {
+    var code = current.weather_code;
+    if (_SNOW_CODES.has(code)) return 'snow';
+    if (_FOG_CODES.has(code))  return 'fog';
+    if (cond === 'rain' && current.intensity === 'heavy') return 'storm';
+  }
+  return cond;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -626,22 +658,26 @@ function renderBeds() {
   });
 }
 
+/** Clouds now live in the full-page #sky-backdrop's .sky-band (promoted
+ *  from the old 86px .garden-sky strip so the whole scene reads as one
+ *  sky). Top offsets are % of the band so they stay proportioned across
+ *  the taller viewport-driven height. */
 function _initClouds() {
-  const sky = document.getElementById('garden-sky');
-  if (!sky) return;
-  sky.querySelectorAll('.sky-cloud').forEach(function (c) { c.remove(); });
+  const band = document.getElementById('sky-band');
+  if (!band) return;
+  band.querySelectorAll('.sky-cloud').forEach(function (c) { c.remove(); });
   /* Durations within the 40-90s "slow and few" motion budget (redesign.md §3.1) */
   [
-    { left: -100, top: 12, width: 110, dur: 58, delay: 0 },
-    { left: 220,  top: 20, width:  78, dur: 74, delay: -30 },
-    { left: 460,  top: 8,  width: 130, dur: 66, delay: -48 },
+    { left: -100, top: 6,  width: 150, dur: 70, delay: 0 },
+    { left: 300,  top: 14, width: 110, dur: 88, delay: -34 },
+    { left: 620,  top: 3,  width: 190, dur: 78, delay: -58 },
   ].forEach(function (c) {
     const el = document.createElement('div');
     el.className = 'sky-cloud';
-    el.style.cssText = 'left:' + c.left + 'px;top:' + c.top + 'px;width:' + c.width + 'px;';
+    el.style.cssText = 'left:' + c.left + 'px;top:' + c.top + '%;width:' + c.width + 'px;';
     el.style.setProperty('--g-cdur',   c.dur + 's');
     el.style.setProperty('--g-cdelay', c.delay + 's');
-    sky.appendChild(el);
+    band.appendChild(el);
   });
 }
 
@@ -919,20 +955,32 @@ function updateGarden(rows) {
   });
 }
 
-/* ── Sky + weather strip update ── */
+/* ── Sky + weather strip update ──────────────────────────────────────────
+   Sun/moon/clouds/veil/rain/mood now render in the full-page #sky-backdrop
+   (.sky-band) instead of the old 86px .garden-sky strip -- the hero keeps
+   `heroSky` (#garden-sky) only for the is-night toggle that grounds birds
+   and darkens the horizon trees. Gradient + mood are written as CSS custom
+   properties / data-attributes on <html>, mirroring the data-theme
+   pattern, so sky-backdrop.css owns all the actual paint. */
 function _updateSky(readings, ts, timeOfDay) {
-  const sky  = document.getElementById('garden-sky');
+  const band   = document.getElementById('sky-band');
+  const heroSky = document.getElementById('garden-sky');
   const sun  = document.getElementById('sky-sun');
   const moon = document.getElementById('sky-moon');
-  if (!sky) return;
+  if (!band) return;
 
-  const skyH   = sky.clientHeight || 86;
   const nowSec = Date.now() / 1000;
   let sunUp = false, moonUp = false;
 
+  /* Fixed viewport-px anchors for the arc (see celestialPos jsdoc) -- the
+     open-sky strip between the sticky header (52px) and the hero's
+     grass/treeline (~150px down), not the full 60vh backdrop band. */
+  const SUN_PEAK_TOP  = 56,  SUN_LOW_TOP  = 150;
+  const MOON_PEAK_TOP = 50,  MOON_LOW_TOP = 150;
+
   if (SKY && SKY.sunrise_ts && SKY.sunset_ts) {
     /* ── Real sun position from Open-Meteo sunrise/sunset ── */
-    const sunPos = celestialPos(nowSec, SKY.sunrise_ts, SKY.sunset_ts, skyH, 38);
+    const sunPos = celestialPos(nowSec, SKY.sunrise_ts, SKY.sunset_ts, SUN_PEAK_TOP, SUN_LOW_TOP);
     sunUp = sunPos.up;
 
     if (sun) {
@@ -954,7 +1002,7 @@ function _updateSky(readings, ts, timeOfDay) {
         moonRise = SKY.sunset_ts;
         moonSet  = SKY.sunrise_ts_tomorrow;
       }
-      const moonPos = celestialPos(nowSec, moonRise, moonSet, skyH, 30);
+      const moonPos = celestialPos(nowSec, moonRise, moonSet, MOON_PEAK_TOP, MOON_LOW_TOP);
       moonUp = moonPos.up && !sunUp;
       if (moon) {
         moon.style.left = moonPos.left_pct.toFixed(1) + '%';
@@ -975,28 +1023,46 @@ function _updateSky(readings, ts, timeOfDay) {
     /* leave left/top at CSS defaults */
   }
 
-  /* ── Sky gradient: continuous crossfade off real sunrise/sunset when we
-     have it, otherwise a flat 3-stop match on the clock-hour bucket ── */
+  /* ── Sky gradient + phase: written onto <html> as CSS custom properties
+     and a data-attribute, mirroring the data-theme pattern in tokens.css.
+     #sky-backdrop (sky-backdrop.css) reads --sky-stop-0/1/2 and reacts to
+     [data-sky-phase] purely via CSS -- no direct background writes here. ── */
   const stops = (SKY && SKY.sunrise_ts && SKY.sunset_ts)
     ? _skyGradientStops(nowSec, SKY.sunrise_ts, SKY.sunset_ts)
     : (SKY_PHASES[timeOfDay] || SKY_PHASES.day);
-  sky.style.background = 'linear-gradient(180deg,' + stops[0] + ' 0%,' + stops[1] + ' 55%,' + stops[2] + ' 100%)';
+  const html = document.documentElement;
+  html.style.setProperty('--sky-stop-0', stops[0]);
+  html.style.setProperty('--sky-stop-1', stops[1]);
+  html.style.setProperty('--sky-stop-2', stops[2]);
+  html.dataset.skyPhase = timeOfDay;
+  _applyAutoTheme(timeOfDay);
 
-  /* ── Weather overlay (Layer 2, §3.1) ── */
+  /* ── Weather overlay (Layer 2, §3.1) + extended mood (storm/fog/snow) ── */
   const hum  = readings[WEATHER_KEYS.humidity];
   const pres = readings[WEATHER_KEYS.pressure];
   const cond = _skyCondition(CURRENT, hum, pres);
+  const mood = _skyWeatherMood(CURRENT, cond);
+  html.dataset.weather = mood;
   const overcastLike = cond === 'overcast' || cond === 'rain';
+
+  /* day-only warm/cool tint, applied via [data-sky-temp] in sky-backdrop.css */
+  const temp = readings[WEATHER_KEYS.temp];
+  let skyTemp = 'normal';
+  if (timeOfDay === 'day' && temp != null && !overcastLike) {
+    if      (temp > 32) skyTemp = 'hot';
+    else if (temp < 5)  skyTemp = 'cold';
+  }
+  html.dataset.skyTemp = skyTemp;
 
   /* sun: hidden under overcast/rain regardless of time of day; warm tint at dawn/dusk */
   if (sun) {
     sun.style.opacity = (sunUp && !overcastLike) ? '1' : '0';
     if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
       sun.style.background = '#ff9040';
-      sun.style.boxShadow  = '0 0 22px 8px rgba(255,140,40,0.6)';
+      sun.style.boxShadow  = '0 0 46px 16px rgba(255,140,40,0.55)';
     } else {
       sun.style.background = '#ffd94a';
-      sun.style.boxShadow  = '0 0 22px 7px rgba(255,220,50,0.55)';
+      sun.style.boxShadow  = '0 0 46px 16px rgba(255,220,50,0.5)';
     }
   }
 
@@ -1007,23 +1073,13 @@ function _updateSky(readings, ts, timeOfDay) {
     _setMoonPhase(moon, moonPhase(new Date()));
   }
 
-  /* Grey veil + desaturation for overcast/rain */
-  const veil = document.getElementById('sky-veil');
-  if (veil) veil.style.opacity = overcastLike ? '1' : '0';
-
-  /* temp tint (day only) combined with the overcast desaturation into one filter */
-  const temp = readings[WEATHER_KEYS.temp];
-  const filters = [];
-  if (overcastLike) filters.push('saturate(0.75)');
-  if (timeOfDay === 'day' && temp != null && !overcastLike) {
-    if      (temp > 32) filters.push('sepia(0.14)', 'saturate(1.1)');
-    else if (temp < 5)  filters.push('hue-rotate(18deg)', 'saturate(0.88)');
-  }
-  sky.style.filter = filters.join(' ');
+  /* Grey veil, storm flash, and fog haze opacity are driven purely by the
+     [data-weather] attribute set above (sky-backdrop.css) -- no direct
+     opacity writes needed here anymore. */
 
   /* clouds: none when clear, 1-2 low-opacity when partly cloudy, all 3
-     denser + grey-tinted when overcast/rain (redesign.md §3.1 Layer 2) */
-  const cloudEls = sky.querySelectorAll('.sky-cloud');
+     denser + grey-tinted when overcast/rain/storm (redesign.md §3.1 Layer 2) */
+  const cloudEls = band.querySelectorAll('.sky-cloud');
   cloudEls.forEach(function (c, i) {
     if (cond === 'clear') {
       c.style.opacity = '0';
@@ -1043,13 +1099,14 @@ function _updateSky(readings, ts, timeOfDay) {
 
   /* fireflies at night — add if not present, remove otherwise */
   if (timeOfDay === 'night') {
-    if (!sky.querySelector('.g-firefly')) _addFireflies();
-  } else {
-    sky.querySelectorAll('.g-firefly').forEach(function (f) { f.remove(); });
+    if (heroSky && !heroSky.querySelector('.g-firefly')) _addFireflies();
+  } else if (heroSky) {
+    heroSky.querySelectorAll('.g-firefly').forEach(function (f) { f.remove(); });
   }
 
-  /* birds only fly in daylight — ground them at night */
-  sky.classList.toggle('is-night', timeOfDay === 'night');
+  /* birds only fly in daylight — ground them at night (hero strip only;
+     the backdrop's own night look is driven by [data-sky-phase]) */
+  if (heroSky) heroSky.classList.toggle('is-night', timeOfDay === 'night');
 
   /* weather value chips */
   _setText('wv-temp', temp  != null ? temp.toFixed(1)  + '°F'   : '—');
@@ -1059,7 +1116,8 @@ function _updateSky(readings, ts, timeOfDay) {
   const condEmojiEl = document.getElementById('wv-cond-emoji');
   if (condEmojiEl) condEmojiEl.textContent = _conditionsEmoji(CURRENT);
 
-  /* live rain visual — sky-strip drizzle for light rain, full-page downpour for heavy */
+  /* live rain/snow visual — sky-band drizzle/flurries for light weather,
+     full-page downpour for heavy rain */
   updateWeatherRain(CURRENT);
 }
 
@@ -1152,13 +1210,17 @@ function applyChartTheme() {
   });
 }
 
-document.getElementById('theme-toggle').addEventListener('click', function () {
+/** Card/chrome theme now follows the sky automatically -- there's no manual
+ *  toggle (the sky already shows day vs. night; a separate user-picked
+ *  chrome theme just fought it). Called from _updateSky() with the same
+ *  timeOfDay phase driving the sky gradient, so they can never disagree. */
+function _applyAutoTheme(timeOfDay) {
   const html = document.documentElement;
-  const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  const next = timeOfDay === 'night' ? 'dark' : 'light';
+  if (html.dataset.theme === next) return;
   html.dataset.theme = next;
-  localStorage.setItem('garden-theme', next);
   applyChartTheme();
-});
+}
 
 /* ════════════════════════════════════════════════════════════════════════════
    CHART FACTORY
@@ -1548,20 +1610,22 @@ function renderBedMoistureCards() {
    ════════════════════════════════════════════════════════════════════════════ */
 
 const TRENDS_GROUPS = [
-  { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f'] },
+  /* heatindex_f folds into the same line chart as outdoor/gazebo temp — same
+     unit, same axis, and it's just derived from temp1_f+humidity1 anyway. */
+  { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f', 'heatindex_f'] },
   { id: 'humidity',    title: 'Humidity',            keys: ['humidity', 'humidity1'] },
   { id: 'vpd',         title: 'VPD',                 keys: ['vpd_kpa'], vpdBand: true },
   /* Pressure & dew point were dropped — neither drives a gardening decision
-     on its own. The "When to water next" card (renderWateringForecast, below)
-     now fills this same grid slot instead, so the 2x2 layout stays symmetric;
-     see the card appended in renderTrendsClimateGrid(). */
+     on its own. This 4th slot previously held a drydown-day projection
+     ("When to water next") that was too noisy to trust; renderMoistureBand
+     Card() (below) replaced it with a live snapshot instead of a forecast. */
 ];
 
 /** Builds the grouped climate chart cards once, then (re)draws each on every
  *  call — safe to call on every refresh tick, same pattern as the moisture row.
- *  The last card, "When to water next", isn't a canvas line chart — it's a
- *  snapshot forecast (renderWateringForecast) sharing the same chart-card
- *  chrome so the grid reads as one symmetric set, not three-plus-an-orphan. */
+ *  The last card, "Soil moisture vs. band", isn't a canvas line chart — it's a
+ *  live snapshot (renderMoistureBandCard) sharing the same chart-card chrome
+ *  so the grid reads as one symmetric set. */
 function renderTrendsClimateGrid() {
   const grid = document.getElementById('trends-climate-grid');
   if (!grid) return;
@@ -1581,8 +1645,8 @@ function renderTrendsClimateGrid() {
     }).join('');
     cardsHtml += (
       '<div class="chart-card">' +
-        '<div class="chart-title">When to water next</div>' +
-        '<div class="watering-forecast" id="watering-forecast"></div>' +
+        '<div class="chart-title">Soil moisture vs. band</div>' +
+        '<div class="moistband-forecast" id="moistband-forecast"></div>' +
       '</div>'
     );
     grid.innerHTML = cardsHtml;
@@ -1590,7 +1654,7 @@ function renderTrendsClimateGrid() {
   }
 
   groups.forEach(_drawTrendGroupChart);
-  renderWateringForecast();
+  renderMoistureBandCard();
 }
 
 function _drawTrendGroupChart(g) {
@@ -1969,56 +2033,67 @@ function renderBedChips(insightBeds) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   WATERING FORECAST — "when does each bed need water next?"
-   A snapshot card fed by /api/insights.watering (garden.main._bed_watering_
-   forecast), which projects each bed's OWN drydown to ITS OWN self-learned/
-   crop-fallback dry threshold (same band the Dry/OK/Wet chips use) — replaces
-   the old Pressure & dew point trend card, neither of which drove a watering
-   decision. Unlike the line-chart cards below it, this is a point-in-time
-   forecast, so it intentionally ignores the 1h-7d Trends range selector.
+   SOIL MOISTURE VS. BAND — live per-bed position within its own dry/ok/wet
+   range. Replaced the "When to water next" day-count projection, which was
+   too noisy to trust (a bed's drydown rate is fragile right after it's been
+   watered — see the removed garden.main._bed_watering_forecast). This card
+   has no forecasting in it at all: just the current reading plotted against
+   BANDS.moistureBands[key] (the same self-learned/crop-fallback band the bed
+   chips and stakes already use), so it can't be wrong in the way a
+   projection can — it only ever states where things stand right now.
    ════════════════════════════════════════════════════════════════════════════ */
 
-/** Urgency color for a bed's projected days-until-dry: healthy/warn/critical,
- *  matching the semantics _moistureFillColor uses for the bed chips. */
-function _wateringUrgencyColor(days) {
-  if (days == null) return 'var(--text-faint)';
-  if (days <= 0.5) return 'var(--crit)';
-  if (days <= 3)   return 'var(--warn)';
-  return 'var(--fill-healthy)';
+function _moistBandStatus(moist, band) {
+  if (moist == null || !band) return 'unknown';
+  if (moist < band.min) return 'dry';
+  if (moist > band.max) return 'wet';
+  return 'ok';
 }
 
-/** Renders the per-bed "when to water next" rows from the latest /api/insights
- *  payload. Safe to call every refresh tick (same pattern as renderBedChips). */
-function renderWateringForecast() {
-  const el = document.getElementById('watering-forecast');
-  if (!el || !LAST_INSIGHTS) return;
+function _moistBandColor(status) {
+  switch (status) {
+    case 'dry': return 'var(--warn)';
+    case 'wet': return 'var(--wet)';
+    case 'ok':  return 'var(--fill-healthy)';
+    default:    return 'var(--text-faint)';
+  }
+}
 
-  const byId = {};
-  (LAST_INSIGHTS.watering || []).forEach(function (w) { byId[w.id] = w; });
-
-  const fc = LAST_INSIGHTS.forecast;
-  const rainPct  = fc ? fc.next_12h_peak_rain_pct : null;
-  const rainSoon = rainPct != null && rainPct >= (G.rainLookaheadPct || 40);
+/** Renders one row per bed: a track spanning 0-100%, the bed's healthy band
+ *  shaded within it, and a marker at the live reading. Safe to call every
+ *  refresh tick (same pattern as renderBedChips) — pure snapshot, doesn't
+ *  depend on the 1h-7d Trends range selector or LAST_INSIGHTS at all. */
+function renderMoistureBandCard() {
+  const el = document.getElementById('moistband-forecast');
+  if (!el) return;
 
   const rows = BEDS.map(function (bed) {
-    const w = byId[bed.id];
-    if (!w) return '';
+    const moistKey = bed.sensors.soil_moisture;
+    const moist = LATEST_READINGS[moistKey] != null ? parseFloat(LATEST_READINGS[moistKey]) : null;
+    const band  = BANDS && BANDS.moistureBands ? BANDS.moistureBands[moistKey] : null;
+    const status = _moistBandStatus(moist, band);
+    const color  = _moistBandColor(status);
 
-    const pct   = w.remaining != null ? Math.round(w.remaining * 100) : 0;
-    const color = _wateringUrgencyColor(w.days);
-    const dueSoon = w.days != null && w.days <= 1;
-    const badge = (rainSoon && dueSoon)
-      ? '<span class="watering-rain-badge" title="Rain expected in the next 12h — consider holding off">☔</span>'
+    const zoneHTML = band
+      ? '<span class="moistband-zone" style="left:' + band.min + '%; width:' + Math.max(0, band.max - band.min) + '%"></span>'
+      : '';
+    const markerHTML = moist != null
+      ? '<span class="moistband-marker" style="left:' + Math.max(0, Math.min(100, moist)) + '%; background:' + color + '"></span>'
       : '';
 
+    const label = moist == null
+      ? 'no reading'
+      : (status === 'dry' ? 'Dry' : status === 'wet' ? 'Wet' : 'OK') +
+        (band ? ' (' + band.min + '–' + band.max + '%)' : '');
+
     return (
-      '<div class="watering-row">' +
-        '<span class="watering-bed-name">' + bed.name + '</span>' +
-        '<span class="watering-bar-track" aria-hidden="true">' +
-          '<span class="watering-bar-fill" style="width:' + pct + '%; background:' + color + '"></span>' +
+      '<div class="moistband-row">' +
+        '<span class="moistband-bed-name">' + bed.name + '</span>' +
+        '<span class="moistband-track" aria-hidden="true">' + zoneHTML + markerHTML + '</span>' +
+        '<span class="moistband-value" style="color:' + color + '">' +
+          (moist != null ? Math.round(moist) + '%' : '—') +
         '</span>' +
-        '<span class="watering-label" style="color:' + color + '">' + w.label + '</span>' +
-        badge +
+        '<span class="moistband-label" style="color:' + color + '">' + label + '</span>' +
       '</div>'
     );
   }).join('');
@@ -2197,6 +2272,9 @@ async function loadInsights() {
       sunrise_ts_tomorrow: data.forecast.sunrise_ts_tomorrow || null,
     };
   }
+  if (data.forecast && data.forecast.wind_max_mph != null) {
+    WIND_MAX_MPH = data.forecast.wind_max_mph;
+  }
 
   /* Live "right now" conditions — drives the sky-strip chip, cloud cover, and rain.
      A failed upstream fetch omits data.current entirely (see api_insights()); keep
@@ -2213,7 +2291,6 @@ async function loadInsights() {
     renderBedChips(data.beds);
     if (OPEN_BED) renderBedDetail();
   }
-  renderWateringForecast();  /* doesn't depend on LATEST_TS staleness — safe here */
 }
 
 /** Single fetch feeds both the stat strip and the garden */
@@ -2249,7 +2326,6 @@ async function refresh() {
       renderClimateStrip(LAST_INSIGHTS);
       renderBedChips(LAST_INSIGHTS.beds);
       if (OPEN_BED) renderBedDetail();
-      renderWateringForecast();
     }
   } else {
     _updateConnDot(null);
@@ -2340,24 +2416,35 @@ function explodeEmoji(emoji, rect) {
   }
 }
 
-/* ── Live weather rain — driven by CURRENT.is_raining / CURRENT.intensity ──
-   Light rain: a small looping shower clipped to the sky strip (#garden-sky).
-   Heavy rain / thunderstorms: escalates to a full-page downpour reusing the
-   easter-egg particle system (spawnEggParticle / g-egg-rain). Respects
-   prefers-reduced-motion the same way the easter egg does. */
+/* ── Live weather rain/snow — driven by CURRENT.is_raining / .intensity /
+   .weather_code ── Light rain: a small looping shower clipped to the
+   full-page sky backdrop's .sky-band. Heavy rain / thunderstorms: escalates
+   to a full-page downpour reusing the easter-egg particle system
+   (spawnEggParticle / g-egg-rain). Snow WMO codes get looping flurries
+   instead of rain. Respects prefers-reduced-motion the same way the easter
+   egg does. */
 let _heavyRainTimer = null;
 
 function updateWeatherRain(current) {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const sky = document.getElementById('garden-sky');
-  const raining = !reduced && !!(current && current.is_raining);
+  const band = document.getElementById('sky-band');
+  const isSnow  = !!(current && _SNOW_CODES.has(current.weather_code));
+  const raining = !reduced && !isSnow && !!(current && current.is_raining);
+  const snowing = !reduced && isSnow;
 
-  if (sky) {
-    const hasDrops = !!sky.querySelector('.sky-rain-drop');
+  if (band) {
+    const hasDrops = !!band.querySelector('.sky-rain-drop');
     if (raining && !hasDrops) {
-      _addSkyRainDrops(sky);
+      _addSkyRainDrops(band);
     } else if (!raining && hasDrops) {
-      sky.querySelectorAll('.sky-rain-drop').forEach(function (d) { d.remove(); });
+      band.querySelectorAll('.sky-rain-drop').forEach(function (d) { d.remove(); });
+    }
+
+    const hasFlakes = !!band.querySelector('.sky-snowflake');
+    if (snowing && !hasFlakes) {
+      _addSkySnowflakes(band);
+    } else if (!snowing && hasFlakes) {
+      band.querySelectorAll('.sky-snowflake').forEach(function (f) { f.remove(); });
     }
   }
 
@@ -2365,16 +2452,40 @@ function updateWeatherRain(current) {
   if (heavy) _startHeavyRain(); else _stopHeavyRain();
 }
 
-function _addSkyRainDrops(sky) {
-  const dropCount = 10;
+function _addSkyRainDrops(band) {
+  const dropCount = 14;
+  const fall  = (band.clientHeight || 420) + 30;
+  const wind  = WIND_MAX_MPH || 0;
+  const drift = Math.min(60, wind * 1.5);  /* wind slants the fall, capped */
   for (let i = 0; i < dropCount; i++) {
     const el = document.createElement('span');
     el.className = 'sky-rain-drop';
     el.setAttribute('aria-hidden', 'true');
     el.style.left = (Math.random() * 96) + '%';
-    el.style.setProperty('--rdur',   (0.6 + Math.random() * 0.5) + 's');
+    el.style.setProperty('--rdur',   (0.7 + Math.random() * 0.5) + 's');
     el.style.setProperty('--rdelay', (Math.random() * 1.2) + 's');
-    sky.appendChild(el);
+    el.style.setProperty('--rfall',  fall + 'px');
+    el.style.setProperty('--rdrift', (drift * (0.6 + Math.random() * 0.4)) + 'px');
+    band.appendChild(el);
+  }
+}
+
+function _addSkySnowflakes(band) {
+  const flakes = ['❄', '❅', '❆'];
+  const count  = 18;
+  const fall   = (band.clientHeight || 420) + 30;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('span');
+    el.className = 'sky-snowflake';
+    el.setAttribute('aria-hidden', 'true');
+    el.textContent = flakes[i % flakes.length];
+    el.style.left = (Math.random() * 96) + '%';
+    el.style.setProperty('--sdur',   (6 + Math.random() * 5) + 's');
+    el.style.setProperty('--sdelay', (Math.random() * 4) + 's');
+    el.style.setProperty('--sfall',  fall + 'px');
+    el.style.setProperty('--sdrift', ((Math.random() - 0.3) * 40) + 'px');
+    el.style.setProperty('--sfsize', (8 + Math.random() * 6) + 'px');
+    band.appendChild(el);
   }
 }
 

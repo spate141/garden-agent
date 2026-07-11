@@ -93,32 +93,4 @@ header {
 .conn-dot.is-offline { background: var(--crit); }
 .conn-dot.is-fetching { box-shadow: 0 0 0 3px var(--accent-soft); }
 
-/* ── THEME TOGGLE ───────────────────────────────────────────────────── */
-
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.theme-toggle:hover {
-  border-color: var(--accent-border);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* In light mode show moon (click to go dark), in dark mode show sun (click to go light) */
-.theme-toggle .icon-sun  { display: none; }
-.theme-toggle .icon-moon { display: block; }
-[data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
-[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 

@@ -2,10 +2,13 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: var(--bg); }
 
+/* body itself stays transparent so #sky-backdrop (fixed, z-index:-1) shows
+   through everywhere content doesn't paint its own surface -- see
+   sky-backdrop.css. html keeps the flat --bg fallback underneath it all. */
 body {
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   font: 15px/1.6 'Inter', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-feature-settings: "tnum" 1;

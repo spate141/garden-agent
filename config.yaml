@@ -83,7 +83,7 @@ sensors:
   heatindex_f:
     label: "Feels like"
     color: "#ef4444"
-    chart: false    # stat-strip only
+    chart: true
 
 # ── Dashboard layout ──────────────────────────────────────────────────────────
 # Bed definitions and weather key bindings — injected into the browser as JSON.

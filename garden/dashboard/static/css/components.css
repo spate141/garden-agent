@@ -35,6 +35,8 @@
   align-items: center;
   gap: 8px;
   background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
@@ -143,6 +145,8 @@
   flex-wrap: wrap;
   gap: 16px 32px;
   background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   padding: 20px 24px;
@@ -296,6 +300,8 @@
 
 .chart-card {
   background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--hairline);
   border-radius: 14px;
   padding: 18px 18px 14px;
@@ -324,62 +330,75 @@
   height: 140px;
 }
 
-/* ── WATERING FORECAST ("when to water next") ──────────────────────── */
-/* Lives inside a regular .chart-card in #trends-climate-grid, in the same
-   slot the Pressure & dew point chart used to occupy — same height as
-   .chart-wrap so the 2x2 grid of cards stays visually symmetric even though
-   this one is rows, not a canvas (see garden.js renderTrendsClimateGrid). */
+/* ── SOIL MOISTURE VS. BAND ──────────────────────────────────────────── */
+/* Lives inside a regular .chart-card in #trends-climate-grid, same slot the
+   day-count "When to water next" projection used to occupy — pure live
+   snapshot (garden.js renderMoistureBandCard), no forecasting. */
 
-.watering-forecast {
+.moistband-forecast {
   height: 140px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
-.watering-row {
+.moistband-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 7px 0;
   border-top: 1px solid var(--hairline);
 }
-.watering-row:first-of-type { border-top: none; }
+.moistband-row:first-of-type { border-top: none; }
 
-.watering-bed-name {
-  flex: 0 0 64px;
+.moistband-bed-name {
+  flex: 0 0 52px;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text);
 }
 
-.watering-bar-track {
+.moistband-track {
+  position: relative;
   flex: 1;
   height: 8px;
   border-radius: 4px;
   background: var(--surface-2);
-  overflow: hidden;
 }
 
-.watering-bar-fill {
-  display: block;
+.moistband-zone {
+  position: absolute;
+  top: 0;
   height: 100%;
   border-radius: 4px;
-  transition: width 0.3s ease, background 0.3s ease;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
 }
 
-.watering-label {
+.moistband-marker {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  transition: left 0.3s ease, background 0.3s ease;
+}
+
+.moistband-value {
   flex: 0 0 auto;
   font-size: 0.8125rem;
-  font-weight: 600;
-  min-width: 84px;
+  font-weight: 700;
+  min-width: 34px;
   text-align: right;
 }
 
-.watering-rain-badge {
+.moistband-label {
   flex: 0 0 auto;
-  font-size: 0.9rem;
-  line-height: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 96px;
+  text-align: right;
 }
 
 .bed-moisture-row {
@@ -451,6 +470,8 @@ footer {
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-sm);
   margin: 0 24px 20px;
   padding: 16px;
@@ -521,21 +542,28 @@ footer {
   .bed-detail { margin: 0 16px 16px; }
 }
 
-/* ── MOBILE ─────────────────────────────────────────────────────────── */
-
-@media (max-width: 480px) {
-  .theme-toggle { width: 32px; height: 32px; border-radius: 7px; }
-}
 
 /* ── LIGHT-MODE PANEL POLISH (§8) ───────────────────────────────────────── */
 /* In light mode .chart-card uses a cream card-bg that blends into the page
-   background. Override to white with a clear border and a soft shadow so
-   cards separate visually the way dark-mode cards do. */
+   background. Override to a translucent white (frosted-glass over the sky
+   backdrop) with a clear border and a soft shadow so cards separate
+   visually the way dark-mode cards do. */
 
 [data-theme="light"] .chart-card {
-  background:    #ffffff;
+  background:    rgba(255, 255, 255, 0.82);
   border:        1px solid #e5e7eb;
   box-shadow:    0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+/* Fallback for browsers without backdrop-filter support: fall back to a
+   solid (opaque) card so text stays legible over whatever's behind it. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bed-chip, .climate-strip, .chart-card, .bed-detail {
+    background: var(--surface-2);
+  }
+  [data-theme="light"] .chart-card {
+    background: #ffffff;
+  }
 }
 
 [data-theme="light"] .chart-card:hover {

@@ -53,75 +53,18 @@
 }
 
 
-/* ── Sky strip ── */
+/* ── Sky strip ──────────────────────────────────────────────────────────
+   Background transparent by design -- the full-page #sky-backdrop (see
+   sky-backdrop.css) shows through, so the horizon trees/birds below read as
+   sitting inside the real sky. Sun/moon/clouds/veil/rain moved to the
+   backdrop when it was introduced (redesign: full-page weather background). */
 .garden-sky {
   position: relative;
   width: 100%;
   height: 86px;
-  background: linear-gradient(180deg, #5ba8d8 0%, #c8e8ff 100%);
+  background: transparent;
   overflow: hidden;
   border-radius: 0;
-  transition: background 3s ease, filter 3s ease;
-}
-
-.sky-sun {
-  position: absolute;
-  top: 14px;
-  left: 75%;          /* fallback when sky data unavailable; JS overrides with arc position */
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #ffd94a;
-  box-shadow: 0 0 22px 7px rgba(255,220,50,0.55);
-  z-index: 0;
-  transition: opacity 2s ease, background 2s ease, box-shadow 2s ease,
-              left 2s ease, top 2s ease;
-}
-
-.sky-moon {
-  position: absolute;
-  top: 14px;
-  left: 75%;          /* fallback when sky data unavailable; JS overrides with arc position */
-  width: 30px;
-  height: 30px;
-  /* shape, background, and glow are all rendered by the inner phase SVG;
-     drop-shadow follows the crescent/gibbous outline correctly */
-  filter: drop-shadow(0 0 5px rgba(220,215,180,0.55));
-  overflow: visible;
-  opacity: 0;
-  z-index: 0;
-  transition: opacity 2s ease, left 2s ease, top 2s ease;
-}
-
-.sky-cloud {
-  position: absolute;
-  height: 22px;
-  border-radius: 50px;
-  background: rgba(255,255,255,0.85);
-  filter: blur(1.5px);
-  z-index: 1;
-  transition: opacity 3s ease, background 3s ease;
-}
-.sky-cloud::before,
-.sky-cloud::after {
-  content: '';
-  position: absolute;
-  background: inherit;
-  border-radius: 50%;
-}
-.sky-cloud::before { width: 55%; height: 160%; top: -50%; left: 18%; }
-.sky-cloud::after  { width: 40%; height: 130%; top: -35%; right: 18%; }
-
-/* Overcast/rain grey veil (redesign.md §3.1 Layer 2) -- opacity toggled by JS,
-   sits above the gradient/clouds but below the sun/moon/chips. */
-.sky-veil {
-  position: absolute;
-  inset: 0;
-  background: rgba(200,205,210,0.35);
-  opacity: 0;
-  z-index: 1;
-  pointer-events: none;
-  transition: opacity 3s ease;
 }
 
 /* ── Horizon trees ──────────────────────────────────────────────────────
@@ -704,26 +647,9 @@
   }
 }
 
-/* ── Live weather: subtle drizzle clipped to the sky strip ──────────────── */
-@media (prefers-reduced-motion: no-preference) {
-  .sky-rain-drop {
-    position: absolute;
-    top: -6px;
-    width: 1px;
-    height: 9px;
-    border-radius: 1px;
-    background: linear-gradient(180deg, rgba(190,210,255,0) 0%, rgba(190,210,255,0.85) 100%);
-    pointer-events: none;
-    z-index: 4;
-    animation: sky-rain-fall var(--rdur, 0.8s) linear var(--rdelay, 0s) infinite;
-  }
-  @keyframes sky-rain-fall {
-    0%   { opacity: 0;   transform: translateY(0); }
-    12%  { opacity: 0.9; }
-    90%  { opacity: 0.9; }
-    100% { opacity: 0;   transform: translateY(96px); }
-  }
-}
+/* Live weather rain streaks now render in the full-page #sky-backdrop's
+   .sky-band (sky-backdrop.css) rather than this strip, since the backdrop
+   owns the sky. */
 
 /* Responsive */
 @media (max-width: 720px) {
@@ -793,24 +719,8 @@
     68%       { transform: rotate(calc(var(--g-tree-amp, 1.4deg) * -0.65)); }
   }
 
-  /* Cloud drift -- slow and few (redesign.md §3.1 motion budget: 40-90s) */
-  .sky-cloud {
-    animation: g-cloud-drift var(--g-cdur, 60s) linear infinite;
-    animation-delay: var(--g-cdelay, 0s);
-  }
-  @keyframes g-cloud-drift {
-    0%   { transform: translateX(-250px); }
-    100% { transform: translateX(calc(100vw + 250px)); }
-  }
-
-  /* Sun shimmer */
-  .sky-sun {
-    animation: g-sun-shimmer 3.8s ease-in-out infinite;
-  }
-  @keyframes g-sun-shimmer {
-    0%, 100% { box-shadow: 0 0 22px 7px rgba(255,220,50,0.55); }
-    50%       { box-shadow: 0 0 34px 12px rgba(255,220,50,0.75); }
-  }
+  /* Cloud drift + sun shimmer now live in sky-backdrop.css (.sky-cloud /
+     .sky-sun moved to the full-page backdrop). */
 
   /* Fireflies */
   .g-firefly {

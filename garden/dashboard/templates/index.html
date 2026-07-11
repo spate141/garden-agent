@@ -6,11 +6,17 @@
   <title>Sprout &amp; Circuit</title>
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 
-  <!-- Anti-flash: set theme before first paint -->
+  <!-- Anti-flash: guess light/dark from the clock before first paint (same
+       night window tod() uses in garden.js). The sky/weather engine takes
+       over and corrects this once real sunrise/sunset data loads -- card
+       theme is derived from time-of-day automatically, there's no manual
+       toggle (the sky itself already shows day vs. night; a separate
+       user-picked chrome theme just fought it). -->
   <script>
     (function () {
-      var t = localStorage.getItem('garden-theme') || 'light';
-      document.documentElement.dataset.theme = t;
+      var h = new Date().getHours();
+      var isNight = (h < 5 || h >= 21);
+      document.documentElement.dataset.theme = isNight ? 'dark' : 'light';
     })();
   </script>
 
@@ -27,9 +33,13 @@
   <link rel="stylesheet" href="/static/css/layout.css">
   <link rel="stylesheet" href="/static/css/components.css">
   <link rel="stylesheet" href="/static/css/garden-hero.css">
+  <link rel="stylesheet" href="/static/css/sky-backdrop.css">
   <link rel="stylesheet" href="/static/css/snehal-footer.css">
 </head>
 <body>
+
+<!-- ── FULL-PAGE WEATHER-REACTIVE SKY BACKDROP (fixed, behind everything) ── -->
+{% include "partials/_sky-backdrop.html" %}
 
 <!-- ── SVG plant sprite definitions (hidden) ──────────────────────────────── -->
 {% include "partials/_svg-sprites.html" %}

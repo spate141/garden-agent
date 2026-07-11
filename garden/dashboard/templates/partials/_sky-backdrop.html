@@ -1,0 +1,21 @@
+<!-- ── FULL-PAGE SKY BACKDROP ──────────────────────────────────────────────
+     Fixed behind all content (see static/css/sky-backdrop.css). Two-tier:
+     live weather gradient across the top ~60vh (immersive), fading into the
+     flat page background below so the charts/trends stay calm and legible.
+     State (phase/mood/gradient stops) is written by _updateSky() in
+     garden.js onto <html data-sky-phase> / <html data-weather> / CSS custom
+     properties, mirroring the existing data-theme pattern in tokens.css.
+     Sun/moon/clouds/veil/rain used to live in the 86px .garden-sky strip
+     inside the hero; they moved up here so the garden beds read as sitting
+     inside the real sky rather than a boxed-in banner. -->
+<div id="sky-backdrop" aria-hidden="true">
+  <div class="sky-band" id="sky-band">
+    <div class="sky-stars" id="sky-stars"></div>
+    <div class="sky-sun"  id="sky-sun"></div>
+    <div class="sky-moon" id="sky-moon"></div>
+    <div class="sky-veil" id="sky-veil"></div>
+    <div class="sky-fog"  id="sky-fog"></div>
+    <div class="sky-flash" id="sky-flash"></div>
+    <!-- clouds / rain drops / snow flakes injected by JS -->
+  </div>
+</div>
