@@ -1551,13 +1551,17 @@ const TRENDS_GROUPS = [
   { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f'] },
   { id: 'humidity',    title: 'Humidity',            keys: ['humidity', 'humidity1'] },
   { id: 'vpd',         title: 'VPD',                 keys: ['vpd_kpa'], vpdBand: true },
-  /* Pressure & dew point were dropped — neither drives a gardening decision on
-     its own. Replaced by the "When to water next" card (renderWateringForecast,
-     below), a snapshot forecast rather than a time-range line chart. */
+  /* Pressure & dew point were dropped — neither drives a gardening decision
+     on its own. The "When to water next" card (renderWateringForecast, below)
+     now fills this same grid slot instead, so the 2x2 layout stays symmetric;
+     see the card appended in renderTrendsClimateGrid(). */
 ];
 
 /** Builds the grouped climate chart cards once, then (re)draws each on every
- *  call — safe to call on every refresh tick, same pattern as the moisture row. */
+ *  call — safe to call on every refresh tick, same pattern as the moisture row.
+ *  The last card, "When to water next", isn't a canvas line chart — it's a
+ *  snapshot forecast (renderWateringForecast) sharing the same chart-card
+ *  chrome so the grid reads as one symmetric set, not three-plus-an-orphan. */
 function renderTrendsClimateGrid() {
   const grid = document.getElementById('trends-climate-grid');
   if (!grid) return;
@@ -1565,10 +1569,9 @@ function renderTrendsClimateGrid() {
   const groups = TRENDS_GROUPS.filter(function (g) {
     return g.keys.some(function (k) { return !!_chartMeta(k); });
   });
-  if (!groups.length) return;
 
   if (!grid.dataset.built) {
-    grid.innerHTML = groups.map(function (g) {
+    var cardsHtml = groups.map(function (g) {
       return (
         '<div class="chart-card">' +
           '<div class="chart-title">' + g.title + '</div>' +
@@ -1576,10 +1579,18 @@ function renderTrendsClimateGrid() {
         '</div>'
       );
     }).join('');
+    cardsHtml += (
+      '<div class="chart-card">' +
+        '<div class="chart-title">When to water next</div>' +
+        '<div class="watering-forecast" id="watering-forecast"></div>' +
+      '</div>'
+    );
+    grid.innerHTML = cardsHtml;
     grid.dataset.built = '1';
   }
 
   groups.forEach(_drawTrendGroupChart);
+  renderWateringForecast();
 }
 
 function _drawTrendGroupChart(g) {
@@ -2012,7 +2023,7 @@ function renderWateringForecast() {
     );
   }).join('');
 
-  el.innerHTML = '<div class="chart-title">When to water next</div>' + rows;
+  el.innerHTML = rows;  /* title lives in the outer chart-card wrapper, not here */
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

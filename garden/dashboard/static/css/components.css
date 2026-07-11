@@ -325,26 +325,23 @@
 }
 
 /* ── WATERING FORECAST ("when to water next") ──────────────────────── */
-/* One card, one row per bed — not a chart-card grid, since there's no
-   time axis (see garden.js renderWateringForecast). Sits between the
-   per-bed moisture charts and the climate trend grid. */
+/* Lives inside a regular .chart-card in #trends-climate-grid, in the same
+   slot the Pressure & dew point chart used to occupy — same height as
+   .chart-wrap so the 2x2 grid of cards stays visually symmetric even though
+   this one is rows, not a canvas (see garden.js renderTrendsClimateGrid). */
 
 .watering-forecast {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  padding: 18px 18px 8px;
-  margin: 0 24px 16px;
-}
-@media (max-width: 720px) {
-  .watering-forecast { margin: 0 16px 12px; padding: 14px 14px 6px; }
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .watering-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
+  padding: 7px 0;
   border-top: 1px solid var(--hairline);
 }
 .watering-row:first-of-type { border-top: none; }
