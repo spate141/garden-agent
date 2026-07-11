@@ -2084,7 +2084,7 @@ function renderMoistureBandCard() {
     const label = moist == null
       ? 'no reading'
       : (status === 'dry' ? 'Dry' : status === 'wet' ? 'Wet' : 'OK') +
-        (band ? ' (' + band.min + '–' + band.max + '%)' : '');
+        (band ? ' (' + Math.round(band.min) + '–' + Math.round(band.max) + '%)' : '');
 
     return (
       '<div class="moistband-row">' +
@@ -2163,7 +2163,7 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
       '</span>'
     : '';
 
-  const bandHTML = band ? band.min + '–' + band.max + '% healthy' : '';
+  const bandHTML = band ? Math.round(band.min) + '–' + Math.round(band.max) + '% healthy' : '';
 
   const bedStats = LAST_INSIGHTS && LAST_INSIGHTS.stats ? LAST_INSIGHTS.stats[moistKey] : null;
   const rangeHTML = bedStats
