@@ -596,6 +596,7 @@ def drydown_rate(
     samples: list[tuple[float, float]],
     settle_window_s: float = 3600,
     min_points: int = 4,
+    min_span_hours: float = 6.0,
 ) -> dict[str, Any]:
     """
     Robust rate of the gradual-drydown phase, excluding any watering spike
@@ -609,11 +610,22 @@ def drydown_rate(
     single least-squares fit, so a handful of noisy points or one outlier
     reading don't swing the result.
 
+    min_span_hours: minimum elapsed time the post-settle tail must cover
+             before a DRYING result is trusted. A bed watered only a few
+             hours ago can still be draining past whatever settle_window_s
+             was assumed (real gravitational drainage varies by soil and can
+             run well past 60-90 minutes) — a short tail then measures that
+             lingering drainage, not the true multi-hour evapotranspiration
+             rate, and wildly overstates %/day. Only gates the DRYING
+             direction: a short but flat/rising tail is still a trustworthy
+             "not currently drying" signal, so it's returned as-is.
+
     Returns:
       {"per_day": float | None, "per_hour": float | None, "n_points": int, "reason": str}
     per_day/per_hour are positive magnitudes (rate of drying). None when there
-    aren't enough points to fit; 0.0 when the tail is flat or net-rising
-    (e.g. still within/near a watering event).
+    aren't enough points to fit, or the post-settle tail is too short to trust
+    (see min_span_hours); 0.0 when the tail is flat or net-rising (e.g. still
+    within/near a watering event).
     """
     if len(samples) < min_points:
         return {"per_day": None, "per_hour": None, "n_points": len(samples), "reason": "too few points"}
@@ -646,6 +658,13 @@ def drydown_rate(
         reason = "rising in window" if slope_per_sec > eps else "flat"
         return {"per_day": 0.0, "per_hour": 0.0, "n_points": len(tail), "reason": reason}
 
+    span_hours = (tail[-1][0] - tail[0][0]) / 3600.0
+    if span_hours < min_span_hours:
+        return {
+            "per_day": None, "per_hour": None, "n_points": len(tail),
+            "reason": f"only {span_hours:.1f}h since settling — too soon to trust a drying rate",
+        }
+
     drying_per_sec = -slope_per_sec
     per_day  = drying_per_sec * 86400
     per_hour = drying_per_sec * 3600
@@ -666,17 +685,31 @@ def days_until_dry(
     Project days until `current_moist` reaches `dry_threshold`, given a
     drydown_rate() per_day figure.
 
-    Returns {"days": float | None, "label": str}. days is None (label "not
-    drying") when the rate is None/zero/negative (i.e. not currently drying —
-    flat, rising, or unknown). Far projections (>=14 days) are clamped to a
-    "2+ weeks" label rather than reported as an overconfident exact number.
-    """
-    if drydown_rate_per_day is None or drydown_rate_per_day <= 0:
-        return {"days": None, "label": "not drying"}
+    Checks whether the bed is ALREADY at/below its dry threshold before
+    looking at the rate at all — a bed that's flat because it has already
+    bottomed out (nothing left to lose) still needs water today, and must
+    not be reported as "not drying" just because the rate happens to be
+    zero.
 
+    Returns {"days": float | None, "label": str}:
+      - "today"        — already at/below dry_threshold (deficit <= 0), or
+                          projected to cross it within a day.
+      - "learning"      — days is None; drydown_rate_per_day is None (not
+                          enough trustworthy history yet — see
+                          drydown_rate's min_span_hours).
+      - "not drying"    — days is None; rate is confirmed zero/negative
+                          (flat or rising), and there's still headroom.
+      - "~N days" / "2+ weeks" — otherwise, clamped past 14 days rather than
+                          reported as an overconfident exact number.
+    """
     deficit = current_moist - dry_threshold
     if deficit <= 0:
         return {"days": 0.0, "label": "today"}
+
+    if drydown_rate_per_day is None:
+        return {"days": None, "label": "learning"}
+    if drydown_rate_per_day <= 0:
+        return {"days": None, "label": "not drying"}
 
     days = deficit / drydown_rate_per_day
 

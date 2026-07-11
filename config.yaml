@@ -151,6 +151,10 @@ thresholds:
     good_soak_min_pct: 5.0         # absorbed >= this -> good soak
     runoff_max_pct: 2.0            # absorbed <= this -> runoff / hydrophobic soil
     overshoot_frac_max: 0.6        # overshoot/(peak-baseline) above this weakens "good"
+    min_drydown_span_hours: 6      # need at least this much post-settle history before
+                                    # trusting a DRYING rate (a bed watered a few hours
+                                    # ago is often still draining past settle_window_minutes,
+                                    # which overstates %/day if extrapolated too early)
 
   # Self-learned per-bed moisture band (garden.derived.learned_moisture_band):
   # a capacitive sensor reads soil dielectric, so loose/fresh soil reads lower

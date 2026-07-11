@@ -189,6 +189,7 @@ def _bed_watering_forecast(bed: dict[str, Any], soil_moist: float | None) -> dic
     lifecycle_cfg = cfg.thresholds.get("watering_lifecycle", {})
     settle_window_s = lifecycle_cfg.get("settle_window_minutes", 60) * 60
     lookback_hours = lifecycle_cfg.get("drydown_lookback_hours", 48)
+    min_span_hours = lifecycle_cfg.get("min_drydown_span_hours", 6)
 
     rows = storage.series(moist_key, hours=lookback_hours)
     samples = [
@@ -199,7 +200,7 @@ def _bed_watering_forecast(bed: dict[str, Any], soil_moist: float | None) -> dic
     event = drv.analyze_watering(samples, settle_window_s=settle_window_s)
     settling = bool(event.get("detected") and event.get("settling"))
 
-    rate = drv.drydown_rate(samples, settle_window_s=settle_window_s)
+    rate = drv.drydown_rate(samples, settle_window_s=settle_window_s, min_span_hours=min_span_hours)
     dtd = drv.days_until_dry(soil_moist, rate["per_day"], dry_threshold)
 
     remaining = None
@@ -209,7 +210,7 @@ def _bed_watering_forecast(bed: dict[str, Any], soil_moist: float | None) -> dic
     return {
         "days":      dtd["days"],
         "label":     "just watered" if settling else dtd["label"],
-        "per_day":   round(rate["per_day"], 1),
+        "per_day":   round(rate["per_day"], 1) if rate["per_day"] is not None else None,
         "remaining": remaining,
         "settling":  settling,
     }

@@ -522,6 +522,39 @@ class TestDrydownRate:
         assert result["per_day"] == 0.0
         assert "flat" in result["reason"].lower()
 
+    def test_short_post_settle_tail_suppressed(self):
+        # A bed watered only ~2.5h ago: the tail after settle_window_s is real
+        # but too short to trust as a daily rate -- this is the exact bug seen
+        # in production (a bed watered a few hours prior projected "water
+        # again in 2 hours" from what was actually still-lingering drainage,
+        # not the true multi-hour drydown trend). Should report "learning"
+        # (per_day None), not a wild extrapolated number.
+        watering = _watering_series(baseline=60.0, peak=84.0, settled=71.0,
+                                     settle_pts=10, interval=60.0)  # settles ~10min
+        tail_start = watering[-1][0] + 60.0
+        short_tail = _linear_series(70.0, per_day_rate=25.0, hours=2.5, start_t=tail_start)
+        result = drydown_rate(watering + short_tail, min_span_hours=6.0)
+        assert result["per_day"] is None
+        assert "too soon" in result["reason"].lower()
+
+    def test_long_post_settle_tail_trusted(self):
+        # Same shape, but the tail now spans well past min_span_hours -- the
+        # rate should be trusted and reported normally.
+        watering = _watering_series(baseline=60.0, peak=84.0, settled=71.0,
+                                     settle_pts=10, interval=60.0)
+        tail_start = watering[-1][0] + 60.0
+        long_tail = _linear_series(70.0, per_day_rate=2.5, hours=24, start_t=tail_start)
+        result = drydown_rate(watering + long_tail, min_span_hours=6.0)
+        assert result["per_day"] == pytest.approx(2.5, abs=0.3)
+
+    def test_short_flat_tail_still_trusted(self):
+        # The min_span_hours guard only gates the DRYING direction -- a short
+        # but flat/rising tail is still a trustworthy "not currently drying"
+        # signal and shouldn't be suppressed.
+        samples = [(i * 600.0, 55.0) for i in range(10)]  # spans 1.5h, flat
+        result = drydown_rate(samples, min_span_hours=6.0)
+        assert result["per_day"] == 0.0
+
 
 class TestDaysUntilDry:
     def test_known_projection(self):
@@ -558,3 +591,31 @@ class TestDaysUntilDry:
         two = days_until_dry(38.0, 4.0, 30.0)
         assert one["label"] == "~1 day"
         assert two["label"] == "~2 days"
+
+    def test_already_dry_and_flat_reports_today_not_not_drying(self):
+        # Real production bug: a bed already at/below its dry threshold but
+        # currently flat (rate=0, nothing left to lose) must say "today", not
+        # the misleadingly reassuring "not drying" -- it needs water NOW.
+        result = days_until_dry(40.0, 0.0, 42.0)
+        assert result["label"] == "today"
+        assert result["days"] == 0.0
+
+    def test_already_dry_and_unknown_rate_reports_today(self):
+        # Same, but the rate hasn't been computed yet (None) rather than a
+        # confirmed zero -- deficit still takes priority.
+        result = days_until_dry(40.0, None, 42.0)
+        assert result["label"] == "today"
+        assert result["days"] == 0.0
+
+    def test_healthy_but_rate_unknown_reports_learning(self):
+        # Plenty of headroom, but no trustworthy rate yet (e.g. bed watered
+        # too recently for drydown_rate's min_span_hours guard) -> "learning",
+        # distinct from a confirmed-flat "not drying".
+        result = days_until_dry(70.0, None, 30.0)
+        assert result["days"] is None
+        assert result["label"] == "learning"
+
+    def test_healthy_and_confirmed_flat_still_not_drying(self):
+        result = days_until_dry(70.0, 0.0, 30.0)
+        assert result["days"] is None
+        assert result["label"] == "not drying"

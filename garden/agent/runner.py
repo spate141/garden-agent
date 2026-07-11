@@ -169,6 +169,7 @@ def _bed_drydown_line(bed: dict, moist_key: str | None, soil_moist: float) -> st
     lifecycle_cfg = cfg.thresholds.get("watering_lifecycle", {})
     lookback_hours = lifecycle_cfg.get("drydown_lookback_hours", 48)
     settle_window_s = lifecycle_cfg.get("settle_window_minutes", 60) * 60
+    min_span_hours = lifecycle_cfg.get("min_drydown_span_hours", 6)
 
     rows = storage.series(moist_key, hours=lookback_hours)
     samples = [
@@ -179,7 +180,7 @@ def _bed_drydown_line(bed: dict, moist_key: str | None, soil_moist: float) -> st
     if event.get("detected") and event.get("settling"):
         return None  # still settling from a recent watering -- forecast not meaningful yet
 
-    rate = derived.drydown_rate(samples, settle_window_s=settle_window_s)
+    rate = derived.drydown_rate(samples, settle_window_s=settle_window_s, min_span_hours=min_span_hours)
     dtd = derived.days_until_dry(soil_moist, rate["per_day"], dry_threshold)
     if dtd["days"] is None:
         return None
