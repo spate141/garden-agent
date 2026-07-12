@@ -10,10 +10,6 @@ RELOAD_NEEDED=0
 echo "==> garden-agent deploy starting (user: $USER)"
 echo "    app dir: $APP_DIR"
 
-# ── 0. Pull latest code ───────────────────────────────────────────────────────
-echo "==> Pulling latest code..."
-cd "$APP_DIR" && git pull
-
 # ── 1. Pre-flight checks ──────────────────────────────────────────────────────
 if [ ! -f "$APP_DIR/secrets.env" ]; then
     echo "Error: secrets.env not found at $APP_DIR — services will not start." >&2
@@ -23,6 +19,8 @@ fi
 # Notify Telegram directly on completion/failure (curl, not the app): when this
 # script is triggered by the /deploy bot command (garden/bot.py), it restarts
 # the very process that queued it, so that process can't reliably report back.
+# Sourced and the trap armed before `git pull` so a failed pull (network,
+# conflict) is reported too, not just failures after that point.
 set -a
 # shellcheck source=/dev/null
 source "$APP_DIR/secrets.env"
@@ -35,7 +33,20 @@ _notify() {
         --data-urlencode "text=$1" \
         > /dev/null || true
 }
-trap '_notify "🌱 Garden: Deploy FAILED — check deploy.log / journalctl -u garden-agent on the VM."' ERR
+_on_error() {
+    local exit_code=$?
+    _notify "🌱 Garden: Deploy FAILED (exit $exit_code) at line $LINENO: \`$BASH_COMMAND\`
+Commit: $(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
+Check deploy.log / journalctl -u garden-agent on the VM."
+}
+trap _on_error ERR
+
+# ── 0. Pull latest code ───────────────────────────────────────────────────────
+echo "==> Pulling latest code..."
+BEFORE_COMMIT="$(git -C "$APP_DIR" rev-parse --short HEAD)"
+cd "$APP_DIR" && git pull
+AFTER_COMMIT="$(git -C "$APP_DIR" rev-parse --short HEAD)"
+COMMIT_SUBJECT="$(git -C "$APP_DIR" log -1 --pretty=%s)"
 
 # uv installs to ~/.local/bin; non-login shells may not have it on PATH
 # shellcheck source=/dev/null
@@ -111,4 +122,19 @@ sudo systemctl is-active --quiet ecowitt-bridge       && echo "    ecowitt-bridg
 
 echo ""
 echo "==> Deploy complete."
-_notify "🌱 Garden: Deploy complete ✅ (garden-agent restarted)."
+
+if echo "$HEALTH" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+    HEALTH_LINE="health: OK"
+else
+    HEALTH_LINE="health: UNEXPECTED RESPONSE — $HEALTH"
+fi
+
+if [ "$BEFORE_COMMIT" = "$AFTER_COMMIT" ]; then
+    COMMIT_LINE="commit: $AFTER_COMMIT (no change) — $COMMIT_SUBJECT"
+else
+    COMMIT_LINE="commit: $BEFORE_COMMIT → $AFTER_COMMIT — $COMMIT_SUBJECT"
+fi
+
+_notify "🌱 Garden: Deploy complete ✅
+$COMMIT_LINE
+$HEALTH_LINE"
