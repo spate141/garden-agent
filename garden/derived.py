@@ -340,6 +340,17 @@ def _percentile(values: list[float], pct: float) -> float:
     return ordered[lo] + (ordered[hi] - ordered[lo]) * frac
 
 
+def near_dry_margin(band: tuple[float, float]) -> float:
+    """
+    How far below band[0] (min) still counts as merely "drying" rather than
+    truly dry — mirrors _nearDryMargin in garden/dashboard/static/js/garden.js
+    so the Telegram alert and the "Soil moisture vs. band" chart agree on what
+    "Dry" means for a given bed. Keep these two formulas in sync.
+    """
+    width = max(0.0, band[1] - band[0])
+    return max(2.0, width * 0.25)
+
+
 def effective_moisture_band(
     values: list[float],
     plants: list[str],

@@ -35,14 +35,21 @@ def _iso_now() -> str:
 
 def _bed_dry_threshold(bed: dict, fallback: float) -> float:
     """
-    The moisture % below which `bed` is considered dry: its self-learned band
-    minimum when there's enough history, else its crop-derived band minimum,
-    else `fallback` (the flat config.yaml threshold).
+    The moisture % below which `bed` is actually considered dry: its band
+    minimum (self-learned when there's enough history, else crop-derived)
+    minus derived.near_dry_margin(), else `fallback` (the flat config.yaml
+    threshold) when there's no band at all.
 
     Mirrors garden.main._effective_bed_band so the "time to water" alert
     agrees with the dashboard's Dry/OK/Wet chip for the same bed — without
     this, a bed with unusually loose or compacted soil could show "Dry" on
-    the dashboard while never tripping (or always tripping) this alert.
+    the dashboard while never tripping (or always tripping) this alert. The
+    margin subtraction matters too: the dashboard's "Soil moisture vs. band"
+    chart only labels a bed "Dry" once it's past that margin below band
+    min — anything closer is "Drying" (still effectively OK). Without the
+    same margin here, this alert fired on every dip into "Drying" territory,
+    re-arming every cooldown window even for a bed sitting 1-2 points under
+    its threshold.
     """
     moist_key = bed.get("sensors", {}).get("soil_moisture")
     plants = bed.get("plants", [])
@@ -66,7 +73,9 @@ def _bed_dry_threshold(bed: dict, fallback: float) -> float:
     else:
         band = derived.bed_moisture_band(plants, cfg.crops)
 
-    return band[0] if band else fallback
+    if band is None:
+        return fallback
+    return band[0] - derived.near_dry_margin(band)
 
 
 def check_soil_moisture_low() -> list[RuleResult]:

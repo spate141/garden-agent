@@ -39,8 +39,11 @@ class TestBedDryThreshold:
             threshold = _bed_dry_threshold(BED1_LOOSE, fallback=30.0)
         # No history and no recognised-crop band mismatch here: falls back to
         # the crop-derived band (tomato min 50), not the flat fallback,
-        # because bed_moisture_band still resolves without any samples.
-        assert threshold == 50.0
+        # because bed_moisture_band still resolves without any samples. The
+        # returned threshold is the band min minus its near-dry margin
+        # (band (50, 80) -> width 30 -> margin max(2, 30*0.25)=7.5 -> 42.5),
+        # matching the dashboard's "Dry" cutoff rather than the raw band edge.
+        assert threshold == 42.5
 
     def test_learns_a_lower_threshold_for_loose_soil(self):
         series_rows = [{"value": v} for v in _sawtooth(35, 58)]
@@ -60,7 +63,7 @@ class TestBedDryThreshold:
                 threshold = _bed_dry_threshold(BED1_LOOSE, fallback=30.0)
         finally:
             cfg.thresholds["moisture_learning"] = original
-        assert threshold == 50.0  # crop band min, learning bypassed
+        assert threshold == 42.5  # crop band min (50) minus near-dry margin (7.5), learning bypassed
 
 
 class TestCheckSoilMoistureLow:
