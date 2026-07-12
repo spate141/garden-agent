@@ -2043,19 +2043,28 @@ function renderBedChips(insightBeds) {
    projection can — it only ever states where things stand right now.
    ════════════════════════════════════════════════════════════════════════════ */
 
+/** How far below band.min still counts as "drying" rather than a hard "dry".
+ *  Fraction of band width, floored so tight bands still get a usable margin. */
+function _nearDryMargin(band) {
+  const width = Math.max(0, band.max - band.min);
+  return Math.max(2, width * 0.25);
+}
+
 function _moistBandStatus(moist, band) {
   if (moist == null || !band) return 'unknown';
-  if (moist < band.min) return 'dry';
   if (moist > band.max) return 'wet';
-  return 'ok';
+  if (moist >= band.min) return 'ok';
+  if (moist >= band.min - _nearDryMargin(band)) return 'near-dry';
+  return 'dry';
 }
 
 function _moistBandColor(status) {
   switch (status) {
-    case 'dry': return 'var(--warn)';
-    case 'wet': return 'var(--wet)';
-    case 'ok':  return 'var(--fill-healthy)';
-    default:    return 'var(--text-faint)';
+    case 'dry':      return 'var(--warn)';
+    case 'near-dry': return 'var(--warn)';
+    case 'wet':      return 'var(--wet)';
+    case 'ok':       return 'var(--fill-healthy)';
+    default:         return 'var(--text-faint)';
   }
 }
 
@@ -2074,6 +2083,11 @@ function renderMoistureBandCard() {
     const status = _moistBandStatus(moist, band);
     const color  = _moistBandColor(status);
 
+    const margin = band ? _nearDryMargin(band) : 0;
+    const bufferHTML = band
+      ? '<span class="moistband-buffer" style="left:' + Math.max(0, band.min - margin) +
+        '%; width:' + Math.min(band.min, margin) + '%"></span>'
+      : '';
     const zoneHTML = band
       ? '<span class="moistband-zone" style="left:' + band.min + '%; width:' + Math.max(0, band.max - band.min) + '%"></span>'
       : '';
@@ -2081,15 +2095,17 @@ function renderMoistureBandCard() {
       ? '<span class="moistband-marker" style="left:' + Math.max(0, Math.min(100, moist)) + '%; background:' + color + '"></span>'
       : '';
 
+    const word = status === 'dry' ? 'Dry'
+      : status === 'near-dry' ? 'Drying'
+      : status === 'wet' ? 'Wet' : 'OK';
     const label = moist == null
       ? 'no reading'
-      : (status === 'dry' ? 'Dry' : status === 'wet' ? 'Wet' : 'OK') +
-        (band ? ' (' + Math.round(band.min) + '–' + Math.round(band.max) + '%)' : '');
+      : word + (band ? ' (' + Math.round(band.min) + '–' + Math.round(band.max) + '%)' : '');
 
     return (
       '<div class="moistband-row">' +
         '<span class="moistband-bed-name">' + bed.name + '</span>' +
-        '<span class="moistband-track" aria-hidden="true">' + zoneHTML + markerHTML + '</span>' +
+        '<span class="moistband-track" aria-hidden="true">' + bufferHTML + zoneHTML + markerHTML + '</span>' +
         '<span class="moistband-value" style="color:' + color + '">' +
           (moist != null ? Math.round(moist) + '%' : '—') +
         '</span>' +

@@ -375,6 +375,17 @@
   border: 1px solid var(--accent-border);
 }
 
+/* Near-dry buffer: faint amber sliver just below the healthy band, so a
+   reading that's only slightly under min reads as "approaching dry" rather
+   than blending into the plain track. */
+.moistband-buffer {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+  background: var(--warn-soft);
+}
+
 .moistband-marker {
   position: absolute;
   top: 50%;
