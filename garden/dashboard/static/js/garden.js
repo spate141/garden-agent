@@ -2044,7 +2044,10 @@ function renderBedChips(insightBeds) {
    ════════════════════════════════════════════════════════════════════════════ */
 
 /** How far below band.min still counts as "drying" rather than a hard "dry".
- *  Fraction of band width, floored so tight bands still get a usable margin. */
+ *  Fraction of band width, floored so tight bands still get a usable margin.
+ *  Mirrored in Python as derived.near_dry_margin() (garden/derived.py), used
+ *  by the "Low soil moisture" Telegram alert so it agrees with this chart on
+ *  what "Dry" means. Keep these two formulas in sync. */
 function _nearDryMargin(band) {
   const width = Math.max(0, band.max - band.min);
   return Math.max(2, width * 0.25);

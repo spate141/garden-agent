@@ -1,5 +1,5 @@
 """
-bot.py — Inbound Telegram bot commands (/bed1, /beds, /weather, /air, /brief, /help).
+bot.py — Inbound Telegram bot commands (/bed1, /beds, /weather, /air, /brief, /deploy, /help).
 
 Counterpart to telegram.py (outbound-only). Telegram delivers each command as a
 webhook POST to /api/telegram (see garden/main.py), which calls handle_update()
@@ -21,7 +21,9 @@ or via deploy.sh whenever TELEGRAM_WEBHOOK_SECRET / GARDEN_PUBLIC_URL are set.
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -33,6 +35,9 @@ from garden.config import cfg
 
 log = logging.getLogger("garden.bot")
 
+_APP_DIR = Path(__file__).resolve().parent.parent  # garden-agent/ (holds deploy.sh)
+_DEPLOY_LOG = _APP_DIR / "deploy.log"
+
 _STATUS_WORD = {
     "ok": "Good", "dry": "Dry", "wet": "Wet",
     "cold": "Cold", "heat": "Heat stress", "unknown": "Unknown",
@@ -43,6 +48,7 @@ _STATIC_COMMANDS: list[tuple[str, str]] = [
     ("weather", "Current conditions + today's forecast"),
     ("air", "VPD, dew point, feels-like"),
     ("brief", "Send the morning brief now"),
+    ("deploy", "Pull latest code and restart services"),
     ("help", "List all commands"),
 ]
 
@@ -185,6 +191,49 @@ def _air() -> str:
     return "\n".join(lines)
 
 
+def _deploy() -> str:
+    """
+    Kick off deploy.sh (git pull, dep sync, service restarts) and reply
+    immediately — the run itself takes tens of seconds and restarts this very
+    process, so it can't run inline and report back the normal way.
+
+    Launched via `systemd-run` as its own transient unit rather than a plain
+    subprocess: deploy.sh's job includes `sudo systemctl restart garden-agent`,
+    and a plain child process would share this service's cgroup and get
+    killed by that restart before finishing the remaining steps (cron/backup
+    timers, webhook re-registration, status summary). `--collect` drops the
+    transient unit once it exits instead of leaving it around as "failed".
+    deploy.sh sends its own completion/failure message to Telegram directly
+    (see deploy.sh) since this process may not survive to do it.
+
+    Requires passwordless sudo for `systemd-run` (and, as before, for the
+    systemctl/tee calls inside deploy.sh) — see docs/telegram.md.
+    """
+    try:
+        subprocess.Popen(
+            [
+                "sudo", "systemd-run",
+                "--unit=garden-deploy",
+                "--collect",
+                "--description=garden-agent deploy (via /deploy)",
+                "--working-directory", str(_APP_DIR),
+                "bash", "-c", f"bash deploy.sh >> {_DEPLOY_LOG} 2>&1",
+            ],
+            cwd=_APP_DIR,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        log.exception("Failed to launch deploy.sh")
+        return "Failed to start the deploy — check garden-agent logs on the VM."
+    return (
+        "\U0001f680 Deploy started (git pull, restart services). "
+        "This restarts garden-agent, so the bot will be briefly unreachable. "
+        "You'll get a message here when it's done."
+    )
+
+
 def _help() -> str:
     lines = ["<b>Available commands</b>"]
     for cmd, desc in _bed_commands() + _STATIC_COMMANDS:
@@ -209,6 +258,8 @@ def dispatch(command: str) -> str:
         from garden.agent.runner import send_daily_brief
         send_daily_brief(force=True)
         return "Morning brief sent."
+    if command == "deploy":
+        return _deploy()
     return _help()
 
 

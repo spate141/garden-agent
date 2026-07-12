@@ -20,6 +20,23 @@ if [ ! -f "$APP_DIR/secrets.env" ]; then
     exit 1
 fi
 
+# Notify Telegram directly on completion/failure (curl, not the app): when this
+# script is triggered by the /deploy bot command (garden/bot.py), it restarts
+# the very process that queued it, so that process can't reliably report back.
+set -a
+# shellcheck source=/dev/null
+source "$APP_DIR/secrets.env"
+set +a
+
+_notify() {
+    [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] || return 0
+    curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+        --data-urlencode "text=$1" \
+        > /dev/null || true
+}
+trap '_notify "🌱 Garden: Deploy FAILED — check deploy.log / journalctl -u garden-agent on the VM."' ERR
+
 # uv installs to ~/.local/bin; non-login shells may not have it on PATH
 # shellcheck source=/dev/null
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
@@ -94,3 +111,4 @@ sudo systemctl is-active --quiet ecowitt-bridge       && echo "    ecowitt-bridg
 
 echo ""
 echo "==> Deploy complete."
+_notify "🌱 Garden: Deploy complete ✅ (garden-agent restarted)."
