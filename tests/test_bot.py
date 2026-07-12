@@ -85,6 +85,33 @@ def test_dispatch_air_with_readings(monkeypatch):
     assert "2.38" in reply
 
 
+# ── dispatch: /deploy ──────────────────────────────────────────────────────────
+
+def test_dispatch_deploy_launches_systemd_run(monkeypatch):
+    calls = []
+    monkeypatch.setattr(bot.subprocess, "Popen", lambda args, **kw: calls.append((args, kw)))
+
+    reply = bot.dispatch("deploy")
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args[:3] == ["sudo", "systemd-run", "--unit=garden-deploy"]
+    assert "--collect" in args
+    assert any("deploy.sh" in a for a in args)
+    assert kwargs["stdin"] is bot.subprocess.DEVNULL
+    assert "Deploy started" in reply
+
+
+def test_dispatch_deploy_failure_to_launch_is_reported(monkeypatch):
+    def _boom(args, **kw):
+        raise OSError("sudo not found")
+
+    monkeypatch.setattr(bot.subprocess, "Popen", _boom)
+
+    reply = bot.dispatch("deploy")
+    assert "Failed to start" in reply
+
+
 # ── dispatch: /help fallback ───────────────────────────────────────────────────
 
 def test_dispatch_help_lists_bed_and_static_commands():
@@ -105,8 +132,8 @@ def test_command_menu_has_one_entry_per_bed_plus_static():
     commands = {m["command"] for m in menu}
     n_beds = len(cfg.dashboard.get("beds", []))
     assert {"bed1", "bed2", "bed3", "bed4"} <= commands
-    assert {"beds", "weather", "air", "brief", "help"} <= commands
-    assert len(menu) == n_beds + 5
+    assert {"beds", "weather", "air", "brief", "deploy", "help"} <= commands
+    assert len(menu) == n_beds + 6
 
 
 # ── handle_update: owner-only guard + parsing ─────────────────────────────────

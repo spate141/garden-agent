@@ -80,7 +80,7 @@ No further input needed — the Telegram code is already written.
 
 ---
 
-## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief)
+## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief, /deploy)
 
 The bot can also answer commands on demand — tap `/bed4` in Telegram and get a
 summary of Bed 4's moisture, battery, and crops back within a second. This needs
@@ -118,7 +118,39 @@ the message box) to see all commands, or type them directly:
 | `/weather` | Today's forecast + current conditions |
 | `/air` | VPD, dew point / frost risk, feels-like |
 | `/brief` | Sends the morning brief immediately (bypasses the 7am schedule) |
+| `/deploy` | Runs `deploy.sh` on the VM: git pull, restart services. See below. |
 | `/help` | Lists all available commands |
+
+### `/deploy`
+
+Runs `deploy.sh` on the VM — the same script you'd otherwise SSH in and run by
+hand after pushing to `main`. Because `deploy.sh` restarts `garden-agent`
+itself partway through, `garden/bot.py` launches it as an independent
+transient systemd unit (`systemd-run --unit=garden-deploy --collect`) instead
+of a plain subprocess — a plain child process would share this service's
+cgroup and get killed by that restart before finishing the remaining steps
+(cron/backup timers, webhook re-registration, status summary). The bot
+replies immediately ("Deploy started…"); `deploy.sh` itself posts a "Deploy
+complete ✅" or "Deploy FAILED" message straight to Telegram (via `curl`,
+using the same `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` from `secrets.env`)
+once it finishes, since the process that queued it doesn't survive to report
+back.
+
+**One-time VM setup required**: `deploy.sh`'s `sudo` calls (`systemctl
+restart`/`enable`/`reset-failed`, `tee` into `/etc/systemd/system/`) prompt
+for a password when run interactively — fine over SSH, but there's no
+terminal to answer that prompt when Telegram triggers it. Add passwordless
+sudo for your deploy user (`sudo visudo -f /etc/sudoers.d/garden-deploy`):
+
+```
+your_vm_user ALL=(root) NOPASSWD: /usr/bin/systemctl, /usr/bin/tee, /usr/bin/systemd-run
+```
+
+**Security note**: this is a materially bigger capability than the other
+commands — anyone who can message the authorized `TELEGRAM_CHAT_ID` can
+trigger a `git pull` of whatever is on `main` plus a root-level systemd
+restart. The existing owner-chat-id check in `garden/bot.py` is the only
+gate, same as every other command; make sure that chat is one you trust.
 
 ### How it works
 
@@ -141,3 +173,9 @@ no separate data path to keep in sync.
   ```bash
   curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo" | python3 -m json.tool
   ```
+- `/deploy` replied but nothing happened / no completion message: check
+  `sudo journalctl -u garden-deploy -n 100` for the transient unit's own
+  output, and `cat deploy.log` in the project directory (deploy.sh's stdout/
+  stderr are appended there when launched this way). A "Failed to start the
+  deploy" reply means `sudo systemd-run` itself couldn't launch — usually the
+  passwordless-sudo entry above is missing.
