@@ -25,11 +25,11 @@
   --g-label-wood:       #6b4527;
   --g-grass:            #6fa64c;
   --g-grass-dark:       #588a3a;
-  --g-stake-track:      rgba(0,0,0,0.28);
-  --g-stake-dry:        #c88a3e;
-  --g-stake-ok:         #3f86ab;
-  --g-stake-wet:        #2b5f7d;
-  --g-stake-asleep:     #8a8578;
+  --g-water-track:      rgba(0,0,0,0.28);
+  --g-water-dry:        #c88a3e;
+  --g-water-ok:         #3f86ab;
+  --g-water-wet:        #2b5f7d;
+  --g-water-asleep:     #8a8578;
 }
 [data-theme="dark"] .garden {
   --g-chip-bg:          rgba(42, 30, 15, 0.96);
@@ -42,11 +42,11 @@
   --g-soil-dry:         #7a5535;
   --g-soil-mid:         #4e3620;
   --g-soil-wet:         #2d1c0d;
-  --g-stake-track:      rgba(0,0,0,0.42);
-  --g-stake-dry:        #d99f52;
-  --g-stake-ok:         #5aa6cc;
-  --g-stake-wet:        #3a7ea3;
-  --g-stake-asleep:     #5c584c;
+  --g-water-track:      rgba(0,0,0,0.42);
+  --g-water-dry:        #d99f52;
+  --g-water-ok:         #5aa6cc;
+  --g-water-wet:        #3a7ea3;
+  --g-water-asleep:     #5c584c;
 }
 @media (max-width: 640px) {
   .garden { margin: 16px -16px 0; }
@@ -350,98 +350,8 @@
 }
 .garden.is-raining .g-soil::after { opacity: 1; }
 
-/* Moisture gauge stake -- slim fill bar standing in the soil, right edge of the
-   bed. Height = raw moisture %, color = status vs. that bed's optimal band
-   (set by updateGarden via .g-stake--dry/--ok/--wet/--asleep). No ticks or
-   numeric text by design -- the hero stays number-free. */
-.g-stake {
-  position: absolute;
-  top: 6px;
-  bottom: 22px;
-  right: 6px;
-  width: 10px;
-  border-radius: 5px;
-  background: var(--g-stake-track);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.35);
-  overflow: hidden;
-  z-index: 7;
-}
-.g-stake-fill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 0;
-  border-radius: 5px;
-  background-color: var(--g-stake-ok);
-  /* glass-tube depth: a bright edge on one side, a soft shadow on the other --
-     gives the fill body volume instead of reading as a flat color swatch */
-  box-shadow:
-    inset 1px 0 0 rgba(255,255,255,0.28),
-    inset -1px 0 2px rgba(0,0,0,0.22);
-  transition: height 1.2s ease, background-color 1.2s ease;
-  overflow: hidden;
-}
-/* Slow light glint drifting up/down the column -- like light playing on a
-   water surface. Soft and low-contrast by design, not a hard pattern. */
-.g-stake-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(200deg,
-    rgba(255,255,255,0.3) 0%,
-    rgba(255,255,255,0) 24%,
-    rgba(255,255,255,0) 68%,
-    rgba(255,255,255,0.12) 100%);
-  background-size: 100% 220%;
-  animation: g-stake-glint 6s ease-in-out infinite;
-  pointer-events: none;
-}
-/* Wavy surface crest -- a thin sine-topped strip in the fill's own color,
-   overlapping the fill's top edge so it reads as the water's own surface.
-   Sways gently side to side (not a scrolling loop) for a subtle slosh. */
-.g-stake-fill::before {
-  content: "";
-  position: absolute;
-  left: -8px;
-  right: -8px;
-  top: -2px;
-  height: 5px;
-  background: inherit;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6'%3E%3Cpath d='M0 6 L0 3.5 Q4 1.5 8 3.5 T16 3.5 L16 6 Z' fill='%23fff'/%3E%3C/svg%3E") repeat-x;
-          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6'%3E%3Cpath d='M0 6 L0 3.5 Q4 1.5 8 3.5 T16 3.5 L16 6 Z' fill='%23fff'/%3E%3C/svg%3E") repeat-x;
-  -webkit-mask-size: 16px 6px;
-          mask-size: 16px 6px;
-  animation: g-stake-wave 4s ease-in-out infinite;
-  z-index: 1;
-}
-.g-stake--dry  .g-stake-fill { background-color: var(--g-stake-dry); }
-.g-stake--ok   .g-stake-fill { background-color: var(--g-stake-ok); }
-.g-stake--wet  .g-stake-fill { background-color: var(--g-stake-wet); }
-.g-stake--asleep {
-  filter: grayscale(0.85);
-  opacity: 0.4;
-}
-.g-stake--asleep .g-stake-fill { background-color: var(--g-stake-asleep); }
-
-@keyframes g-stake-wave {
-  0%, 100% { transform: translateX(0); }
-  50%      { transform: translateX(-8px); }
-}
-
-@keyframes g-stake-glint {
-  0%, 100% { background-position: 0 0%; }
-  50%      { background-position: 0 100%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .g-stake-fill { transition: none; }
-  .g-stake-fill::before,
-  .g-stake-fill::after { animation: none; }
-}
-
-/* Front rail -- overlaps soil bottom so plants sit inside the bed */
+/* Front rail -- overlaps soil bottom so plants sit inside the bed; holds the
+   droplet meter (below) set into it. */
 .g-front-rail {
   position: absolute;
   bottom: 0;
@@ -463,6 +373,80 @@
     transparent 0, transparent 66px,
     var(--g-wood-shadow) 66px, var(--g-wood-shadow) 68px);
   opacity: 0.55;
+}
+
+/* Droplet meter -- DROP_COUNT droplets set into the rail, filled left to right
+   like a battery/signal gauge (set live in updateGarden). Discrete, countable
+   droplets read at a glance and compare cleanly bed to bed -- unlike a
+   shallow continuous bar, where the real-world moisture range (usually
+   30-70%) compresses into a few pixels of height difference and every bed
+   ends up looking about the same. */
+.g-dropmeter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 2;
+}
+.g-drop {
+  position: relative;
+  width: 13px;
+  height: 17px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='4 2 16 20'%3E%3Cpath d='M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / contain;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='4 2 16 20'%3E%3Cpath d='M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / contain;
+  background-color: var(--g-water-track);
+  overflow: hidden;
+}
+.g-drop-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  --g-water-hue: var(--g-water-ok);
+  /* same top-lit/deep-shaded gradient as the old water bar, just miniaturized */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--g-water-hue) 55%, white)  0%,
+    var(--g-water-hue)                                45%,
+    color-mix(in srgb, var(--g-water-hue) 78%, black) 100%);
+  transition: height 0.9s ease;
+}
+/* Slow light glint drifting across each filled droplet, like light playing on
+   a water surface. Soft and low-contrast by design, not a hard pattern. */
+.g-drop-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(200deg,
+    rgba(255,255,255,0.35) 0%,
+    rgba(255,255,255,0) 28%,
+    rgba(255,255,255,0) 70%,
+    rgba(255,255,255,0.15) 100%);
+  background-size: 220% 100%;
+  animation: g-water-glint 6s ease-in-out infinite;
+  pointer-events: none;
+}
+.g-dropmeter--dry  .g-drop-fill { --g-water-hue: var(--g-water-dry); }
+.g-dropmeter--ok   .g-drop-fill { --g-water-hue: var(--g-water-ok); }
+.g-dropmeter--wet  .g-drop-fill { --g-water-hue: var(--g-water-wet); }
+.g-dropmeter--asleep {
+  filter: grayscale(0.85);
+  opacity: 0.4;
+}
+.g-dropmeter--asleep .g-drop-fill { --g-water-hue: var(--g-water-asleep); }
+
+@keyframes g-water-glint {
+  0%, 100% { background-position: 0% 0; }
+  50%      { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-drop-fill { transition: none; }
+  .g-drop-fill::after { animation: none; }
 }
 
 /* Damp soil patch under each plant root (child of .g-plant) */

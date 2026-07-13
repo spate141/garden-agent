@@ -72,6 +72,9 @@ const BANDS = window.GARDEN_CONFIG.BANDS;
  *  Built server-side from dashboard.beds (main.py). */
 const MOISTURE_GROUP = window.GARDEN_CONFIG.MOISTURE_GROUP;
 
+/** Number of droplets in each bed's front-rail moisture gauge (g-dropmeter). */
+const DROP_COUNT = 5;
+
 /* ════════════════════════════════════════════════════════════════════════════
    VALID SPRITE SET
    ════════════════════════════════════════════════════════════════════════════ */
@@ -617,22 +620,30 @@ function renderBeds() {
     soilEl.appendChild(plantsEl);
     frameEl.appendChild(soilEl);
 
-    /* moisture gauge stake: slim fill bar, height/color set live in updateGarden
-       from BANDS.moistureBands (per-bed optimal range) -- no ticks/text, hero
-       stays number-free by design. */
-    const stakeEl = document.createElement('div');
-    stakeEl.className = 'g-stake';
-    stakeEl.id = 'stake-' + bed.id;
-    stakeEl.setAttribute('aria-hidden', 'true');
-    const stakeFillEl = document.createElement('div');
-    stakeFillEl.className = 'g-stake-fill';
-    stakeEl.appendChild(stakeFillEl);
-    frameEl.appendChild(stakeEl);
-
     /* front rail: overlaps the soil's bottom edge, plants appear inside the bed */
     const railEl = document.createElement('div');
     railEl.className = 'g-front-rail';
     frameEl.appendChild(railEl);
+
+    /* droplet meter: DROP_COUNT droplets set into the rail, filled left to
+       right like a battery/signal gauge -- level/color set live in
+       updateGarden from raw moisture % (no per-bed band normalization) and
+       BANDS.moistureBands for status color. Discrete, countable droplets read
+       at a glance and compare cleanly bed to bed, unlike a shallow continuous
+       bar where small height differences all but disappear. */
+    const meterEl = document.createElement('div');
+    meterEl.className = 'g-dropmeter';
+    meterEl.id = 'dropmeter-' + bed.id;
+    meterEl.setAttribute('aria-hidden', 'true');
+    for (let d = 0; d < DROP_COUNT; d++) {
+      const dropEl = document.createElement('div');
+      dropEl.className = 'g-drop';
+      const dropFillEl = document.createElement('div');
+      dropFillEl.className = 'g-drop-fill';
+      dropEl.appendChild(dropFillEl);
+      meterEl.appendChild(dropEl);
+    }
+    railEl.appendChild(meterEl);
 
     /* No moisture%/battery badge here by design (redesign.md §3.2/§10) -- that
        data lives in the bed chip row and its inline detail; the hero stays number-free. */
@@ -829,17 +840,28 @@ function _minutesAgo(isoTs) {
 
 const _prevDry = {};
 
-/** Set a bed's gauge-stake fill height and status color.
- *  moist: 0-100 or null. Status is dry/ok/wet against BANDS.moistureBands[moistKey]
- *  (that bed's crop-derived optimal window); if no band exists for this sensor,
- *  falls back to the global G.dry cutoff (dry vs. ok, no "wet" distinction). */
-function _updateStake(bed, moistKey, moist) {
-  const stakeEl = document.getElementById('stake-' + bed.id);
-  if (!stakeEl) return;
-  const fillEl = stakeEl.querySelector('.g-stake-fill');
-  if (!fillEl || moist == null) return;
+/** Set a bed's droplet-meter fill levels and status color.
+ *  moist: 0-100 or null, mapped onto DROP_COUNT droplets filled left to right
+ *  like a battery gauge -- each droplet covers an equal 100/DROP_COUNT slice,
+ *  with the boundary droplet partially filled so the gauge still reads
+ *  smoothly rather than only in coarse steps. Status is dry/ok/wet against
+ *  BANDS.moistureBands[moistKey] (that bed's crop-derived optimal window); if
+ *  no band exists for this sensor, falls back to the global G.dry cutoff
+ *  (dry vs. ok, no "wet" distinction). */
+function _updateDropmeter(bed, moistKey, moist) {
+  const meterEl = document.getElementById('dropmeter-' + bed.id);
+  if (!meterEl) return;
+  const drops = meterEl.querySelectorAll('.g-drop');
+  if (!drops.length || moist == null) return;
 
-  fillEl.style.height = Math.max(0, Math.min(100, moist)) + '%';
+  const clamped = Math.max(0, Math.min(100, moist));
+  const step = 100 / DROP_COUNT;
+  drops.forEach(function (dropEl, i) {
+    const fillEl = dropEl.querySelector('.g-drop-fill');
+    const within = clamped - i * step;
+    const pct = Math.max(0, Math.min(100, (within / step) * 100));
+    fillEl.style.height = pct + '%';
+  });
 
   const band = BANDS.moistureBands && BANDS.moistureBands[moistKey];
   let status;
@@ -848,8 +870,8 @@ function _updateStake(bed, moistKey, moist) {
   } else {
     status = moist < G.dry ? 'dry' : 'ok';
   }
-  stakeEl.classList.remove('g-stake--dry', 'g-stake--ok', 'g-stake--wet');
-  stakeEl.classList.add('g-stake--' + status);
+  meterEl.classList.remove('g-dropmeter--dry', 'g-dropmeter--ok', 'g-dropmeter--wet');
+  meterEl.classList.add('g-dropmeter--' + status);
 }
 
 function updateGarden(rows) {
@@ -888,8 +910,8 @@ function updateGarden(rows) {
         d.style.height  = '4px';
         d.style.opacity = '0.12';
       });
-      const staleStakeEl = document.getElementById('stake-' + bed.id);
-      if (staleStakeEl) staleStakeEl.classList.add('g-stake--asleep');
+      const staleMeterEl = document.getElementById('dropmeter-' + bed.id);
+      if (staleMeterEl) staleMeterEl.classList.add('g-dropmeter--asleep');
       /* populate nosig text with time since last reading */
       const minsAgo = _minutesAgo(moistTs);
       const nosig = document.getElementById('nosig-' + bed.id);
@@ -907,8 +929,8 @@ function updateGarden(rows) {
       u.removeAttribute('data-dormant');
     });
     bedEl.classList.remove('g-asleep');
-    const wokeStakeEl = document.getElementById('stake-' + bed.id);
-    if (wokeStakeEl) wokeStakeEl.classList.remove('g-stake--asleep');
+    const wokeMeterEl = document.getElementById('dropmeter-' + bed.id);
+    if (wokeMeterEl) wokeMeterEl.classList.remove('g-dropmeter--asleep');
 
     /* ── Soil gradient (dry = pale/sandy, wet = dark/rich) ── */
     const soilEl = document.getElementById('soil-' + bed.id);
@@ -917,10 +939,10 @@ function updateGarden(rows) {
       soilEl.style.background = 'linear-gradient(to bottom,' + topC + ',' + botC + ')';
     }
 
-    /* ── Moisture gauge stake: height = raw %, color = status vs. this bed's
+    /* ── Droplet meter: filled droplets = raw %, color = status vs. this bed's
        optimal band (BANDS.moistureBands), falling back to the global dry
        threshold when the bed has no crop-derived range. ── */
-    _updateStake(bed, moistKey, moist);
+    _updateDropmeter(bed, moistKey, moist);
 
     /* ── Damp patches: grow and darken with moisture ── */
     if (moist != null) {
