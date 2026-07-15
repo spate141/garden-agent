@@ -238,6 +238,17 @@ quiet_hours:
   start_hour: 7    # first hour alerts are allowed (07:00)
   end_hour: 20     # alerts allowed until this hour, exclusive (20:00 = 8pm)
 
+# ── Data retention ─────────────────────────────────────────────────────────────
+# The dashboard never looks back further than 7 days (the "7d" trend button),
+# so old raw readings/snapshots are pure dead weight -- they're what makes
+# garden.sqlite3 (and every nightly backup, which is a full-DB copy) grow
+# forever. Pruned once per day during the cron tick; older history still
+# lives in the dated R2 backups if ever needed.
+retention:
+  enabled: true
+  days: 30       # delete readings/snapshots older than this
+  vacuum: true   # reclaim disk space after pruning (rebuilds the file; runs at most once/day)
+
 # ── Derived metric computation ────────────────────────────────────────────────
 # VPD, dew point, and heat index are computed from a live temp+humidity source
 # at ingest time and stored as regular sensor readings (auto-charts + agent).

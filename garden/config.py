@@ -71,6 +71,7 @@ class _Config:
         self.weather: dict[str, Any] = raw.get("weather", {})
         self.daily_brief: dict[str, Any] = raw.get("daily_brief", {})
         self.quiet_hours: dict[str, Any] = raw.get("quiet_hours", {})
+        self.retention: dict[str, Any] = raw.get("retention", {})
         self.derived: dict[str, Any] = raw.get("derived", {})
         self.crops: dict[str, Any] = raw.get("crops", {})
 

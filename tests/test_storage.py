@@ -116,3 +116,27 @@ class TestSeries:
         assert 0 < len(rows) < 480
         # Endpoints of the window are still represented.
         assert rows[0]["ts"] < rows[-1]["ts"]
+
+
+class TestPruneOldData:
+    def test_deletes_readings_and_snapshots_before_cutoff(self, db):
+        _write(db, "temp_f", 60.0, 60 * 24 * 40)  # 40 days ago -- should be pruned
+        _write(db, "temp_f", 75.0, 60)            # 1h ago -- should survive
+
+        cutoff = _iso(60 * 24 * 30)  # 30 days ago
+        readings_deleted, snapshots_deleted = db.prune_old_data(cutoff)
+
+        assert readings_deleted == 1
+        assert snapshots_deleted == 1
+        rows = db.series("temp_f", hours=24 * 365)
+        assert len(rows) == 1
+        assert rows[0]["value"] == 75.0
+
+    def test_nothing_to_prune_returns_zero(self, db):
+        _write(db, "temp_f", 75.0, 60)
+        cutoff = _iso(60 * 24 * 30)
+        assert db.prune_old_data(cutoff) == (0, 0)
+
+    def test_vacuum_does_not_raise(self, db):
+        _write(db, "temp_f", 75.0, 60)
+        db.vacuum()  # should not raise even with no prior DELETE in this connection

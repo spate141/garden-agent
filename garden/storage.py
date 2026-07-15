@@ -253,6 +253,27 @@ def stats(sensor_key: str, hours: int = 24) -> dict[str, Any] | None:
 
 # ── alert_state helpers ───────────────────────────────────────────────────────
 
+def prune_old_data(cutoff_iso: str) -> tuple[int, int]:
+    """
+    Delete readings and snapshots older than cutoff_iso (ISO-8601 UTC).
+    readings.ts and snapshots.ts are always written identically (see write_snapshot),
+    so a plain ts cutoff on each table is safe -- no orphaned readings result.
+    Returns (readings_deleted, snapshots_deleted).
+    """
+    with _conn() as con:
+        cur = con.execute("DELETE FROM readings WHERE ts < ?", (cutoff_iso,))
+        readings_deleted = cur.rowcount
+        cur = con.execute("DELETE FROM snapshots WHERE ts < ?", (cutoff_iso,))
+        snapshots_deleted = cur.rowcount
+    return readings_deleted, snapshots_deleted
+
+
+def vacuum() -> None:
+    """Reclaim disk space freed by prune_old_data(). Rebuilds the whole file -- call sparingly."""
+    with _conn() as con:
+        con.execute("VACUUM")
+
+
 def get_alert_state(rule_id: str) -> dict[str, Any]:
     with _conn() as con:
         row = con.execute(

@@ -13,6 +13,8 @@ from garden.agent.runner import (
     _in_cooldown,
     _already_sent_today,
     _in_quiet_hours,
+    _already_pruned_today,
+    _maybe_prune_retention,
 )
 
 
@@ -187,3 +189,101 @@ def test_quiet_hours_wraps_midnight(monkeypatch):
     assert _in_quiet_hours() is False
     _set_local_hour(monkeypatch, 12)
     assert _in_quiet_hours() is True
+
+
+# ── retention prune ────────────────────────────────────────────────────────────
+
+def test_already_pruned_today_no_record(monkeypatch):
+    from garden import storage
+    monkeypatch.setattr(storage, "get_alert_state", lambda rule_id: {"last_fired_ts": ""})
+    assert _already_pruned_today() is False
+
+
+def test_already_pruned_today_ran_today(monkeypatch):
+    from garden import storage
+    today = datetime.now(timezone.utc).date().isoformat()
+    monkeypatch.setattr(
+        storage, "get_alert_state",
+        lambda rule_id: {"last_fired_ts": f"{today}T03:00:00+00:00"},
+    )
+    assert _already_pruned_today() is True
+
+
+def test_already_pruned_today_ran_yesterday(monkeypatch):
+    from garden import storage
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
+    monkeypatch.setattr(
+        storage, "get_alert_state",
+        lambda rule_id: {"last_fired_ts": f"{yesterday}T03:00:00+00:00"},
+    )
+    assert _already_pruned_today() is False
+
+
+def test_maybe_prune_retention_disabled_skips(monkeypatch):
+    from garden.config import cfg as cfg_mod
+    from garden import storage
+
+    monkeypatch.setattr(cfg_mod, "retention", {"enabled": False}, raising=False)
+    called = []
+    monkeypatch.setattr(storage, "prune_old_data", lambda cutoff: called.append(cutoff) or (0, 0))
+    _maybe_prune_retention()
+    assert called == []
+
+
+def test_maybe_prune_retention_already_ran_today_skips(monkeypatch):
+    from garden.config import cfg as cfg_mod
+    from garden import storage
+
+    monkeypatch.setattr(cfg_mod, "retention", {"enabled": True, "days": 30}, raising=False)
+    today = datetime.now(timezone.utc).date().isoformat()
+    monkeypatch.setattr(
+        storage, "get_alert_state",
+        lambda rule_id: {"last_fired_ts": f"{today}T03:00:00+00:00"},
+    )
+    called = []
+    monkeypatch.setattr(storage, "prune_old_data", lambda cutoff: called.append(cutoff) or (0, 0))
+    _maybe_prune_retention()
+    assert called == []
+
+
+def test_maybe_prune_retention_runs_and_records_state(monkeypatch):
+    from garden.config import cfg as cfg_mod
+    from garden import storage
+
+    monkeypatch.setattr(cfg_mod, "retention", {"enabled": True, "days": 30, "vacuum": True}, raising=False)
+    monkeypatch.setattr(storage, "get_alert_state", lambda rule_id: {"last_fired_ts": ""})
+
+    prune_calls = []
+    monkeypatch.setattr(storage, "prune_old_data", lambda cutoff: prune_calls.append(cutoff) or (5, 2))
+    vacuum_calls = []
+    monkeypatch.setattr(storage, "vacuum", lambda: vacuum_calls.append(True))
+    state_calls = []
+    monkeypatch.setattr(
+        storage, "set_alert_state",
+        lambda rule_id, sensor_key, active, last_fired_ts: state_calls.append((rule_id, active, last_fired_ts)),
+    )
+
+    _maybe_prune_retention()
+
+    assert len(prune_calls) == 1
+    assert vacuum_calls == [True]  # rows were deleted -> vacuum runs
+    assert state_calls[0][0] == "retention_prune"
+
+
+def test_maybe_prune_retention_skips_vacuum_when_nothing_deleted(monkeypatch):
+    from garden.config import cfg as cfg_mod
+    from garden import storage
+
+    monkeypatch.setattr(cfg_mod, "retention", {"enabled": True, "days": 30, "vacuum": True}, raising=False)
+    monkeypatch.setattr(storage, "get_alert_state", lambda rule_id: {"last_fired_ts": ""})
+    monkeypatch.setattr(storage, "prune_old_data", lambda cutoff: (0, 0))
+    vacuum_calls = []
+    monkeypatch.setattr(storage, "vacuum", lambda: vacuum_calls.append(True))
+    monkeypatch.setattr(
+        storage, "set_alert_state",
+        lambda rule_id, sensor_key, active, last_fired_ts: None,
+    )
+
+    _maybe_prune_retention()
+
+    assert vacuum_calls == []

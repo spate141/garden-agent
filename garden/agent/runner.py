@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from garden import derived, storage
@@ -147,6 +147,11 @@ def run_cron_tick() -> None:
         _maybe_daily_brief()
     except Exception:
         log.exception("Daily brief failed")
+
+    try:
+        _maybe_prune_retention()
+    except Exception:
+        log.exception("Retention prune failed")
 
     log.info("Cron tick complete")
 
@@ -353,6 +358,44 @@ def send_daily_brief(force: bool = False) -> None:
 
 def _maybe_daily_brief() -> None:
     send_daily_brief(force=False)
+
+
+# ── Data retention ────────────────────────────────────────────────────────────
+
+_RETENTION_RULE_ID = "retention_prune"
+
+
+def _already_pruned_today() -> bool:
+    """True if the retention prune already ran today (UTC date)."""
+    state = storage.get_alert_state(_RETENTION_RULE_ID)
+    last_run = state.get("last_fired_ts", "")
+    if not last_run:
+        return False
+    today = datetime.now(timezone.utc).date().isoformat()
+    return last_run.startswith(today)
+
+
+def _maybe_prune_retention() -> None:
+    """Delete readings/snapshots older than the configured window, at most once/day."""
+    conf = cfg.retention
+    if not conf.get("enabled", False):
+        return
+    if _already_pruned_today():
+        return
+
+    days = conf.get("days", 30)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    readings_deleted, snapshots_deleted = storage.prune_old_data(cutoff)
+    log.info(
+        "Retention prune: removed %d readings, %d snapshots older than %d days",
+        readings_deleted, snapshots_deleted, days,
+    )
+
+    if conf.get("vacuum", True) and (readings_deleted or snapshots_deleted):
+        storage.vacuum()
+        log.info("VACUUM complete")
+
+    storage.set_alert_state(_RETENTION_RULE_ID, "", active=False, last_fired_ts=_now_iso())
 
 
 # ── CLI entry point (used by garden-cron.service) ────────────────────────────
