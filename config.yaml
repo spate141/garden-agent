@@ -228,6 +228,16 @@ daily_brief:
   enabled: true
   hour_local: 7         # send around 7am local time
 
+# ── Quiet hours (hold alerts outside the daytime window) ──────────────────────
+# Alerts are only sent when local time is within [start_hour, end_hour).
+# Outside that window every alert is held (re-fires next tick once the window
+# opens if the condition still holds). Does NOT affect the daily brief.
+# Timezone is set by GARDEN_TIMEZONE in secrets.env.
+quiet_hours:
+  enabled: true
+  start_hour: 7    # first hour alerts are allowed (07:00)
+  end_hour: 20     # alerts allowed until this hour, exclusive (20:00 = 8pm)
+
 # ── Derived metric computation ────────────────────────────────────────────────
 # VPD, dew point, and heat index are computed from a live temp+humidity source
 # at ingest time and stored as regular sensor readings (auto-charts + agent).

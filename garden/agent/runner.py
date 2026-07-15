@@ -109,6 +109,9 @@ def _evaluate(results: list[RuleResult]) -> None:
         was_active = bool(state.get("active", 0))
 
         if result.fired:
+            if _in_quiet_hours():
+                log.debug("Suppressed (quiet hours): %s", result.rule_id)
+                continue
             if _in_cooldown(state, result.rule_id):
                 log.debug("Suppressed (cooldown): %s", result.rule_id)
                 continue
@@ -276,6 +279,21 @@ def _local_now() -> datetime:
         log.warning("Unknown timezone %r, falling back to UTC", tz_name)
         tz = ZoneInfo("UTC")
     return datetime.now(tz)
+
+
+def _in_quiet_hours() -> bool:
+    """True if local time is outside the allowed alert window (alert should be held)."""
+    qh = cfg.quiet_hours
+    if not qh.get("enabled", False):
+        return False
+    start = qh.get("start_hour", 7)
+    end = qh.get("end_hour", 20)
+    hour = _local_now().hour
+    if start <= end:
+        allowed = start <= hour < end
+    else:  # window wraps midnight (e.g. 22-6)
+        allowed = hour >= start or hour < end
+    return not allowed
 
 
 def _already_sent_today(local_now: datetime) -> bool:

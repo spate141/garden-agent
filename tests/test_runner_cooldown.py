@@ -12,6 +12,7 @@ from garden.agent.runner import (
     _cooldown_minutes,
     _in_cooldown,
     _already_sent_today,
+    _in_quiet_hours,
 )
 
 
@@ -130,3 +131,59 @@ def test_already_sent_today_bad_timezone(monkeypatch):
         assert result is True, "Bad timezone caused dedup to fail — brief would send again"
     finally:
         cfg_mod.cfg.location.update(original)
+
+
+# ── _in_quiet_hours ────────────────────────────────────────────────────────────
+
+def _set_quiet_hours(monkeypatch, **kwargs):
+    from garden.config import cfg as cfg_mod
+    monkeypatch.setattr(cfg_mod, "quiet_hours", kwargs, raising=False)
+
+
+def _set_local_hour(monkeypatch, hour: int):
+    from garden.agent import runner
+    fixed = datetime(2024, 6, 15, hour, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(runner, "_local_now", lambda: fixed)
+
+
+def test_quiet_hours_disabled_always_allows(monkeypatch):
+    _set_quiet_hours(monkeypatch, enabled=False, start_hour=7, end_hour=20)
+    _set_local_hour(monkeypatch, 2)  # deep night
+    assert _in_quiet_hours() is False
+
+
+def test_quiet_hours_night_is_held(monkeypatch):
+    _set_quiet_hours(monkeypatch, enabled=True, start_hour=7, end_hour=20)
+    _set_local_hour(monkeypatch, 23)
+    assert _in_quiet_hours() is True
+
+
+def test_quiet_hours_day_is_allowed(monkeypatch):
+    _set_quiet_hours(monkeypatch, enabled=True, start_hour=7, end_hour=20)
+    _set_local_hour(monkeypatch, 12)
+    assert _in_quiet_hours() is False
+
+
+def test_quiet_hours_start_boundary_allowed(monkeypatch):
+    _set_quiet_hours(monkeypatch, enabled=True, start_hour=7, end_hour=20)
+    _set_local_hour(monkeypatch, 7)
+    assert _in_quiet_hours() is False
+
+
+def test_quiet_hours_end_boundary_held(monkeypatch):
+    """end_hour is exclusive: alerts stop right at 20:00."""
+    _set_quiet_hours(monkeypatch, enabled=True, start_hour=7, end_hour=20)
+    _set_local_hour(monkeypatch, 20)
+    assert _in_quiet_hours() is True
+
+
+def test_quiet_hours_wraps_midnight(monkeypatch):
+    """A window like 22-6 spans midnight; 23:00 and 3:00 should be allowed,
+    noon should be held."""
+    _set_quiet_hours(monkeypatch, enabled=True, start_hour=22, end_hour=6)
+    _set_local_hour(monkeypatch, 23)
+    assert _in_quiet_hours() is False
+    _set_local_hour(monkeypatch, 3)
+    assert _in_quiet_hours() is False
+    _set_local_hour(monkeypatch, 12)
+    assert _in_quiet_hours() is True
