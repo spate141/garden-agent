@@ -1222,6 +1222,8 @@ function applyChartTheme() {
       var scale = chart.options.scales[axis];
       if (scale.grid  && scale.grid.color  !== undefined) scale.grid.color  = c.grid;
       if (scale.ticks && scale.ticks.color !== undefined) scale.ticks.color = c.ticks;
+      if (scale.angleLines && scale.angleLines.color !== undefined) scale.angleLines.color = c.grid;
+      if (scale.pointLabels && scale.pointLabels.color !== undefined) scale.pointLabels.color = c.ticks;
     });
     const tip = chart.options.plugins.tooltip;
     tip.backgroundColor = c.tooltipBg;
@@ -1423,10 +1425,12 @@ function makeChartOpts(color, opts) {
     }
   };
   if (opts.dualAxis) {
+    scales.y.title = { display: !!opts.yTitle, text: opts.yTitle, color: c.ticks, font: { size: 10 } };
     scales.y1 = {
       position: 'right',
       grid:  { drawOnChartArea: false },
-      ticks: { color: c.ticks, font: { size: 10 } }
+      ticks: { color: c.ticks, font: { size: 10 } },
+      title: { display: !!opts.y1Title, text: opts.y1Title, color: c.ticks, font: { size: 10 } }
     };
   }
   return {
@@ -1463,6 +1467,139 @@ function makeChartOpts(color, opts) {
       scales: scales
     }
   };
+}
+
+/** Radar-chart factory for the bed-moisture card. Separate from makeChartOpts
+ *  (which is hardcoded type:'line') since a radial scale needs its own shape.
+ *  `datasets` are pre-built per bed by _drawMoistureRadar(); each gets a
+ *  translucent fill so the 4 beds read as overlapping areas (the "stacked,
+ *  smooth" look from the Chart.js radar sample), not just outlines. */
+function makeRadarOpts(datasets, labels) {
+  const c = chartThemeColors();
+  return {
+    type: 'radar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: c.ticks, boxWidth: 10, font: { size: 10 } } },
+        tooltip: {
+          backgroundColor:  c.tooltipBg,
+          borderColor:      c.tooltipBorder,
+          borderWidth:      1,
+          titleColor:       c.tooltipTitle,
+          bodyColor:        c.tooltipBody,
+          padding:          8,
+          callbacks: { label: function (ctx) { return ' ' + ctx.dataset.label + ': ' + (ctx.parsed.r == null ? '—' : ctx.parsed.r.toFixed(0) + '%'); } }
+        }
+      },
+      scales: {
+        r: {
+          min: 0,
+          max: 100,
+          angleLines: { color: c.grid },
+          grid:       { color: c.grid },
+          pointLabels: { color: c.ticks, font: { size: 9 } },
+          ticks:      { color: c.ticks, backdropColor: 'transparent', font: { size: 9 }, stepSize: 25 }
+        }
+      }
+    }
+  };
+}
+
+/** Splits [now-hours, now] into evenly spaced time buckets ("spokes") and
+ *  averages `rows` values into each -- storage.series() buckets adaptively
+ *  (~350 pts total), not hourly, so the radar's hourly/time axis is built
+ *  here client-side instead. Spoke count is capped so wide ranges (7d) don't
+ *  explode into one spoke per hour; 24h still lands on ~hourly spokes. */
+function _radarSpokes(rows, hours) {
+  const spokeCount = Math.min(24, Math.max(6, Math.round(hours)));
+  const now = Date.now();
+  const spanMs = hours * 3600000;
+  const startMs = now - spanMs;
+  const bucketMs = spanMs / spokeCount;
+
+  const sums = new Array(spokeCount).fill(0);
+  const counts = new Array(spokeCount).fill(0);
+  rows.forEach(function (r) {
+    if (r.value == null) return;
+    const t = new Date(r.ts).getTime();
+    var idx = Math.floor((t - startMs) / bucketMs);
+    if (idx < 0) idx = 0;
+    if (idx >= spokeCount) idx = spokeCount - 1;
+    sums[idx] += r.value;
+    counts[idx] += 1;
+  });
+
+  const values = [];
+  const labels = [];
+  for (var i = 0; i < spokeCount; i++) {
+    values.push(counts[i] ? sums[i] / counts[i] : null);
+    labels.push(fmtTime(new Date(startMs + bucketMs * (i + 0.5)).toISOString()));
+  }
+  return { values: values, labels: labels };
+}
+
+/** Adds an alpha channel to a "#rrggbb" hex color for the radar's translucent
+ *  fill; falls through unchanged for any other color format. */
+function _withAlpha(hex, alpha) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+
+/** Distinct 4-color palette for the moisture radar only -- config.yaml's
+ *  per-bed colors are shades of green (by design, for the single-bed line
+ *  charts/gauges elsewhere), which read as near-identical once 4 overlapping
+ *  filled areas share one radar. Cycles if there are ever more than 4 beds. */
+const RADAR_BED_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899'];
+
+/** Draws/updates the "Bed moisture" radar card: one smoothed, filled area per
+ *  bed, spokes = evenly spaced time buckets over the current Trends window
+ *  (HOURS), so it re-buckets on every range-toggle click same as the other
+ *  Trends charts. Reads already-fetched rows from seriesCache (populated by
+ *  loadChart() for each MOISTURE_GROUP key via reloadTrendsSeries()). */
+function _drawMoistureRadar() {
+  const canvas = document.getElementById('trend-radar-moisture');
+  if (!canvas || !MOISTURE_GROUP.length) return;
+
+  const titleEl = document.getElementById('trend-radar-title');
+  if (titleEl) titleEl.textContent = 'Bed moisture (last ' + HOURS + 'h)';
+
+  var labels = null;
+  const datasets = [];
+  MOISTURE_GROUP.forEach(function (m, i) {
+    const rows = seriesCache[m.key];
+    if (!rows || !rows.length) return;
+    const spokes = _radarSpokes(rows, HOURS);
+    if (!labels) labels = spokes.labels;
+    const color = RADAR_BED_COLORS[i % RADAR_BED_COLORS.length];
+    datasets.push({
+      label:           bedEmoji(m.plants) + ' ' + m.bed,
+      data:            spokes.values,
+      borderColor:     color,
+      backgroundColor: _withAlpha(color, 0.15),
+      borderWidth:     1.5,
+      pointRadius:     0,
+      tension:         0.3,
+      fill:            true,
+    });
+  });
+  if (!labels || !datasets.length) return;
+
+  const instKey = 'trend-radar-moisture';
+  let chart = instances[instKey];
+  if (!chart) {
+    chart = new Chart(canvas, makeRadarOpts(datasets, labels));
+    instances[instKey] = chart;
+  } else {
+    chart.data.labels   = labels;
+    chart.data.datasets = datasets;
+    chart.update('none');
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1632,10 +1769,13 @@ function renderBedMoistureCards() {
    ════════════════════════════════════════════════════════════════════════════ */
 
 const TRENDS_GROUPS = [
-  /* heatindex_f folds into the same line chart as outdoor/gazebo temp — same
-     unit, same axis, and it's just derived from temp1_f+humidity1 anyway. */
-  { id: 'temperature', title: 'Temperature',        keys: ['temp_f', 'temp1_f', 'heatindex_f'] },
-  { id: 'humidity',    title: 'Humidity',            keys: ['humidity', 'humidity1'] },
+  /* Temperature (incl. heatindex_f, derived from temp1_f+humidity1) shares a
+     card with humidity on a second right-hand axis — the two series most
+     gardeners read together, and it frees a grid slot for the bed-moisture
+     radar (see _drawMoistureRadar) to sit beside it in row one. */
+  { id: 'temphum', title: 'Temperature & Humidity', keys: ['temp_f', 'temp1_f', 'heatindex_f', 'humidity', 'humidity1'],
+    dualAxis: true, yTitle: '°F', y1Title: '%',
+    axisByKey: { humidity: 'y1', humidity1: 'y1' } /* everything else defaults to left 'y' */ },
   { id: 'vpd',         title: 'VPD',                 keys: ['vpd_kpa'], vpdBand: true },
   /* Pressure & dew point were dropped — neither drives a gardening decision
      on its own. This 4th slot previously held a drydown-day projection
@@ -1657,13 +1797,24 @@ function renderTrendsClimateGrid() {
   });
 
   if (!grid.dataset.built) {
-    var cardsHtml = groups.map(function (g) {
-      return (
+    /* First card is Temperature & Humidity; the moisture radar slots in right
+       next to it so row one reads [Temp & Humidity][Bed moisture radar]. */
+    var cardsHtml = groups.map(function (g, i) {
+      var html = (
         '<div class="chart-card">' +
           '<div class="chart-title">' + g.title + '</div>' +
           '<div class="chart-wrap"><canvas id="trend-chart-' + g.id + '"></canvas></div>' +
         '</div>'
       );
+      if (i === 0 && MOISTURE_GROUP.length) {
+        html += (
+          '<div class="chart-card">' +
+            '<div class="chart-title" id="trend-radar-title">Bed moisture (last ' + HOURS + 'h)</div>' +
+            '<div class="chart-wrap is-radar"><canvas id="trend-radar-moisture"></canvas></div>' +
+          '</div>'
+        );
+      }
+      return html;
     }).join('');
     cardsHtml += (
       '<div class="chart-card">' +
@@ -1676,6 +1827,7 @@ function renderTrendsClimateGrid() {
   }
 
   groups.forEach(_drawTrendGroupChart);
+  _drawMoistureRadar();
   renderMoistureBandCard();
 }
 
@@ -1689,6 +1841,7 @@ function _drawTrendGroupChart(g) {
   const labels = seriesCache[validKeys[0]].map(function (r) { return fmtTime(r.ts); });
   const datasets = validKeys.map(function (k, i) {
     const meta = _chartMeta(k);
+    const axisId = (g.axisByKey && g.axisByKey[k]) ? g.axisByKey[k] : ((g.dualAxis && i === 1) ? 'y1' : 'y');
     return {
       label:       meta.label,
       data:        seriesCache[k].map(function (r) { return r.value; }),
@@ -1697,7 +1850,12 @@ function _drawTrendGroupChart(g) {
       pointRadius: 0,
       tension:     0.3,
       fill:        false,
-      yAxisID:     (g.dualAxis && i === 1) ? 'y1' : 'y',
+      yAxisID:     axisId,
+      /* Dash the second family so its line reads as a distinct group even
+         where it visually nears the other family's lane (see
+         _applyDualAxisLanes below) -- two families sharing similar-colored
+         lines (blue/cyan) were otherwise hard to tell apart at a glance. */
+      borderDash:  (g.dualAxis && axisId === 'y1') ? [5, 3] : undefined,
     };
   });
 
@@ -1715,6 +1873,7 @@ function _drawTrendGroupChart(g) {
   if (!chart) {
     chart = new Chart(canvas, makeChartOpts(datasets[0].borderColor, {
       datasets: datasets, legend: datasets.length > 1, dualAxis: g.dualAxis,
+      yTitle: g.yTitle, y1Title: g.y1Title,
     }));
     instances[instKey] = chart;
   }
@@ -1724,7 +1883,36 @@ function _drawTrendGroupChart(g) {
   chart._lines         = [];
   chart._wateringEvents = [];
   chart._projection    = null;
+  if (g.dualAxis) _applyDualAxisLanes(chart, datasets);
   chart.update('none');
+}
+
+/** Two axes sharing one chart area otherwise draw both families across the
+ *  full height, so lines with similar numeric ranges (e.g. 72-75°F and
+ *  50-75%) visually tangle together. This carves the chart into two lanes --
+ *  'y' (left) data occupies roughly the top 40%, 'y1' (right) data the
+ *  bottom 40%, with a clear gap between -- by padding each axis's *unused*
+ *  side with extra range instead of relying on Chart.js's automatic bounds. */
+function _applyDualAxisLanes(chart, datasets) {
+  if (!chart.options.scales.y1) return;
+  const LANE_PAD = 1.3; /* extra range pushed to the far side, as a multiple of the data's own range */
+  const topVals = [], bottomVals = [];
+  datasets.forEach(function (ds) {
+    const vals = ds.data.filter(function (v) { return v != null; });
+    (ds.yAxisID === 'y1' ? bottomVals : topVals).push.apply(ds.yAxisID === 'y1' ? bottomVals : topVals, vals);
+  });
+  if (topVals.length) {
+    const tMin = Math.min.apply(null, topVals), tMax = Math.max.apply(null, topVals);
+    const tRange = (tMax - tMin) || Math.abs(tMax) * 0.1 || 1;
+    chart.options.scales.y.min = tMin - tRange * LANE_PAD;
+    chart.options.scales.y.max = tMax + tRange * 0.15;
+  }
+  if (bottomVals.length) {
+    const hMin = Math.min.apply(null, bottomVals), hMax = Math.max.apply(null, bottomVals);
+    const hRange = (hMax - hMin) || Math.abs(hMax) * 0.1 || 1;
+    chart.options.scales.y1.max = hMax + hRange * LANE_PAD;
+    chart.options.scales.y1.min = hMin - hRange * 0.15;
+  }
 }
 
 /* ── Time-range control + collapse (§6) ────────────────────────────────────── */

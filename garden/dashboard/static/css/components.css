@@ -299,6 +299,8 @@
 }
 
 .chart-card {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -327,7 +329,16 @@
 
 .chart-wrap {
   position: relative;
-  height: 140px;
+  flex: 1 1 auto;
+  min-height: 220px;
+}
+
+/* Radar needs more vertical room than a line chart to keep the 4-bed
+   legend + spoke labels legible. flex:1 above already lets it fill a
+   taller card (e.g. sharing a grid row with this one); the higher
+   min-height just raises its floor when it's on its own / a short row. */
+.chart-wrap.is-radar {
+  min-height: 340px;
 }
 
 /* ── SOIL MOISTURE VS. BAND ──────────────────────────────────────────── */
@@ -336,7 +347,8 @@
    snapshot (garden.js renderMoistureBandCard), no forecasting. */
 
 .moistband-forecast {
-  height: 140px;
+  flex: 1 1 auto;
+  min-height: 140px;
   display: flex;
   flex-direction: column;
   justify-content: center;
