@@ -1384,6 +1384,59 @@ Chart.register({
   }
 });
 
+/* currentHourMarker plugin: draws a "live" pulsing dot (solid dot + expanding
+   fading ring, like a recording indicator) on the moisture radar's current-
+   hour spoke, one per bed dataset. chart._currentSpokeIdx : index into each
+   dataset's data/labels marking the most recent time bucket ("now"). Redrawn
+   continuously by _tickRadarBlink()'s rAF loop, not just on data updates --
+   afterDraw reads Date.now() directly so each frame's phase differs even
+   though the underlying chart data hasn't changed. */
+Chart.register({
+  id: 'currentHourMarker',
+  afterDraw(chart) {
+    const idx = chart._currentSpokeIdx;
+    if (idx == null) return;
+    const ctx = chart.ctx;
+    const period = 1400; /* ms per pulse cycle */
+    const phase = (Date.now() % period) / period; /* 0..1 */
+    const dotAlpha  = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
+    const ringAlpha = (1 - phase) * 0.55;
+    const ringR     = 4 + phase * 8;
+
+    ctx.save();
+    chart.data.datasets.forEach(function (ds, dIdx) {
+      const meta = chart.getDatasetMeta(dIdx);
+      if (meta.hidden || ds.data[idx] == null) return;
+      const pt = meta.data[idx];
+      if (!pt) return;
+
+      ctx.beginPath();
+      ctx.strokeStyle = _withAlpha(ds.borderColor, ringAlpha);
+      ctx.lineWidth = 1.5;
+      ctx.arc(pt.x, pt.y, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = _withAlpha(ds.borderColor, dotAlpha);
+      ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+});
+
+/** Keeps the moisture radar's current-hour dot pulsing smoothly regardless of
+ *  data refresh cadence -- chart.draw() re-runs currentHourMarker's afterDraw
+ *  (which reads Date.now() itself) every frame without recomputing scales/
+ *  data. No-ops until the radar chart exists; mirrors the rAF-loop pattern
+ *  used by the ninja easter egg (_ninjaTick) elsewhere in this file. */
+function _tickRadarBlink() {
+  const chart = instances['trend-radar-moisture'];
+  if (chart) chart.draw();
+  requestAnimationFrame(_tickRadarBlink);
+}
+requestAnimationFrame(_tickRadarBlink);
+
 const instances = {};
 
 /* Cache of latest series rows keyed by sensor key.
@@ -1590,6 +1643,10 @@ function _drawMoistureRadar() {
   });
   if (!labels || !datasets.length) return;
 
+  /* Last spoke's bucket always ends exactly at "now" (see _radarSpokes),
+     so it's the current-hour spoke the currentHourMarker plugin pulses. */
+  const currentSpokeIdx = labels.length - 1;
+
   const instKey = 'trend-radar-moisture';
   let chart = instances[instKey];
   if (!chart) {
@@ -1600,6 +1657,7 @@ function _drawMoistureRadar() {
     chart.data.datasets = datasets;
     chart.update('none');
   }
+  chart._currentSpokeIdx = currentSpokeIdx;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1839,9 +1897,9 @@ function _drawTrendGroupChart(g) {
   if (!validKeys.length) return;
 
   const labels = seriesCache[validKeys[0]].map(function (r) { return fmtTime(r.ts); });
-  const datasets = validKeys.map(function (k, i) {
+  const datasets = validKeys.map(function (k) {
     const meta = _chartMeta(k);
-    const axisId = (g.axisByKey && g.axisByKey[k]) ? g.axisByKey[k] : ((g.dualAxis && i === 1) ? 'y1' : 'y');
+    const axisId = (g.axisByKey && g.axisByKey[k]) ? g.axisByKey[k] : 'y';
     return {
       label:       meta.label,
       data:        seriesCache[k].map(function (r) { return r.value; }),
@@ -2234,6 +2292,7 @@ function renderBedChips(insightBeds) {
         'title="Soil moisture: live sensor · status: computed from crop-specific healthy range" ' +
         'aria-label="' + bed.name + ': ' + state.word + (moistVal != null ? ', ' + moistVal.toFixed(0) + '% moisture' : '') + '">' +
         '<span class="bed-chip-fill" aria-hidden="true" style="width:' + fillPct + '%; background:' + fillColor + '"></span>' +
+        '<span class="bed-chip-fill-edge" aria-hidden="true" style="left:' + fillPct + '%; color:' + fillColor + '"></span>' +
         '<span class="bed-chip-dot" aria-hidden="true"></span>' +
         '<span class="bed-chip-name">' + bed.name + '</span>' +
         '<span class="bed-chip-state">' + state.word + '</span>' +

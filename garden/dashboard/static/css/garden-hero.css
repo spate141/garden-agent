@@ -364,17 +364,6 @@
   z-index: 8;
   overflow: hidden;
 }
-/* plank seam lines on the front rail */
-.g-front-rail::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(90deg,
-    transparent 0, transparent 66px,
-    var(--g-wood-shadow) 66px, var(--g-wood-shadow) 68px);
-  opacity: 0.55;
-}
-
 /* Droplet meter -- DROP_COUNT droplets set into the rail, filled left to right
    like a battery/signal gauge (set live in updateGarden). Discrete, countable
    droplets read at a glance and compare cleanly bed to bed -- unlike a

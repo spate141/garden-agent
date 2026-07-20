@@ -62,6 +62,36 @@
   pointer-events: none;
 }
 
+/* Live marker at the fill's leading edge (level == current reading) -- a
+   separate sibling, not .bed-chip-fill::after, so its blink isn't dimmed by
+   the wash's own 0.32 opacity. `left` tracks the same % as the fill's width;
+   `color` carries the fill's color so background/box-shadow below can both
+   reference it via currentColor without repeating the value inline. */
+.bed-chip-fill-edge {
+  position: absolute;
+  z-index: -1;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  transform: translateX(-1px);
+  background: currentColor;
+  box-shadow: 0 0 6px 1px currentColor;
+  transition: left 0.3s ease, color 0.3s ease;
+  animation: bed-chip-edge-blink 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes bed-chip-edge-blink {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bed-chip-fill-edge { animation: none; opacity: 0.85; }
+}
+
 .bed-chip-dot {
   width: 8px;
   height: 8px;
