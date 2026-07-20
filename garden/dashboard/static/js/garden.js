@@ -1384,24 +1384,39 @@ Chart.register({
   }
 });
 
-/* currentHourMarker plugin: draws a "live" pulsing dot (solid dot + expanding
-   fading ring, like a recording indicator) on the moisture radar's current-
-   hour spoke, one per bed dataset. chart._currentSpokeIdx : index into each
-   dataset's data/labels marking the most recent time bucket ("now"). Redrawn
-   continuously by _tickRadarBlink()'s rAF loop, not just on data updates --
-   afterDraw reads Date.now() directly so each frame's phase differs even
-   though the underlying chart data hasn't changed. */
+/* Respect the OS/browser "reduce motion" setting: pulsing markers below
+   fall back to a single static render instead of an animated loop. Read once
+   -- a mid-session preference change is rare enough not to warrant a
+   matchMedia listener here. */
+const _REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Shared phase math for the "live" pulsing dot (solid dot + expanding fading
+ *  ring, like a recording indicator) used by both currentHourMarker (radar)
+ *  and currentPointMarker (line charts). Reduced-motion callers should skip
+ *  calling this and just draw a static dot/ring at phase 0. */
+function _pulsePhase() {
+  const period = 1400; /* ms per pulse cycle */
+  const phase = (Date.now() % period) / period; /* 0..1 */
+  return {
+    dotAlpha:  0.35 + 0.65 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2)),
+    ringAlpha: (1 - phase) * 0.55,
+    ringR:     4 + phase * 8,
+  };
+}
+
+/* currentHourMarker plugin: draws the live pulsing dot on the moisture
+   radar's current-hour spoke, one per bed dataset. chart._currentSpokeIdx :
+   index into each dataset's data/labels marking the most recent time bucket
+   ("now"). Redrawn continuously by _tickPulses()'s rAF loop, not just on data
+   updates -- afterDraw reads Date.now() directly so each frame's phase
+   differs even though the underlying chart data hasn't changed. */
 Chart.register({
   id: 'currentHourMarker',
   afterDraw(chart) {
     const idx = chart._currentSpokeIdx;
     if (idx == null) return;
     const ctx = chart.ctx;
-    const period = 1400; /* ms per pulse cycle */
-    const phase = (Date.now() % period) / period; /* 0..1 */
-    const dotAlpha  = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
-    const ringAlpha = (1 - phase) * 0.55;
-    const ringR     = 4 + phase * 8;
+    const p = _REDUCED_MOTION ? { dotAlpha: 0.85, ringAlpha: 0, ringR: 0 } : _pulsePhase();
 
     ctx.save();
     chart.data.datasets.forEach(function (ds, dIdx) {
@@ -1410,14 +1425,16 @@ Chart.register({
       const pt = meta.data[idx];
       if (!pt) return;
 
-      ctx.beginPath();
-      ctx.strokeStyle = _withAlpha(ds.borderColor, ringAlpha);
-      ctx.lineWidth = 1.5;
-      ctx.arc(pt.x, pt.y, ringR, 0, Math.PI * 2);
-      ctx.stroke();
+      if (p.ringAlpha > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = _withAlpha(ds.borderColor, p.ringAlpha);
+        ctx.lineWidth = 1.5;
+        ctx.arc(pt.x, pt.y, p.ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       ctx.beginPath();
-      ctx.fillStyle = _withAlpha(ds.borderColor, dotAlpha);
+      ctx.fillStyle = _withAlpha(ds.borderColor, p.dotAlpha);
       ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
       ctx.fill();
     });
@@ -1425,17 +1442,92 @@ Chart.register({
   }
 });
 
-/** Keeps the moisture radar's current-hour dot pulsing smoothly regardless of
- *  data refresh cadence -- chart.draw() re-runs currentHourMarker's afterDraw
- *  (which reads Date.now() itself) every frame without recomputing scales/
- *  data. No-ops until the radar chart exists; mirrors the rAF-loop pattern
- *  used by the ninja easter egg (_ninjaTick) elsewhere in this file. */
-function _tickRadarBlink() {
-  const chart = instances['trend-radar-moisture'];
-  if (chart) chart.draw();
-  requestAnimationFrame(_tickRadarBlink);
+/* currentPointMarker plugin: the line-chart counterpart of currentHourMarker
+   above -- draws the same pulsing "live" dot on each dataset's most recent
+   non-null point, plus a small "<value> · <HH:MM>" callout (chart._pulseLabel,
+   set by the draw function alongside the data) so the current reading is
+   unambiguous even before you find the dot. Only runs when chart._pulseLive
+   is true, so unrelated charts (radar handles itself above) are unaffected. */
+Chart.register({
+  id: 'currentPointMarker',
+  afterDraw(chart) {
+    if (!chart._pulseLive) return;
+    const ctx = chart.ctx;
+    const p = _REDUCED_MOTION ? { dotAlpha: 0.9, ringAlpha: 0, ringR: 0 } : _pulsePhase();
+    const labels = chart._pulseLabel || {};
+
+    ctx.save();
+    chart.data.datasets.forEach(function (ds, dIdx) {
+      const meta = chart.getDatasetMeta(dIdx);
+      if (meta.hidden) return;
+      var idx = ds.data.length - 1;
+      while (idx >= 0 && ds.data[idx] == null) idx--;
+      if (idx < 0) return;
+      const pt = meta.data[idx];
+      if (!pt) return;
+
+      if (p.ringAlpha > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = _withAlpha(ds.borderColor, p.ringAlpha);
+        ctx.lineWidth = 1.5;
+        ctx.arc(pt.x, pt.y, p.ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = _withAlpha(ds.borderColor, p.dotAlpha);
+      ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      const text = labels[dIdx];
+      if (text) {
+        /* Clamp to the chart area's right edge so the label never overflows
+           the canvas -- the latest point sits at (or near) the far right in
+           chronological left-to-right order. */
+        const maxRight = chart.chartArea.right;
+        ctx.font = '10px sans-serif';
+        ctx.textBaseline = 'middle';
+        const textWidth = ctx.measureText(text).width;
+        var tx = pt.x + 8;
+        var align = 'left';
+        if (tx + textWidth > maxRight) { align = 'right'; tx = Math.min(pt.x - 8, maxRight); }
+        ctx.textAlign = align;
+        ctx.fillStyle = _withAlpha(ds.borderColor, 0.95);
+        ctx.fillText(text, tx, pt.y - 8);
+      }
+    });
+    ctx.restore();
+  }
+});
+
+/** Keeps every "live" pulsing dot (the moisture radar's + every line chart
+ *  currently showing one) animating smoothly regardless of data refresh
+ *  cadence -- chart.draw() re-runs each chart's afterDraw plugins (which read
+ *  Date.now() themselves) without recomputing scales/data. Throttled to
+ *  ~30fps since this now redraws up to ~7 canvases per tick instead of 1.
+ *  Skips entirely under reduced-motion (markers render once, statically, at
+ *  draw time -- see _pulseLive/_pulseLabel assignment) and mirrors the
+ *  rAF-loop pattern used by the ninja easter egg (_ninjaTick) elsewhere in
+ *  this file. */
+let _lastPulseFrame = 0;
+function _tickPulses(now) {
+  if (_REDUCED_MOTION) return; /* static render only; no loop needed */
+  if (!_lastPulseFrame || now - _lastPulseFrame >= 33) {
+    _lastPulseFrame = now;
+    const radar = instances['trend-radar-moisture'];
+    if (radar) radar.draw();
+    Object.keys(instances).forEach(function (k) {
+      const chart = instances[k];
+      if (chart && chart._pulseLive) chart.draw();
+    });
+    Object.keys(bedChartInstances).forEach(function (k) {
+      const chart = bedChartInstances[k];
+      if (chart && chart._pulseLive) chart.draw();
+    });
+  }
+  requestAnimationFrame(_tickPulses);
 }
-requestAnimationFrame(_tickRadarBlink);
+requestAnimationFrame(_tickPulses);
 
 const instances = {};
 
@@ -1458,16 +1550,49 @@ var _VPD_COLORS = [
   'rgba(239,68,68,0.09)',    /* very high -- red    */
 ];
 
+/** Human-readable "N ago -> now" caption for the trend charts' X-axis, so the
+ *  chronological left-to-right reading order (oldest left, newest right,
+ *  matching normal reading direction) is unambiguous regardless of the
+ *  current Trends range selection. Derived from the global HOURS (§6). */
+function rangeCaption() {
+  if (HOURS > 24 && HOURS % 24 === 0) return (HOURS / 24) + 'd ago → now';
+  return HOURS + 'h ago → now';
+}
+
+/** Refreshes an already-built chart's X-axis caption to the current HOURS --
+ *  makeChartOpts() only sets the caption text once, at chart creation, but
+ *  range-toggle redraws (_renderChart/_drawTrendGroupChart/_drawBedChart)
+ *  reuse the existing chart instance via update('none') rather than rebuilding
+ *  options, so without this the caption would go stale after the first range
+ *  switch. No-op for charts built with opts.noCaption (no title to refresh). */
+function _refreshAxisCaption(chart) {
+  const title = chart.options.scales.x.title;
+  if (title && title.display) title.text = rangeCaption();
+}
+
 /** Shared chart factory. `opts.datasets` (with `opts.legend: true`) builds a
  *  multi-series chart for the Trends grouped panels (§6); otherwise this is
- *  the plain single-series chart used everywhere else (moisture row, bed detail). */
+ *  the plain single-series chart used everywhere else (moisture row, bed detail).
+ *  `opts.noCaption` skips the X-axis "N ago -> now" title -- used for the
+ *  84px-tall bed-detail sparkline, too short to fit an axis title readably;
+ *  its pulsing current-point label (currentPointMarker) anchors "now" instead. */
 function makeChartOpts(color, opts) {
   opts = opts || {};
   const c = chartThemeColors();
   const scales = {
     x: {
       grid:  { color: c.grid },
-      ticks: { color: c.ticks, maxTicksLimit: 6, font: { size: 10 } }
+      ticks: { color: c.ticks, maxTicksLimit: 6, font: { size: 10 } },
+      /* autoSkip (driven by maxTicksLimit above) can drop the very last tick,
+         which is part of what makes "where's now?" ambiguous -- force it to
+         always render alongside whichever ticks autoSkip already picked. */
+      afterBuildTicks: function (axis) {
+        const lastIdx = (axis.chart.data.labels || []).length - 1;
+        if (lastIdx > 0 && !axis.ticks.some(function (t) { return t.value === lastIdx; })) {
+          axis.ticks.push({ value: lastIdx });
+        }
+      },
+      title: opts.noCaption ? undefined : { display: true, text: rangeCaption(), color: c.ticks, font: { size: 9 } }
     },
     y: {
       grid:  { color: c.grid },
@@ -1562,35 +1687,30 @@ function makeRadarOpts(datasets, labels) {
   };
 }
 
-/** Splits [now-hours, now] into evenly spaced time buckets ("spokes") and
- *  averages `rows` values into each -- storage.series() buckets adaptively
- *  (~350 pts total), not hourly, so the radar's hourly/time axis is built
- *  here client-side instead. Spoke count is capped so wide ranges (7d) don't
- *  explode into one spoke per hour; 24h still lands on ~hourly spokes. */
-function _radarSpokes(rows, hours) {
-  const spokeCount = Math.min(24, Math.max(6, Math.round(hours)));
-  const now = Date.now();
-  const spanMs = hours * 3600000;
-  const startMs = now - spanMs;
-  const bucketMs = spanMs / spokeCount;
-
-  const sums = new Array(spokeCount).fill(0);
-  const counts = new Array(spokeCount).fill(0);
+/** Fixed 24-hour "clock face" spokes for the moisture radar: spoke 0 is
+ *  always midnight (00:00), spoke 23 is 23:00, going clockwise -- the axis
+ *  itself never moves, regardless of the selected Trends range or what time
+ *  it is right now. `rows` (already limited server-side to the last HOURS)
+ *  are bucketed by local hour-of-day and averaged into their spoke; for
+ *  ranges over a day (e.g. 7d) that means each spoke shows that hour's
+ *  average *across every included day*, so the shape reads as a daily
+ *  moisture rhythm rather than a shifting rolling window. Spokes with no
+ *  data in range stay null (Chart.js skips them, same as before). */
+function _radarClockSpokes(rows) {
+  const sums = new Array(24).fill(0);
+  const counts = new Array(24).fill(0);
   rows.forEach(function (r) {
     if (r.value == null) return;
-    const t = new Date(r.ts).getTime();
-    var idx = Math.floor((t - startMs) / bucketMs);
-    if (idx < 0) idx = 0;
-    if (idx >= spokeCount) idx = spokeCount - 1;
-    sums[idx] += r.value;
-    counts[idx] += 1;
+    const hr = new Date(r.ts).getHours(); /* browser-local hour, matching fmtTime's convention */
+    sums[hr] += r.value;
+    counts[hr] += 1;
   });
 
   const values = [];
   const labels = [];
-  for (var i = 0; i < spokeCount; i++) {
-    values.push(counts[i] ? sums[i] / counts[i] : null);
-    labels.push(fmtTime(new Date(startMs + bucketMs * (i + 0.5)).toISOString()));
+  for (var h = 0; h < 24; h++) {
+    values.push(counts[h] ? sums[h] / counts[h] : null);
+    labels.push((h < 10 ? '0' : '') + h + ':00');
   }
   return { values: values, labels: labels };
 }
@@ -1620,14 +1740,16 @@ function _drawMoistureRadar() {
   if (!canvas || !MOISTURE_GROUP.length) return;
 
   const titleEl = document.getElementById('trend-radar-title');
-  if (titleEl) titleEl.textContent = 'Bed moisture (last ' + HOURS + 'h)';
+  if (titleEl) titleEl.textContent = HOURS > 24
+    ? 'Bed moisture (by hour of day, last ' + (HOURS / 24) + 'd)'
+    : 'Bed moisture (last ' + HOURS + 'h)';
 
   var labels = null;
   const datasets = [];
   MOISTURE_GROUP.forEach(function (m, i) {
     const rows = seriesCache[m.key];
     if (!rows || !rows.length) return;
-    const spokes = _radarSpokes(rows, HOURS);
+    const spokes = _radarClockSpokes(rows);
     if (!labels) labels = spokes.labels;
     const color = RADAR_BED_COLORS[i % RADAR_BED_COLORS.length];
     datasets.push({
@@ -1643,9 +1765,10 @@ function _drawMoistureRadar() {
   });
   if (!labels || !datasets.length) return;
 
-  /* Last spoke's bucket always ends exactly at "now" (see _radarSpokes),
-     so it's the current-hour spoke the currentHourMarker plugin pulses. */
-  const currentSpokeIdx = labels.length - 1;
+  /* The axis is a fixed 24h clock face (spoke index === hour-of-day, see
+     _radarClockSpokes), so "now" is always the spoke matching the actual
+     wall-clock hour -- not the last spoke in the array. */
+  const currentSpokeIdx = new Date().getHours();
 
   const instKey = 'trend-radar-moisture';
   let chart = instances[instKey];
@@ -1757,6 +1880,15 @@ function _renderChart(key, color, rows) {
     }
   }
 
+  /* Live "current reading" pulse: label the latest non-null row as
+     "<value><unit> · <HH:MM>" for the currentPointMarker plugin (registered
+     above, near currentHourMarker) to draw on the chart's most recent point. */
+  var lastRow = null;
+  for (var li = rows.length - 1; li >= 0; li--) {
+    if (rows[li].value != null) { lastRow = rows[li]; break; }
+  }
+  var pulseLabel = lastRow ? [lastRow.value.toFixed(1) + (lastRow.unit || '') + ' · ' + fmtTime(lastRow.ts)] : [];
+
   if (instances[key]) {
     instances[key].data.labels            = labels;
     instances[key].data.datasets[0].data  = data;
@@ -1764,6 +1896,9 @@ function _renderChart(key, color, rows) {
     instances[key]._bands                 = bands;
     instances[key]._lines                 = lines;
     instances[key]._projection            = projection;
+    instances[key]._pulseLive             = !!lastRow;
+    instances[key]._pulseLabel            = pulseLabel;
+    _refreshAxisCaption(instances[key]);
     instances[key].update('none');
   } else {
     const canvas = document.getElementById('chart-' + key);
@@ -1775,6 +1910,8 @@ function _renderChart(key, color, rows) {
     instances[key]._bands                 = bands;
     instances[key]._lines                 = lines;
     instances[key]._projection            = projection;
+    instances[key]._pulseLive             = !!lastRow;
+    instances[key]._pulseLabel            = pulseLabel;
     instances[key].update();
   }
 }
@@ -1926,6 +2063,18 @@ function _drawTrendGroupChart(g) {
     });
   }
 
+  /* Live "current reading" pulse: one label per dataset, from that series'
+     own latest non-null row (each series can have a different-length tail if
+     a sensor recently went stale), for the currentPointMarker plugin. */
+  const pulseLabels = validKeys.map(function (k) {
+    const rows = seriesCache[k];
+    for (var li = rows.length - 1; li >= 0; li--) {
+      if (rows[li].value != null) return rows[li].value.toFixed(1) + (rows[li].unit || '') + ' · ' + fmtTime(rows[li].ts);
+    }
+    return null;
+  });
+  const anyLive = pulseLabels.some(function (l) { return !!l; });
+
   const instKey = 'trend-' + g.id;
   let chart = instances[instKey];
   if (!chart) {
@@ -1941,6 +2090,9 @@ function _drawTrendGroupChart(g) {
   chart._lines         = [];
   chart._wateringEvents = [];
   chart._projection    = null;
+  chart._pulseLive     = anyLive;
+  chart._pulseLabel    = pulseLabels;
+  _refreshAxisCaption(chart);
   if (g.dualAxis) _applyDualAxisLanes(chart, datasets);
   chart.update('none');
 }
@@ -2491,9 +2643,18 @@ function _drawBedChart(bed) {
   const band   = BANDS && BANDS.moistureBands ? BANDS.moistureBands[key] : null;
   const bands  = band ? [{ yMin: band.min, yMax: band.max, color: 'rgba(63,156,90,0.14)' }] : [];
 
+  /* Live "current reading" pulse -- no axis caption here (opts.noCaption,
+     below): the 84px sparkline is too short to fit one, so the pulsing dot +
+     label is this chart's only "now" anchor. */
+  var lastRow = null;
+  for (var li = rows.length - 1; li >= 0; li--) {
+    if (rows[li].value != null) { lastRow = rows[li]; break; }
+  }
+  var pulseLabel = lastRow ? [lastRow.value.toFixed(0) + '%'] : [];
+
   let chart = bedChartInstances[bed.id];
   if (!chart) {
-    chart = new Chart(canvas, makeChartOpts(cfg_moisture_color(bed)));
+    chart = new Chart(canvas, makeChartOpts(cfg_moisture_color(bed), { noCaption: true }));
     bedChartInstances[bed.id] = chart;
   }
   chart.data.labels           = labels;
@@ -2502,6 +2663,8 @@ function _drawBedChart(bed) {
   chart._lines                = [];
   chart._wateringEvents       = [];
   chart._projection           = null;
+  chart._pulseLive            = !!lastRow;
+  chart._pulseLabel           = pulseLabel;
   chart.update('none');
 }
 
