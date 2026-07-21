@@ -109,6 +109,10 @@ dashboard:
       plants: [zucchini, eggplant]
       layout: vertical   # stack plants in a single column instead of side-by-side
   weather_keys: {temp: temp1_f, humidity: humidity1, pressure: baromrel_inhg}
+  watering_forecast:
+    enabled: true
+    drydown_hours: 48      # raw moisture lookback fed to drydown_rate()
+    rain_relief_in: 0.25   # single-day forecast precip that counts as covering irrigation
   stat_groups:
     - name: "Bed 1"
       sensors: [soilmoisture1, soilbatt1]

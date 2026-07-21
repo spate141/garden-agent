@@ -371,6 +371,64 @@
   min-height: 340px;
 }
 
+/* Spans both trends-climate-grid columns — used by the 7-day water outlook
+   card, which needs the extra width for its day-tile strip. */
+.chart-card.is-wide {
+  grid-column: 1 / -1;
+}
+
+/* ── 7-DAY WATER OUTLOOK ──────────────────────────────────────────────── */
+/* Lives inside a .chart-card.is-wide in #trends-climate-grid (garden.js
+   renderOutlook): an icon/hi-lo/rain% strip above a combo chart of daily
+   ET0 demand vs forecast rain supply. Hidden entirely (not rendered empty)
+   when weather is unavailable — see renderOutlook's forecast.daily guard. */
+
+.outlook-strip {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.outlook-tile {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.outlook-tile-day {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.outlook-tile-emoji {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.outlook-tile-temp {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.outlook-tile-rain {
+  font-size: 0.6875rem;
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .outlook-tile-day  { font-size: 9px; }
+  .outlook-tile-temp { font-size: 0.6875rem; }
+}
+
 /* ── SOIL MOISTURE VS. BAND ──────────────────────────────────────────── */
 /* Lives inside a regular .chart-card in #trends-climate-grid, same slot the
    day-count "When to water next" projection used to occupy — pure live
@@ -590,6 +648,18 @@ footer {
   padding-top: 12px;
   border-top: 1px solid var(--hairline);
 }
+
+/* Rain-aware "dry in ~N days" projection (garden.js _wateringLabel /
+   garden.main._bed_watering_forecast) — a rain-relief day reads as covered
+   (accent blue), an urgent "water today" reads as a warning; the default
+   (learning/holding steady/dry-in-N-days) is a quiet neutral line. */
+.bed-outlook {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+.bed-outlook.is-relief { color: var(--accent); }
+.bed-outlook.is-urgent { color: var(--warn); font-weight: 600; }
 
 @media (max-width: 640px) {
   .bed-detail { margin: 0 16px 16px; }

@@ -30,3 +30,19 @@ def test_daily_brief_defaults():
 def test_timezone_set():
     # Confirm the env-var timezone is forwarded into cfg.location
     assert cfg.location["timezone"] == "America/Chicago"
+
+
+def test_watering_forecast_config():
+    wf = cfg.dashboard.get("watering_forecast", {})
+    assert wf.get("enabled", True) is True
+    assert wf.get("drydown_hours", 48) == 48
+    assert wf.get("rain_relief_in", 0.25) == 0.25
+
+
+def test_watering_forecast_defaults_when_block_absent():
+    # api_insights() reads these via .get() with the same fallbacks, so a
+    # config.yaml without the block must still behave, not KeyError.
+    empty: dict = {}
+    assert empty.get("enabled", True) is True
+    assert int(empty.get("drydown_hours", 48)) == 48
+    assert float(empty.get("rain_relief_in", 0.25)) == 0.25

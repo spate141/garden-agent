@@ -1156,6 +1156,22 @@ function _conditionsEmoji(current) {
   return '🌤️';
 }
 
+/** WMO code → emoji for the 7-day outlook, where there's no is_raining/intensity
+ *  flag to lean on (unlike _conditionsEmoji, which reads "right now" conditions) —
+ *  covers rain/showers/thunderstorm buckets directly from the code. */
+function _wmoEmoji(code) {
+  if (code == null) return '🌤️';
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2)  return '⛅';
+  if (code === 3)  return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code >= 51 && code <= 65) return '🌧️';
+  if (code >= 71 && code <= 75) return '❄️';
+  if (code >= 80 && code <= 82) return '🌦️';
+  if (code >= 95) return '⛈️';
+  return '🌤️';
+}
+
 function _addFireflies() {
   const ground = document.getElementById('garden-ground');
   if (!ground) return;
@@ -2017,6 +2033,13 @@ function renderTrendsClimateGrid() {
         '<div class="moistband-forecast" id="moistband-forecast"></div>' +
       '</div>'
     );
+    cardsHtml += (
+      '<div class="chart-card is-wide" id="outlook-card">' +
+        '<div class="chart-title">7-day water outlook</div>' +
+        '<div class="outlook-strip" id="outlook-strip"></div>' +
+        '<div class="chart-wrap"><canvas id="outlook-chart"></canvas></div>' +
+      '</div>'
+    );
     grid.innerHTML = cardsHtml;
     grid.dataset.built = '1';
   }
@@ -2024,6 +2047,7 @@ function renderTrendsClimateGrid() {
   groups.forEach(_drawTrendGroupChart);
   _drawMoistureRadar();
   renderMoistureBandCard();
+  renderOutlook(LAST_INSIGHTS && LAST_INSIGHTS.forecast);
 }
 
 function _drawTrendGroupChart(g) {
@@ -2419,6 +2443,21 @@ function _moistureFillColor(value, band) {
   return 'var(--fill-healthy)';
 }
 
+/** Turns a bed's /api/insights forecast fields (days_until_dry, dry_label,
+ *  rain_relief) into one short phrase. rain_relief takes precedence over the
+ *  raw day count — a bed "dry in ~2 days" but with rain landing first should
+ *  read as covered, not as an impending chore. Labels other than a bare
+ *  "~N days"/"2+ weeks" are surfaced verbatim from days_until_dry() rather
+ *  than guessed at here, per the noisy-right-after-watering lesson above. */
+function _wateringLabel(b) {
+  if (!b || !b.dry_label) return '';
+  if (b.rain_relief) return 'Rain covers it (' + (b.rain_relief_day || 'soon') + ')';
+  if (b.dry_label === 'today') return 'Water today';
+  if (b.dry_label === 'learning') return 'Learning drydown…';
+  if (b.dry_label === 'not drying') return 'Holding steady';
+  return 'Dry in ' + b.dry_label;   // "~3 days" / "2+ weeks"
+}
+
 /** Renders the 4 always-fixed-order bed chips from the latest /api/insights bed_stress. */
 function renderBedChips(insightBeds) {
   const row = document.getElementById('bed-chip-row');
@@ -2436,13 +2475,15 @@ function renderBedChips(insightBeds) {
     const band = BANDS && BANDS.moistureBands ? BANDS.moistureBands[bed.sensors.soil_moisture] : null;
     const fillPct   = moistVal != null ? Math.max(0, Math.min(100, moistVal)) : 0;
     const fillColor = _moistureFillColor(moistVal, band);
+    const wateringLabel = _wateringLabel(byId[bed.id]);
+    const titleSuffix = wateringLabel ? ' · ' + wateringLabel : '';
 
     return (
       '<button type="button" class="bed-chip is-' + state.cls + (isOpen ? ' is-open' : '') + '" ' +
         'onclick="toggleBedDetail(\'' + bed.id + '\')" ' +
         'aria-expanded="' + isOpen + '" ' +
-        'title="Soil moisture: live sensor · status: computed from crop-specific healthy range" ' +
-        'aria-label="' + bed.name + ': ' + state.word + (moistVal != null ? ', ' + moistVal.toFixed(0) + '% moisture' : '') + '">' +
+        'title="Soil moisture: live sensor · status: computed from crop-specific healthy range' + titleSuffix + '" ' +
+        'aria-label="' + bed.name + ': ' + state.word + (moistVal != null ? ', ' + moistVal.toFixed(0) + '% moisture' : '') + titleSuffix + '">' +
         '<span class="bed-chip-fill" aria-hidden="true" style="width:' + fillPct + '%; background:' + fillColor + '"></span>' +
         '<span class="bed-chip-fill-edge" aria-hidden="true" style="left:' + fillPct + '%; color:' + fillColor + '"></span>' +
         '<span class="bed-chip-dot" aria-hidden="true"></span>' +
@@ -2455,13 +2496,20 @@ function renderBedChips(insightBeds) {
 
 /* ════════════════════════════════════════════════════════════════════════════
    SOIL MOISTURE VS. BAND — live per-bed position within its own dry/ok/wet
-   range. Replaced the "When to water next" day-count projection, which was
-   too noisy to trust (a bed's drydown rate is fragile right after it's been
-   watered — see the removed garden.main._bed_watering_forecast). This card
-   has no forecasting in it at all: just the current reading plotted against
-   BANDS.moistureBands[key] (the same self-learned/crop-fallback band the bed
-   chips and stakes already use), so it can't be wrong in the way a
-   projection can — it only ever states where things stand right now.
+   range. Replaced the original "When to water next" day-count projection,
+   which was too noisy to trust (a bed's drydown rate is fragile right after
+   it's been watered). This card has no forecasting in it at all: just the
+   current reading plotted against BANDS.moistureBands[key] (the same
+   self-learned/crop-fallback band the bed chips and stakes already use), so
+   it can't be wrong in the way a projection can — it only ever states where
+   things stand right now.
+
+   The projection itself is back, rain-aware this time, as the "Irrigation
+   outlook" line in the bed detail panel (renderBedDetail/_wateringLabel
+   below) — fed by garden.main._bed_watering_forecast(), which surfaces the
+   drydown_rate()/days_until_dry() "learning"/"not drying"/"today" labels
+   verbatim instead of forcing a number, and defers to upcoming rain when it
+   would cover the projected dry date.
    ════════════════════════════════════════════════════════════════════════════ */
 
 /** How far below band.min still counts as "drying" rather than a hard "dry".
@@ -2541,6 +2589,98 @@ function renderMoistureBandCard() {
   el.innerHTML = rows;  /* title lives in the outer chart-card wrapper, not here */
 }
 
+/** Labels tiles/day-index by offset-from-today (0="Today", 1="Tmrw", else the
+ *  weekday) instead of parsing forecast.daily[i].date (a local-calendar-date
+ *  string from Open-Meteo) into a browser-TZ Date and reading its weekday —
+ *  that can shift the label a day at a TZ boundary. Offset-from-index sidesteps
+ *  timezones entirely since it never round-trips through a Date object. */
+function _outlookDayLabel(dateStr, offset) {
+  if (offset === 0) return 'Today';
+  if (offset === 1) return 'Tmrw';
+  try {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' });
+  } catch (_) {
+    return dateStr;
+  }
+}
+
+/** 7-day water outlook: an icon/hi-lo/rain% strip plus a combo chart of daily
+ *  ET0 demand vs forecast rain supply, with a cumulative water-balance line.
+ *  Weather is always optional server-side (garden/agent/weather.py) — hides
+ *  the whole card rather than rendering with holes when forecast is absent. */
+function renderOutlook(forecast) {
+  const card = document.getElementById('outlook-card');
+  if (!card) return;
+
+  const daily = forecast && forecast.daily;
+  if (!daily || !daily.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  const strip = document.getElementById('outlook-strip');
+  if (strip) {
+    strip.innerHTML = daily.map(function (d, i) {
+      return (
+        '<div class="outlook-tile">' +
+          '<div class="outlook-tile-day">' + _outlookDayLabel(d.date, i) + '</div>' +
+          '<div class="outlook-tile-emoji">' + _wmoEmoji(d.weather_code) + '</div>' +
+          '<div class="outlook-tile-temp">' +
+            (d.hi_f != null ? Math.round(d.hi_f) + '°' : '—') + '/' +
+            (d.lo_f != null ? Math.round(d.lo_f) + '°' : '—') +
+          '</div>' +
+          '<div class="outlook-tile-rain">' +
+            (d.precip_prob_pct != null ? Math.round(d.precip_prob_pct) + '%' : '—') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  const canvas = document.getElementById('outlook-chart');
+  if (!canvas) return;
+
+  const labels = daily.map(function (d, i) { return _outlookDayLabel(d.date, i); });
+  const c = chartThemeColors();
+
+  let cumulative = 0;
+  const balance = daily.map(function (d) {
+    cumulative += (d.precip_in || 0) - (d.et0_in != null ? d.et0_in : 0);
+    return Math.round(cumulative * 100) / 100;
+  });
+
+  const datasets = [
+    {
+      type: 'bar', label: 'Rain supply', yAxisID: 'y',
+      data: daily.map(function (d) { return d.precip_in || 0; }),
+      backgroundColor: 'rgba(59,130,246,0.55)', borderWidth: 0,
+    },
+    {
+      type: 'bar', label: 'ET₀ demand', yAxisID: 'y',
+      data: daily.map(function (d) { return d.et0_in; }),
+      backgroundColor: 'rgba(245,158,11,0.55)', borderWidth: 0,
+    },
+    {
+      type: 'line', label: 'Cumulative balance', yAxisID: 'y1',
+      data: balance, borderColor: c.ticks, borderWidth: 1.5,
+      pointRadius: 2, tension: 0.3, fill: false,
+    },
+  ];
+
+  let chart = instances['outlook'];
+  if (!chart) {
+    chart = new Chart(canvas, makeChartOpts(datasets[0].backgroundColor, {
+      datasets: datasets, legend: true, dualAxis: true,
+      yTitle: 'in/day', y1Title: 'cum in', noCaption: true,
+    }));
+    instances['outlook'] = chart;
+  }
+  chart.data.labels          = labels;
+  chart.data.datasets        = datasets;
+  chart.update('none');
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    BED DETAIL (inline expand) — redesign.md §4.1
    Shown directly beneath the bed chip row instead of a side drawer. The old
@@ -2614,6 +2754,13 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
 
   const verdict = stale ? 'Check the sensor, no recent data' : _bedVerdict(stress ? stress.status : 'unknown', waterBalanceIn);
 
+  const wateringLabel = _wateringLabel(stress);
+  const outlookHTML = wateringLabel
+    ? '<div class="bed-outlook' + (stress && stress.rain_relief ? ' is-relief' : (stress && stress.dry_label === 'today' ? ' is-urgent' : '')) + '">' +
+        (stress && stress.rain_relief ? '🌧️ ' : '💧 ') + wateringLabel +
+      '</div>'
+    : '';
+
   return (
     '<div class="bed-detail-inner">' +
       '<div class="bed-detail-line">' + plainLine + '</div>' +
@@ -2626,6 +2773,7 @@ function _buildBedDetailHTML(bed, stress, waterBalanceIn) {
       '<div class="bed-detail-chart"><canvas id="bed-detail-chart-' + bed.id + '"></canvas></div>' +
       '<div class="bed-detail-foot">' + battHTML + '</div>' +
       '<div class="bed-detail-verdict">' + verdict + '</div>' +
+      outlookHTML +
     '</div>'
   );
 }

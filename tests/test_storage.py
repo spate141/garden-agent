@@ -118,6 +118,46 @@ class TestSeries:
         assert rows[0]["ts"] < rows[-1]["ts"]
 
 
+class TestRawSeries:
+    def test_returns_oldest_first_epoch_value_pairs(self, db):
+        _write(db, "soilmoisture1", 40.0, 20)
+        _write(db, "soilmoisture1", 55.0, 10)
+        _write(db, "soilmoisture1", 50.0, 1)
+        samples = db.raw_series("soilmoisture1", hours=1)
+        assert [v for _, v in samples] == [40.0, 55.0, 50.0]
+        # Timestamps strictly increase (oldest -> newest), unlike series()'s
+        # ISO ts strings this returns raw epoch floats.
+        epochs = [e for e, _ in samples]
+        assert epochs == sorted(epochs)
+        assert all(isinstance(e, float) for e in epochs)
+
+    def test_not_bucket_averaged(self, db):
+        # Two readings within the same 60s-bucket that series() would collapse
+        # into one averaged point must both survive raw_series() distinctly.
+        _write(db, "soilmoisture1", 30.0, 10.05)
+        _write(db, "soilmoisture1", 60.0, 10.0)
+        samples = db.raw_series("soilmoisture1", hours=1)
+        assert len(samples) == 2
+
+    def test_respects_hours_cutoff(self, db):
+        _write(db, "soilmoisture1", 40.0, 5 * 60)  # 5h ago -- outside a 3h window
+        _write(db, "soilmoisture1", 55.0, 60)      # 1h ago -- inside a 3h window
+        samples = db.raw_series("soilmoisture1", hours=3)
+        assert len(samples) == 1
+        assert samples[0][1] == 55.0
+
+    def test_thins_to_max_points_keeping_newest(self, db):
+        for minutes_ago in range(100, 0, -1):
+            _write(db, "soilmoisture1", float(100 - minutes_ago), minutes_ago)
+        samples = db.raw_series("soilmoisture1", hours=2, max_points=20)
+        assert 0 < len(samples) <= 20
+        # The most recent reading (minutes_ago=1, value=99.0) must survive thinning.
+        assert samples[-1][1] == 99.0
+
+    def test_unknown_sensor_returns_empty(self, db):
+        assert db.raw_series("nope") == []
+
+
 class TestPruneOldData:
     def test_deletes_readings_and_snapshots_before_cutoff(self, db):
         _write(db, "temp_f", 60.0, 60 * 24 * 40)  # 40 days ago -- should be pruned

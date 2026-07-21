@@ -192,6 +192,40 @@ def series(sensor_key: str, hours: int = 24) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def raw_series(
+    sensor_key: str, hours: int = 48, max_points: int | None = None
+) -> list[tuple[float, float]]:
+    """
+    Raw (epoch_seconds, value) pairs for one sensor over the last `hours`,
+    oldest-first, NOT bucket-averaged.
+
+    Unlike series(), which bucket-averages and smears watering spikes, this
+    is for math that needs an un-smeared shape — drydown_rate() and
+    analyze_watering() in derived.py. When `max_points` is set and the raw
+    row count exceeds it, thin with a stride (keeping the newest rows) since
+    those functions need the trend's shape, not every single reading.
+    """
+    cutoff = _hours_ago_iso(hours)
+    with _conn() as con:
+        rows = con.execute(
+            """
+            SELECT CAST(strftime('%s', ts) AS INTEGER) AS epoch, value
+            FROM readings
+            WHERE sensor_key = ?
+              AND ts >= ?
+            ORDER BY ts ASC
+            """,
+            (sensor_key, cutoff),
+        ).fetchall()
+    samples = [(float(r["epoch"]), r["value"]) for r in rows]
+    if max_points and len(samples) > max_points:
+        step = -(-len(samples) // max_points)  # ceil div
+        # Stride from the end so the newest sample is always kept.
+        thinned = samples[::-step][::-1]
+        samples = thinned
+    return samples
+
+
 def last_seen(sensor_key: str) -> str | None:
     """ISO timestamp of the most recent reading for this key, or None."""
     with _conn() as con:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -160,6 +161,70 @@ def _effective_bed_band(bed: dict[str, Any]) -> tuple[float, float] | None:
     )
 
 
+def rain_covers(
+    days: float | None, daily: list[dict[str, Any]] | None, rain_relief_in: float
+) -> dict[str, Any]:
+    """
+    Does forecast rain arrive before a bed is projected to go dry?
+
+    Scans forecast days from tomorrow (index 1, so today's already-observed
+    rain isn't double counted) through ceil(days), looking for a single day
+    with at least `rain_relief_in` of rain. A single-day threshold (not a
+    cumulative sum) is deliberate: rain_relief_in worth of rain in one day
+    reliably soaks the root zone, while the same total drizzled across
+    several days often doesn't reach it.
+
+    days=None/<=0 (no finite dry-date projection — "today"/"learning"/
+    "not drying" already cover those cases) or an empty/missing forecast
+    both mean nothing to offset against, so relief is always False then.
+    """
+    out = {"rain_relief": False, "rain_relief_day": None, "rain_relief_in": None}
+    if not days or days <= 0 or not daily:
+        return out
+
+    horizon = min(7, math.ceil(days))
+    for i in range(1, horizon + 1):
+        if i >= len(daily):
+            break
+        day = daily[i]
+        precip = day.get("precip_in") or 0.0
+        if precip >= rain_relief_in:
+            out["rain_relief"]     = True
+            out["rain_relief_day"] = day.get("date")
+            out["rain_relief_in"]  = precip
+            break
+    return out
+
+
+def _bed_watering_forecast(
+    moist_key: str,
+    current_moist: float,
+    band: tuple[float, float],
+    fc: dict[str, Any] | None,
+    drydown_hours: int,
+    rain_relief_in: float,
+) -> dict[str, Any]:
+    """
+    Rain-aware "when will this bed need water" projection for one bed.
+
+    Reuses drydown_rate()/days_until_dry() from derived.py (previously
+    unused server-side — a prior "when to water next" card was pulled for
+    being noisy right after a watering event). The fix here is to surface
+    the "learning"/"not drying"/"today" labels verbatim instead of forcing
+    a number, and to let an upcoming-rain projection override the raw day
+    count when relevant.
+    """
+    samples = storage.raw_series(moist_key, hours=drydown_hours, max_points=200)
+    rate = drv.drydown_rate(samples)
+    dud = drv.days_until_dry(current_moist, rate.get("per_day"), band[0])
+    relief = rain_covers(dud["days"], fc.get("daily") if fc else None, rain_relief_in)
+    return {
+        "days_until_dry": dud["days"],
+        "dry_label":      dud["label"],
+        **relief,
+    }
+
+
 # ── GET /api/insights ────────────────────────────────────────────────────────
 
 @app.get("/api/insights")
@@ -220,6 +285,8 @@ async def api_insights() -> JSONResponse:
             "sunrise_ts_tomorrow": fc.get("sunrise_ts_tomorrow"),
             # Wind for sky animation — drives cloud/rain drift speed on the dashboard
             "wind_max_mph":        fc.get("wind_max_mph"),
+            # 7-day outlook (day 0 = today) — dashboard water-balance chart + strip.
+            "daily":               fc.get("daily", []),
         }
 
     # ── Live "right now" conditions (separate short-TTL cache from the daily forecast) ──
@@ -239,11 +306,17 @@ async def api_insights() -> JSONResponse:
     air_temp_row = latest_map.get(src_temp_key)
     air_temp_f   = air_temp_row["value"] if air_temp_row else None
 
+    wf_cfg          = cfg.dashboard.get("watering_forecast", {})
+    wf_enabled      = wf_cfg.get("enabled", True)
+    wf_drydown_hrs  = int(wf_cfg.get("drydown_hours", 48))
+    wf_rain_relief  = float(wf_cfg.get("rain_relief_in", 0.25))
+
     bed_results: list[dict[str, Any]] = []
     for bed in cfg.dashboard.get("beds", []):
         moist_key = bed.get("sensors", {}).get("soil_moisture")
         moist_row = latest_map.get(moist_key) if moist_key else None
         soil_moist = moist_row["value"] if moist_row else None
+        band = _effective_bed_band(bed)
 
         if soil_moist is not None and air_temp_f is not None:
             stress = drv.bed_stress(
@@ -251,7 +324,7 @@ async def api_insights() -> JSONResponse:
                 soil_moist,
                 air_temp_f,
                 cfg.crops,
-                band_override=_effective_bed_band(bed),
+                band_override=band,
             )
         else:
             stress = {
@@ -261,10 +334,17 @@ async def api_insights() -> JSONResponse:
                 "crops": [],
             }
 
+        forecast_fields: dict[str, Any] = {}
+        if wf_enabled and soil_moist is not None and band is not None and moist_key:
+            forecast_fields = _bed_watering_forecast(
+                moist_key, soil_moist, band, fc, wf_drydown_hrs, wf_rain_relief,
+            )
+
         bed_results.append({
             "id":   bed.get("id"),
             "name": bed.get("name"),
             **stress,
+            **forecast_fields,
         })
 
     insights["beds"] = bed_results

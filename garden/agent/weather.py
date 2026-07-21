@@ -115,6 +115,36 @@ _cache: dict[str, Any] = {}
 _cache_ts: float = 0.0
 
 
+def _build_daily(daily: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Per-day forecast rows from Open-Meteo's `daily` block, day 0 = today.
+    `daily["time"]` (local ISO dates) is always present regardless of which
+    `daily=` variables were requested, so this needs no extra API params.
+    """
+    dates = daily.get("time", [])
+    out: list[dict[str, Any]] = []
+    for i, date in enumerate(dates):
+        def _at(key: str) -> Any:
+            vals = daily.get(key, [])
+            return vals[i] if i < len(vals) else None
+
+        code = _at("weather_code")
+        # ET₀ is always returned in mm regardless of precipitation_unit — convert per day.
+        et0_mm = _at("et0_fao_evapotranspiration")
+        out.append({
+            "date":            date,
+            "weather_code":    code,
+            "conditions":      _WMO.get(int(code), "unknown") if code is not None else "unknown",
+            "hi_f":            _at("temperature_2m_max"),
+            "lo_f":            _at("temperature_2m_min"),
+            "precip_in":       _at("precipitation_sum") or 0.0,
+            "precip_prob_pct": _at("precipitation_probability_max"),
+            "et0_in":          round(et0_mm / 25.4, 3) if et0_mm is not None else None,
+            "wind_max_mph":    _at("wind_speed_10m_max"),
+        })
+    return out
+
+
 def get_forecast() -> dict[str, Any] | None:
     """
     Fetch today's Open-Meteo forecast. Returns a normalized dict or None.
@@ -128,6 +158,9 @@ def get_forecast() -> dict[str, Any] | None:
       weather_code, conditions         — WMO code + human text
       next_12h_peak_rain_pct           — highest rain probability in next 12h (%)
       next_12h_peak_hour_offset        — hours from now until that peak
+      daily                            — 7-day outlook, day 0 = today; each entry:
+                                          {date, weather_code, conditions, hi_f, lo_f,
+                                           precip_in, precip_prob_pct, et0_in, wind_max_mph}
     """
     global _cache, _cache_ts
 
@@ -139,7 +172,7 @@ def get_forecast() -> dict[str, Any] | None:
     cache_minutes = cfg.weather.get("cache_minutes", 120)
     now_mono = time.monotonic()
     if _cache and (now_mono - _cache_ts) < cache_minutes * 60:
-        return dict(_cache)
+        return {**_cache, "daily": [dict(d) for d in _cache.get("daily", [])]}
 
     coords = _get_latlon()
     if coords is None:
@@ -163,7 +196,7 @@ def get_forecast() -> dict[str, Any] | None:
                     "et0_fao_evapotranspiration,sunrise,sunset"
                 ),
                 "hourly": "precipitation_probability,temperature_2m",
-                "forecast_days": 2,   # day 0 = today, day 1 = tomorrow (frost lookahead)
+                "forecast_days": 7,   # day 0 = today, day 1 = tomorrow (frost lookahead + outlook)
                 "timezone": tz,
             },
             timeout=10,
@@ -241,6 +274,13 @@ def get_forecast() -> dict[str, Any] | None:
         except Exception as _exc:
             log.debug("Sun time parse error: %s", _exc)
 
+        # 7-day outlook (day 0 = today) — for the dashboard water-balance chart.
+        try:
+            fc["daily"] = _build_daily(daily)
+        except Exception as _exc:
+            log.debug("Daily outlook build error: %s", _exc)
+            fc["daily"] = []
+
         _cache    = fc
         _cache_ts = now_mono
 
@@ -249,7 +289,9 @@ def get_forecast() -> dict[str, Any] | None:
             fc["conditions"], fc["today_high_f"], fc["today_low_f"],
             fc["precip_prob_pct"], fc["precip_in"],
         )
-        return dict(fc)
+        # Shallow dict(fc) would share the "daily" list by reference across every
+        # cached call — copy it too so callers never risk mutating the cache.
+        return {**fc, "daily": [dict(d) for d in fc.get("daily", [])]}
 
     except Exception as exc:
         log.warning("Open-Meteo parse error: %s", exc)
