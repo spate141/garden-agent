@@ -1598,7 +1598,7 @@ function makeChartOpts(color, opts) {
   const scales = {
     x: {
       grid:  { color: c.grid },
-      ticks: { color: c.ticks, maxTicksLimit: 6, font: { size: 10 } },
+      ticks: { color: c.ticks, maxTicksLimit: opts.maxTicksLimit || 6, font: { size: 10 } },
       /* autoSkip (driven by maxTicksLimit above) can drop the very last tick,
          which is part of what makes "where's now?" ambiguous -- force it to
          always render alongside whichever ticks autoSkip already picked. */
@@ -2604,6 +2604,17 @@ function _outlookDayLabel(dateStr, offset) {
   }
 }
 
+/** MM/DD label for the outlook chart's X axis — distinct from _outlookDayLabel
+ *  (used by the tile strip above it), which favors "Today"/weekday wording. */
+function _outlookAxisLabel(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0');
+  } catch (_) {
+    return dateStr;
+  }
+}
+
 /** 7-day water outlook: an icon/hi-lo/rain% strip plus a combo chart of daily
  *  ET0 demand vs forecast rain supply, with a cumulative water-balance line.
  *  Weather is always optional server-side (garden/agent/weather.py) — hides
@@ -2641,7 +2652,7 @@ function renderOutlook(forecast) {
   const canvas = document.getElementById('outlook-chart');
   if (!canvas) return;
 
-  const labels = daily.map(function (d, i) { return _outlookDayLabel(d.date, i); });
+  const labels = daily.map(function (d) { return _outlookAxisLabel(d.date); });
   const c = chartThemeColors();
 
   let cumulative = 0;
@@ -2673,6 +2684,7 @@ function renderOutlook(forecast) {
     chart = new Chart(canvas, makeChartOpts(datasets[0].backgroundColor, {
       datasets: datasets, legend: true, dualAxis: true,
       yTitle: 'in/day', y1Title: 'cum in', noCaption: true,
+      maxTicksLimit: daily.length,
     }));
     instances['outlook'] = chart;
   }
