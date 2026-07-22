@@ -4,7 +4,12 @@
 
 .garden {
   overflow: hidden;
-  margin: 16px 24px 0;
+  /* Full-bleed: break out of .page's centered 1200px column to the actual
+     viewport edge (grass/soil/wood should run edge-to-edge; bed cards and
+     the chip bar stay centered inside via their own justify-content/gap,
+     unaffected by the wider box). */
+  width: 100vw;
+  margin: 16px calc(50% - 50vw) 0;
   border-radius: 0;
   border-bottom: 2px solid rgba(0,0,0,0.08);
   /* Garden palette -- ported from reference_bed.html :root */
@@ -47,9 +52,6 @@
   --g-water-ok:         #5aa6cc;
   --g-water-wet:        #3a7ea3;
   --g-water-asleep:     #5c584c;
-}
-@media (max-width: 640px) {
-  .garden { margin: 16px -16px 0; }
 }
 
 

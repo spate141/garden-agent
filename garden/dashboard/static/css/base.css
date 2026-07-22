@@ -2,7 +2,14 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: var(--bg); }
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg);
+  /* .garden below breaks out to the viewport edge (full-bleed hero); guard
+     against the 100vw-breakout trick introducing a horizontal scrollbar. */
+  overflow-x: hidden;
+}
 
 /* body itself stays transparent so #sky-backdrop (fixed, z-index:-1) shows
    through everywhere content doesn't paint its own surface -- see
