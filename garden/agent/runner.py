@@ -391,11 +391,15 @@ def _maybe_prune_retention() -> None:
         readings_deleted, snapshots_deleted, days,
     )
 
+    # Mark today's prune done before the slow VACUUM below. VACUUM rebuilds the
+    # whole DB file and can run long on modest hardware -- if it gets killed by
+    # the service timeout, we still don't want the next tick to redo the delete
+    # + VACUUM cycle every 15 min for the rest of the day.
+    storage.set_alert_state(_RETENTION_RULE_ID, "", active=False, last_fired_ts=_now_iso())
+
     if conf.get("vacuum", True) and (readings_deleted or snapshots_deleted):
         storage.vacuum()
         log.info("VACUUM complete")
-
-    storage.set_alert_state(_RETENTION_RULE_ID, "", active=False, last_fired_ts=_now_iso())
 
 
 # ── CLI entry point (used by garden-cron.service) ────────────────────────────

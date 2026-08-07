@@ -11,4 +11,4 @@ ExecStart=/home/YOUR_VM_USER/apps/garden-agent/.venv/bin/python -m garden.agent.
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=garden-cron
-TimeoutStartSec=60
+TimeoutStartSec=300
