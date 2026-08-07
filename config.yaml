@@ -249,7 +249,9 @@ quiet_hours:
 # forever. Pruned once per day during the cron tick; older history still
 # lives in the dated R2 backups if ever needed.
 retention:
-  enabled: true
+  enabled: false # TEMPORARILY DISABLED 2026-08-07: backlog of ~195k rows was too large for the
+                 # e2-micro to prune+vacuum inside garden-cron's timeout, causing repeated CPU
+                 # spikes. Re-enable once the backlog is cleared manually (see docs/deploy.md).
   days: 30       # delete readings/snapshots older than this
   vacuum: true   # reclaim disk space after pruning (rebuilds the file; runs at most once/day)
 
