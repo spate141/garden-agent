@@ -11,4 +11,13 @@ ExecStart=/home/YOUR_VM_USER/apps/garden-agent/.venv/bin/python -m garden.agent.
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=garden-cron
-TimeoutStartSec=300
+# With the retention-prune indexes in place a healthy tick finishes in
+# seconds, so a tick still running past 2 min is a bug -- fail fast and
+# loudly instead of grinding for 5 min like the old timeout allowed.
+TimeoutStartSec=120
+# Guardrail: cap the blast radius of any future regression here so a stuck
+# or runaway tick can no longer pin the whole e2-micro VM.
+CPUQuota=35%
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=256M

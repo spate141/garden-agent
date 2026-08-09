@@ -251,7 +251,11 @@ quiet_hours:
 retention:
   enabled: true
   days: 30       # delete readings/snapshots older than this
-  vacuum: true   # reclaim disk space after pruning (rebuilds the file; runs at most once/day)
+  # VACUUM rebuilds the whole DB file under an exclusive lock, blocking ingest for
+  # as long as it takes -- default off. SQLite reuses freed pages in place at
+  # steady state, so the file stops growing without it. Run
+  # `python -m garden.agent.runner --vacuum` manually if disk needs reclaiming.
+  vacuum: false
 
 # ── Derived metric computation ────────────────────────────────────────────────
 # VPD, dew point, and heat index are computed from a live temp+humidity source

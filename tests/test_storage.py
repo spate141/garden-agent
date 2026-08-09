@@ -180,3 +180,82 @@ class TestPruneOldData:
     def test_vacuum_does_not_raise(self, db):
         _write(db, "temp_f", 75.0, 60)
         db.vacuum()  # should not raise even with no prior DELETE in this connection
+
+    def test_batches_across_multiple_chunks(self, db, monkeypatch):
+        # Force a tiny batch size so a backlog bigger than one batch exercises
+        # the loop-until-empty-batch path, not just the single-DELETE case.
+        monkeypatch.setattr(storage, "_PRUNE_BATCH_SIZE", 3)
+        old_count = 10
+        for i in range(old_count):
+            _write(db, "temp_f", float(i), 60 * 24 * 40)  # 40 days ago
+        _write(db, "temp_f", 999.0, 60)  # 1h ago -- should survive
+
+        cutoff = _iso(60 * 24 * 30)
+        readings_deleted, snapshots_deleted = db.prune_old_data(cutoff)
+
+        assert readings_deleted == old_count
+        assert snapshots_deleted == old_count
+        rows = db.series("temp_f", hours=24 * 365)
+        assert len(rows) == 1
+        assert rows[0]["value"] == 999.0
+
+    def test_respects_per_run_cap(self, db, monkeypatch):
+        # A backlog larger than the per-run cap should only be partially
+        # drained in one call, not held in a single long-running transaction.
+        monkeypatch.setattr(storage, "_PRUNE_BATCH_SIZE", 2)
+        monkeypatch.setattr(storage, "_PRUNE_MAX_ROWS_PER_TABLE", 4)
+        for i in range(10):
+            _write(db, "temp_f", float(i), 60 * 24 * 40)
+
+        cutoff = _iso(60 * 24 * 30)
+        readings_deleted, snapshots_deleted = db.prune_old_data(cutoff)
+
+        assert readings_deleted == 4
+        assert snapshots_deleted == 4
+
+    def test_no_orphaned_readings_after_prune(self, db):
+        _write(db, "temp_f", 60.0, 60 * 24 * 40)
+        _write(db, "temp_f", 75.0, 60)
+        cutoff = _iso(60 * 24 * 30)
+        db.prune_old_data(cutoff)
+        with db._conn() as con:
+            orphans = con.execute(
+                """
+                SELECT COUNT(*) as n FROM readings
+                WHERE snapshot_id NOT IN (SELECT id FROM snapshots)
+                """
+            ).fetchone()["n"]
+        assert orphans == 0
+
+
+class TestLatest:
+    def test_returns_latest_value_per_sensor(self, db):
+        _write(db, "temp_f", 60.0, 20)
+        _write(db, "temp_f", 75.0, 1)
+        _write(db, "humidity", 55.0, 10)
+        rows = {r["sensor_key"]: r for r in db.latest()}
+        assert rows["temp_f"]["value"] == 75.0
+        assert rows["humidity"]["value"] == 55.0
+
+    def test_no_readings_returns_empty(self, db):
+        assert db.latest() == []
+
+    def test_sorted_by_sensor_key(self, db):
+        _write(db, "zzz_sensor", 1.0, 5)
+        _write(db, "aaa_sensor", 2.0, 5)
+        rows = db.latest()
+        assert [r["sensor_key"] for r in rows] == sorted(r["sensor_key"] for r in rows)
+
+
+class TestHealthInfo:
+    def test_reports_sensor_count_and_last_reading(self, db):
+        _write(db, "temp_f", 60.0, 20)
+        _write(db, "humidity", 55.0, 1)
+        info = db.health_info()
+        assert info["sensors_seen"] == 2
+        assert info["last_reading_ts"] is not None
+
+    def test_empty_db(self, db):
+        info = db.health_info()
+        assert info["sensors_seen"] == 0
+        assert info["last_reading_ts"] is None

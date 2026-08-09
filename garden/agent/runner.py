@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -383,23 +384,30 @@ def _maybe_prune_retention() -> None:
     if _already_pruned_today():
         return
 
-    days = conf.get("days", 30)
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    readings_deleted, snapshots_deleted = storage.prune_old_data(cutoff)
-    log.info(
-        "Retention prune: removed %d readings, %d snapshots older than %d days",
-        readings_deleted, snapshots_deleted, days,
-    )
-
-    # Mark today's prune done before the slow VACUUM below. VACUUM rebuilds the
-    # whole DB file and can run long on modest hardware -- if it gets killed by
-    # the service timeout, we still don't want the next tick to redo the delete
-    # + VACUUM cycle every 15 min for the rest of the day.
+    # Mark today's prune done BEFORE doing the (possibly slow) delete work. If the
+    # prune throws or gets killed partway through, we don't want the next tick 15
+    # min later to immediately retry and repeat whatever went wrong -- one bad
+    # prune costs one day, not an infinite loop of every-15-min retries.
     storage.set_alert_state(_RETENTION_RULE_ID, "", active=False, last_fired_ts=_now_iso())
 
-    if conf.get("vacuum", True) and (readings_deleted or snapshots_deleted):
+    days = conf.get("days", 30)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    started = time.monotonic()
+    readings_deleted, snapshots_deleted = storage.prune_old_data(cutoff)
+    elapsed = time.monotonic() - started
+    log.info(
+        "Retention prune: removed %d readings, %d snapshots older than %d days in %.1fs",
+        readings_deleted, snapshots_deleted, days, elapsed,
+    )
+
+    # VACUUM is opt-in (config.yaml retention.vacuum, default False) -- it rebuilds
+    # the whole DB file under an exclusive lock, which blocks ingest for as long as
+    # it takes. Prefer letting SQLite reuse freed pages in place; run `python -m
+    # garden.agent.runner --vacuum` manually if disk actually needs reclaiming.
+    if conf.get("vacuum", False) and (readings_deleted or snapshots_deleted):
+        vac_started = time.monotonic()
         storage.vacuum()
-        log.info("VACUUM complete")
+        log.info("VACUUM complete in %.1fs", time.monotonic() - vac_started)
 
 
 # ── CLI entry point (used by garden-cron.service) ────────────────────────────
@@ -410,12 +418,18 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description="garden-agent cron runner")
-    parser.add_argument("--cron",  action="store_true", help="Run cron tick (rules + brief)")
-    parser.add_argument("--brief", action="store_true", help="Force-send morning brief now (ignores hour/dedup)")
+    parser.add_argument("--cron",   action="store_true", help="Run cron tick (rules + brief)")
+    parser.add_argument("--brief",  action="store_true", help="Force-send morning brief now (ignores hour/dedup)")
+    parser.add_argument("--vacuum", action="store_true", help="Manually VACUUM the DB now (rebuilds the whole file; run when disk needs reclaiming)")
     args = parser.parse_args()
 
     if args.brief:
         storage.init_db()
         send_daily_brief(force=True)
+    elif args.vacuum:
+        storage.init_db()
+        started = time.monotonic()
+        storage.vacuum()
+        log.info("VACUUM complete in %.1fs", time.monotonic() - started)
     elif args.cron:
         run_cron_tick()

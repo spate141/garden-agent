@@ -71,7 +71,16 @@ CREATE TABLE IF NOT EXISTS readings (
     value       REAL    NOT NULL,
     unit        TEXT    NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS idx_readings_key_ts ON readings(sensor_key, ts);
+CREATE INDEX IF NOT EXISTS idx_readings_key_ts     ON readings(sensor_key, ts);
+-- FK target for readings.snapshot_id -- without this, PRAGMA foreign_keys=ON
+-- makes every snapshot DELETE (retention prune) do a full table scan of
+-- readings per deleted row to check for children. That turns a 1-day prune
+-- into a multi-minute lock that starves ingest.
+CREATE INDEX IF NOT EXISTS idx_readings_snapshot_id ON readings(snapshot_id);
+-- Lets retention pruning and MAX(ts) lookups (health_info) seek instead of scan.
+CREATE INDEX IF NOT EXISTS idx_readings_ts          ON readings(ts);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_ts ON snapshots(ts);
 
 CREATE TABLE IF NOT EXISTS alert_state (
     rule_id       TEXT PRIMARY KEY,
@@ -139,29 +148,45 @@ def health_info() -> dict[str, Any]:
     Returns a dict for the /health endpoint:
       sensors_seen: count of distinct sensor keys in the DB
       last_reading_ts: ISO timestamp of the most recent reading (or null)
+
+    Split into two index-only lookups rather than one COUNT(DISTINCT)/MAX(ts)
+    over the whole table -- on a 650k+-row table without idx_readings_ts,
+    MAX(ts) alone was a multi-second full scan.
     """
     with _conn() as con:
-        row = con.execute(
-            "SELECT COUNT(DISTINCT sensor_key) as n, MAX(ts) as latest FROM readings"
-        ).fetchone()
+        n = con.execute("SELECT COUNT(*) as n FROM (SELECT DISTINCT sensor_key FROM readings)").fetchone()["n"]
+        latest_ts = con.execute("SELECT MAX(ts) as latest FROM readings").fetchone()["latest"]
     return {
-        "sensors_seen": row["n"],
-        "last_reading_ts": row["latest"],
+        "sensors_seen": n,
+        "last_reading_ts": latest_ts,
     }
 
 
 def latest() -> list[dict[str, Any]]:
-    """Latest value per sensor key (for dashboard current-values panel)."""
+    """
+    Latest value per sensor key (for dashboard current-values panel).
+
+    Implemented as one index seek per distinct sensor_key against
+    idx_readings_key_ts, rather than a correlated MAX(ts) subquery that scans
+    the whole readings table once per row -- on 650k+ rows the old query took
+    ~11s of CPU per call and this endpoint is polled by the dashboard.
+    """
     with _conn() as con:
-        rows = con.execute(
-            """
-            SELECT sensor_key, value, unit, ts
-            FROM readings
-            WHERE ts = (SELECT MAX(ts) FROM readings r2 WHERE r2.sensor_key = readings.sensor_key)
-            ORDER BY sensor_key
-            """
-        ).fetchall()
-    return [dict(r) for r in rows]
+        keys = [r["sensor_key"] for r in con.execute("SELECT DISTINCT sensor_key FROM readings")]
+        rows = [
+            con.execute(
+                """
+                SELECT sensor_key, value, unit, ts
+                FROM readings
+                WHERE sensor_key = ?
+                ORDER BY ts DESC
+                LIMIT 1
+                """,
+                (key,),
+            ).fetchone()
+            for key in keys
+        ]
+    return [dict(r) for r in sorted(rows, key=lambda r: r["sensor_key"])]
 
 
 def series(sensor_key: str, hours: int = 24) -> list[dict[str, Any]]:
@@ -287,19 +312,51 @@ def stats(sensor_key: str, hours: int = 24) -> dict[str, Any] | None:
 
 # ── alert_state helpers ───────────────────────────────────────────────────────
 
+_PRUNE_BATCH_SIZE = 5000
+_PRUNE_MAX_ROWS_PER_TABLE = 200_000  # per-run cap so a large backlog drains over several days
+
+
 def prune_old_data(cutoff_iso: str) -> tuple[int, int]:
     """
-    Delete readings and snapshots older than cutoff_iso (ISO-8601 UTC).
+    Delete readings and snapshots older than cutoff_iso (ISO-8601 UTC), in small
+    batches with a commit between each rather than one big transaction.
+
+    A single unbounded DELETE holds the write lock for as long as the delete
+    takes, which can be minutes on a large backlog -- long enough to make
+    concurrent ingest POSTs fail with "database is locked". Batching keeps
+    each lock hold to a fraction of a second and caps total work per call so
+    a big backlog is drained over several days of cron ticks instead of one
+    long-running (and easily timed-out) transaction.
+
     readings.ts and snapshots.ts are always written identically (see write_snapshot),
     so a plain ts cutoff on each table is safe -- no orphaned readings result.
+    Children (readings) are deleted before parents (snapshots).
     Returns (readings_deleted, snapshots_deleted).
     """
-    with _conn() as con:
-        cur = con.execute("DELETE FROM readings WHERE ts < ?", (cutoff_iso,))
-        readings_deleted = cur.rowcount
-        cur = con.execute("DELETE FROM snapshots WHERE ts < ?", (cutoff_iso,))
-        snapshots_deleted = cur.rowcount
+    readings_deleted = _prune_table(cutoff_iso, "readings")
+    snapshots_deleted = _prune_table(cutoff_iso, "snapshots")
     return readings_deleted, snapshots_deleted
+
+
+def _prune_table(cutoff_iso: str, table: str) -> int:
+    assert table in ("readings", "snapshots")  # not user input; guards against typos
+    total = 0
+    while total < _PRUNE_MAX_ROWS_PER_TABLE:
+        with _conn() as con:
+            cur = con.execute(
+                f"""
+                DELETE FROM {table}
+                WHERE rowid IN (
+                    SELECT rowid FROM {table} WHERE ts < ? LIMIT ?
+                )
+                """,
+                (cutoff_iso, _PRUNE_BATCH_SIZE),
+            )
+            n = cur.rowcount
+        total += n
+        if n < _PRUNE_BATCH_SIZE:
+            break
+    return total
 
 
 def vacuum() -> None:
