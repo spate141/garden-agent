@@ -132,8 +132,41 @@ def test_command_menu_has_one_entry_per_bed_plus_static():
     commands = {m["command"] for m in menu}
     n_beds = len(cfg.dashboard.get("beds", []))
     assert {"bed1", "bed2", "bed3", "bed4"} <= commands
-    assert {"beds", "weather", "air", "brief", "deploy", "help"} <= commands
-    assert len(menu) == n_beds + 6
+    assert {"beds", "weather", "air", "brief", "pause", "resume", "deploy", "help"} <= commands
+    assert len(menu) == n_beds + 8
+
+
+# ── dispatch: /pause, /resume ──────────────────────────────────────────────────
+
+def test_dispatch_pause_sets_pause_and_confirms(monkeypatch):
+    calls = []
+    monkeypatch.setattr(bot.storage, "pause_notifications", lambda until: calls.append(until))
+
+    reply = bot.dispatch("pause")
+
+    assert len(calls) == 1
+    assert "paused" in reply.lower()
+    assert "/resume" in reply
+
+
+def test_dispatch_resume_when_paused(monkeypatch):
+    monkeypatch.setattr(bot.storage, "notifications_paused_until", lambda: "2026-01-01T00:00:00+00:00")
+    calls = []
+    monkeypatch.setattr(bot.storage, "resume_notifications", lambda: calls.append(True))
+
+    reply = bot.dispatch("resume")
+
+    assert len(calls) == 1
+    assert "resumed" in reply.lower()
+
+
+def test_dispatch_resume_when_not_paused(monkeypatch):
+    monkeypatch.setattr(bot.storage, "notifications_paused_until", lambda: None)
+    monkeypatch.setattr(bot.storage, "resume_notifications", lambda: None)
+
+    reply = bot.dispatch("resume")
+
+    assert "weren't paused" in reply
 
 
 # ── handle_update: owner-only guard + parsing ─────────────────────────────────

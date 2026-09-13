@@ -80,7 +80,7 @@ No further input needed — the Telegram code is already written.
 
 ---
 
-## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief, /deploy)
+## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief, /pause, /resume, /deploy)
 
 The bot can also answer commands on demand — tap `/bed4` in Telegram and get a
 summary of Bed 4's moisture, battery, and crops back within a second. This needs
@@ -118,6 +118,8 @@ the message box) to see all commands, or type them directly:
 | `/weather` | Today's forecast + current conditions |
 | `/air` | VPD, dew point / frost risk, feels-like |
 | `/brief` | Sends the morning brief immediately (bypasses the 7am schedule) |
+| `/pause` | Mutes rule-triggered alerts and the daily brief until local midnight |
+| `/resume` | Turns paused alerts back on early |
 | `/deploy` | Runs `deploy.sh` on the VM: git pull, restart services. See below. |
 | `/help` | Lists all available commands |
 

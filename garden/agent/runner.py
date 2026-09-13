@@ -110,6 +110,9 @@ def _evaluate(results: list[RuleResult]) -> None:
         was_active = bool(state.get("active", 0))
 
         if result.fired:
+            if storage.notifications_paused_until():
+                log.debug("Suppressed (notifications paused): %s", result.rule_id)
+                continue
             if _in_quiet_hours():
                 log.debug("Suppressed (quiet hours): %s", result.rule_id)
                 continue
@@ -341,6 +344,9 @@ def send_daily_brief(force: bool = False) -> None:
             return
         if _already_sent_today(local_now):
             log.debug("Daily brief already sent today, skipping")
+            return
+        if storage.notifications_paused_until():
+            log.debug("Daily brief suppressed (notifications paused)")
             return
 
     log.info("Sending daily brief (force=%s, local time=%s)", force, local_now.strftime("%H:%M %Z"))

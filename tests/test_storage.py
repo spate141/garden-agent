@@ -259,3 +259,47 @@ class TestHealthInfo:
         info = db.health_info()
         assert info["sensors_seen"] == 0
         assert info["last_reading_ts"] is None
+
+
+class TestSettings:
+    def test_unknown_key_returns_none(self, db):
+        assert db.get_setting("nope") is None
+
+    def test_set_then_get(self, db):
+        db.set_setting("foo", "bar")
+        assert db.get_setting("foo") == "bar"
+
+    def test_set_overwrites_existing_value(self, db):
+        db.set_setting("foo", "bar")
+        db.set_setting("foo", "baz")
+        assert db.get_setting("foo") == "baz"
+
+    def test_delete_removes_key(self, db):
+        db.set_setting("foo", "bar")
+        db.delete_setting("foo")
+        assert db.get_setting("foo") is None
+
+    def test_delete_unknown_key_does_not_raise(self, db):
+        db.delete_setting("nope")
+
+
+class TestNotificationsPause:
+    def test_not_paused_by_default(self, db):
+        assert db.notifications_paused_until() is None
+
+    def test_pause_sets_until_and_reads_back(self, db):
+        until = _iso(-60)  # 1h in the future
+        db.pause_notifications(until)
+        assert db.notifications_paused_until() == until
+
+    def test_expired_pause_is_cleared_on_read(self, db):
+        past = _iso(60)  # 1h in the past
+        db.pause_notifications(past)
+        assert db.notifications_paused_until() is None
+        # Clearing is persisted, not just returned as None once.
+        assert db.get_setting("notifications_paused_until") is None
+
+    def test_resume_clears_pause(self, db):
+        db.pause_notifications(_iso(-60))
+        db.resume_notifications()
+        assert db.notifications_paused_until() is None

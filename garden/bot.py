@@ -1,5 +1,6 @@
 """
-bot.py — Inbound Telegram bot commands (/bed1, /beds, /weather, /air, /brief, /deploy, /help).
+bot.py — Inbound Telegram bot commands (/bed1, /beds, /weather, /air, /brief,
+/pause, /resume, /deploy, /help).
 
 Counterpart to telegram.py (outbound-only). Telegram delivers each command as a
 webhook POST to /api/telegram (see garden/main.py), which calls handle_update()
@@ -22,9 +23,10 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -48,6 +50,8 @@ _STATIC_COMMANDS: list[tuple[str, str]] = [
     ("weather", "Current conditions + today's forecast"),
     ("air", "VPD, dew point, feels-like"),
     ("brief", "Send the morning brief now"),
+    ("pause", "Pause all alerts until midnight"),
+    ("resume", "Resume alerts if paused"),
     ("deploy", "Pull latest code and restart services"),
     ("help", "List all commands"),
 ]
@@ -191,6 +195,37 @@ def _air() -> str:
     return "\n".join(lines)
 
 
+def _local_tz() -> ZoneInfo:
+    tz_name = cfg.location.get("timezone", "UTC")
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _pause() -> str:
+    """Pause rule-triggered alerts and the daily brief until local midnight."""
+    tz = _local_tz()
+    now_local = datetime.now(tz)
+    midnight_local = (now_local + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    storage.pause_notifications(midnight_local.astimezone(timezone.utc).isoformat())
+    hours_left = (midnight_local - now_local).total_seconds() / 3600
+    return (
+        f"\U0001f515 Notifications paused for the rest of today (~{hours_left:.1f}h, "
+        "until midnight). Send /resume to turn them back on early."
+    )
+
+
+def _resume() -> str:
+    was_paused = storage.notifications_paused_until() is not None
+    storage.resume_notifications()
+    if was_paused:
+        return "\U0001f514 Notifications resumed."
+    return "Notifications weren't paused."
+
+
 def _deploy() -> str:
     """
     Kick off deploy.sh (git pull, dep sync, service restarts) and reply
@@ -258,6 +293,10 @@ def dispatch(command: str) -> str:
         from garden.agent.runner import send_daily_brief
         send_daily_brief(force=True)
         return "Morning brief sent."
+    if command == "pause":
+        return _pause()
+    if command == "resume":
+        return _resume()
     if command == "deploy":
         return _deploy()
     return _help()

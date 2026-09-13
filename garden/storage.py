@@ -88,6 +88,11 @@ CREATE TABLE IF NOT EXISTS alert_state (
     active        INTEGER NOT NULL DEFAULT 0,   -- 1 = condition currently tripped
     last_fired_ts TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -390,3 +395,60 @@ def set_alert_state(
             """,
             (rule_id, sensor_key, int(active), last_fired_ts),
         )
+
+
+# ── generic key/value settings ───────────────────────────────────────────────
+
+def get_setting(key: str) -> str | None:
+    with _conn() as con:
+        row = con.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    with _conn() as con:
+        con.execute(
+            """
+            INSERT INTO settings(key, value) VALUES (?,?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (key, value),
+        )
+
+
+def delete_setting(key: str) -> None:
+    with _conn() as con:
+        con.execute("DELETE FROM settings WHERE key = ?", (key,))
+
+
+# ── notification pause ("mute for today") ────────────────────────────────────
+
+_PAUSE_KEY = "notifications_paused_until"
+
+
+def notifications_paused_until() -> str | None:
+    """
+    ISO-8601 UTC timestamp the current pause expires at, or None if there is
+    no active pause. Lazily clears an expired pause on read, so callers never
+    need to check it themselves.
+    """
+    until = get_setting(_PAUSE_KEY)
+    if not until:
+        return None
+    try:
+        until_dt = datetime.fromisoformat(until.replace("Z", "+00:00"))
+    except ValueError:
+        delete_setting(_PAUSE_KEY)
+        return None
+    if datetime.now(timezone.utc) >= until_dt:
+        delete_setting(_PAUSE_KEY)
+        return None
+    return until
+
+
+def pause_notifications(until_iso: str) -> None:
+    set_setting(_PAUSE_KEY, until_iso)
+
+
+def resume_notifications() -> None:
+    delete_setting(_PAUSE_KEY)
