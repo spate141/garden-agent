@@ -62,6 +62,8 @@ html[data-season="winter"] .winter-ground {
   position: relative;
   isolation: isolate;
   display: grid;
+  /* One centered column -- overrides garden-hero.css's mobile 2-column bed grid. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 26px 20px 14px;
   background:
