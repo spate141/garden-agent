@@ -1,10 +1,16 @@
 <header>
   <div class="logo">
     <span class="logo-word">Sprout &amp; Circuit</span>
+    {% if season == 'winter' %}
+    <span class="logo-tagline">Resting for the winter · back in spring</span>
+    {% else %}
     <span class="logo-tagline">Live garden microclimate powered by Ecowitt sensors & Open-Meteo weather API</span>
+    {% endif %}
   </div>
   <div class="meta">
     <span class="header-clock" id="header-clock" aria-live="off"></span>
+    {% if season != 'winter' %}
     <div class="conn-dot is-fresh" id="conn-dot" data-last-ts="{{ last_ts or '' }}" role="status" aria-label="Connection status"></div>
+    {% endif %}
   </div>
 </header>

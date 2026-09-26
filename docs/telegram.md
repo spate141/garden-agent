@@ -80,7 +80,7 @@ No further input needed — the Telegram code is already written.
 
 ---
 
-## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief, /pause, /resume, /deploy)
+## 5. Inbound bot commands (/bed1, /beds, /weather, /air, /brief, /pause, /resume, /winter, /summer, /deploy)
 
 The bot can also answer commands on demand — tap `/bed4` in Telegram and get a
 summary of Bed 4's moisture, battery, and crops back within a second. This needs
@@ -120,8 +120,25 @@ the message box) to see all commands, or type them directly:
 | `/brief` | Sends the morning brief immediately (bypasses the 7am schedule) |
 | `/pause` | Mutes rule-triggered alerts and the daily brief until local midnight |
 | `/resume` | Turns paused alerts back on early |
+| `/winter` | Puts the garden to sleep for the season (see below) |
+| `/summer` | Wakes it back up |
 | `/deploy` | Runs `deploy.sh` on the VM: git pull, restart services. See below. |
 | `/help` | Lists all available commands |
+
+### `/winter` and `/summer` (season toggle)
+
+In winter the garden is dormant: sensor POSTs are acked but not stored, alerts,
+the morning brief and retention pruning are off (so last season's data is kept),
+`/api/latest|series|insights` return empty, and the dashboard shows one snowy
+placeholder bed with no live numbers. The data commands (`/bedN`, `/beds`,
+`/weather`, `/air`, `/brief`) reply that the garden is dormant; `/pause`,
+`/resume`, `/deploy` and `/help` still work.
+
+The default season is `season:` in `config.yaml`. `/winter` and `/summer` store
+an override in the DB that **wins over config.yaml** until the other command is
+sent. `curl https://garden.snehal.ai/health` shows the effective `"season"`.
+After `/summer`, the watchdog will alert if the sensors aren't back online yet;
+use `/pause` to quiet it for the day.
 
 ### `/deploy`
 

@@ -1,0 +1,101 @@
+<!-- ── WINTER (dormant season) ────────────────────────────────────────────────
+     Rendered instead of the hero + trends when the season is "winter" (see
+     storage.season(); config.yaml `season:` or Telegram /winter). Decorative art
+     only -- no sensor data, no chips, no polling. Reuses the hero's .garden
+     sky strip / horizon / ground so the full-page sky backdrop and
+     _updateSky() (called from bootWinter() in garden.js) still apply;
+     winter.css frosts it over. -->
+<section class="garden garden--winter" id="garden" aria-label="Garden resting for winter">
+  <div class="winter-snowfall" aria-hidden="true"></div>
+  <div class="garden-sky" id="garden-sky">
+    <div class="garden-tree garden-tree-1" aria-hidden="true">
+      <svg viewBox="0 0 40 52" preserveAspectRatio="xMidYMax meet" focusable="false"><use href="#sprite-tree-shrub"/></svg>
+    </div>
+    <div class="garden-tree garden-tree-2" aria-hidden="true">
+      <svg viewBox="0 0 40 52" preserveAspectRatio="xMidYMax meet" focusable="false"><use href="#sprite-tree-poplar"/></svg>
+    </div>
+    <div class="garden-tree garden-tree-3" aria-hidden="true">
+      <svg viewBox="0 0 40 52" preserveAspectRatio="xMidYMax meet" focusable="false"><use href="#sprite-tree-round"/></svg>
+    </div>
+    <div class="garden-tree garden-tree-4" aria-hidden="true">
+      <svg viewBox="0 0 40 52" preserveAspectRatio="xMidYMax meet" focusable="false"><use href="#sprite-tree-poplar"/></svg>
+    </div>
+    <div class="garden-tree garden-tree-5" aria-hidden="true">
+      <svg viewBox="0 0 40 52" preserveAspectRatio="xMidYMax meet" focusable="false"><use href="#sprite-tree-round"/></svg>
+    </div>
+  </div>
+  <div class="garden-horizon" id="garden-horizon" aria-hidden="true"></div>
+  <div class="garden-ground winter-ground">
+    <div class="g-bed winter-bed">
+      <div class="g-bed-name">Bed 1 <span aria-hidden="true">·</span> resting</div>
+      <div class="winter-bed-frame" aria-hidden="true">
+        <svg class="winter-bed-art" viewBox="0 0 720 290" fill="none" focusable="false">
+          <defs>
+            <linearGradient id="winter-wood-front" x1="360" y1="132" x2="360" y2="249" gradientUnits="userSpaceOnUse">
+              <stop class="winter-wood-light"/><stop offset="1" class="winter-wood-deep"/>
+            </linearGradient>
+            <linearGradient id="winter-wood-side" x1="576" y1="123" x2="648" y2="219" gradientUnits="userSpaceOnUse">
+              <stop class="winter-wood-mid"/><stop offset="1" class="winter-wood-deep"/>
+            </linearGradient>
+            <linearGradient id="winter-snow" x1="360" y1="54" x2="360" y2="171" gradientUnits="userSpaceOnUse">
+              <stop class="winter-snow-light"/><stop offset="0.6" class="winter-snow-mid"/><stop offset="1" class="winter-snow-shade"/>
+            </linearGradient>
+            <radialGradient id="winter-bed-shadow">
+              <stop stop-color="var(--winter-shadow)" stop-opacity="0.3"/><stop offset="1" stop-color="var(--winter-shadow)" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- A soft contact shadow settles the raised bed into the snow. -->
+          <ellipse cx="362" cy="243" rx="322" ry="37" fill="url(#winter-bed-shadow)"/>
+          <path d="M82 126 556 143 556 243 82 223Z" fill="url(#winter-wood-front)"/>
+          <path d="m556 143 83-42v99l-83 43Z" fill="url(#winter-wood-side)"/>
+          <path d="m82 126 80-49 477 24-83 42Z" fill="var(--winter-wood-edge)"/>
+          <!-- Plank seams, subtle wood grain, and inset corner posts. -->
+          <g stroke="var(--winter-grain)" stroke-linecap="round">
+            <path d="m83 176 473 19m1 0 81-43" stroke-width="3" opacity="0.55"/>
+            <g opacity="0.3" stroke-width="1.5">
+              <path d="m135 158 114 5m22 1 94 4m39 0 102 5M145 202l79 3m33 1 139 6m36 1 64 3m88-53 29-15m-27 49 34-18"/>
+              <path d="M300 185c20-6 54-2 72 3m-187 31c18-5 33-3 47 1m181-37c16-6 39-3 54 1"/>
+              <ellipse cx="325" cy="163" rx="11" ry="3" transform="rotate(2 325 163)"/>
+              <ellipse cx="449" cy="211" rx="8" ry="2.5" transform="rotate(2 449 211)"/>
+            </g>
+          </g>
+          <path d="m99 142 22 1v90l-22-1Zm429 15 23 1v91l-23-1Z" fill="url(#winter-wood-front)" stroke="var(--winter-wood-edge)" stroke-opacity="0.4"/>
+          <g fill="var(--winter-grain)" opacity="0.65">
+            <circle cx="110" cy="163" r="2"/><circle cx="110" cy="217" r="2"/>
+            <circle cx="540" cy="176" r="2"/><circle cx="540" cy="232" r="2"/>
+          </g>
+          <!-- The blanket follows the bed's perspective, with an uneven lip. -->
+          <path d="M73 123c11-13 34-21 53-35 18-14 30-22 54-20l411 19c24 1 42 1 51 10 10 10-3 20-21 27l-51 27c-14 8-21 16-38 15l-47-3c-10 0-10 10-18 10-10 0-9-11-20-12l-124-5c-16-1-19 6-29 5-10 0-11-8-23-9l-99-4c-11 0-12 13-21 12-10 0-6-14-18-15l-42-2c-16-1-29-7-23-20Z" fill="url(#winter-snow)"/>
+          <path d="M93 120c28-12 47-39 81-38l404 19c19 1 31 0 44 4" stroke="var(--winter-snow-highlight)" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+          <path d="M131 128c73-12 113 17 196 7s135-7 215 8" stroke="var(--winter-snow-highlight)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+          <!-- Dormant stems and little pillows of snow at their roots. -->
+          <g fill="var(--winter-snow-shade)" opacity="0.5">
+            <ellipse cx="197" cy="113" rx="19" ry="4"/><ellipse cx="299" cy="122" rx="17" ry="4"/>
+            <ellipse cx="398" cy="110" rx="19" ry="4"/><ellipse cx="501" cy="129" rx="18" ry="4"/>
+          </g>
+          <g stroke="var(--winter-twig)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m195 111-3-36m1 19-11-10m11 2 9-10M297 120l3-28m-2 13-8-8m9 4 9-8M397 108l-2-46m1 27 12-14m-13 5-9-9M500 127l3-32m-2 21-10-12m11 1 9-9"/>
+          </g>
+          <g stroke="var(--winter-snow-highlight)" stroke-width="4" stroke-linecap="round">
+            <path d="m187 76 7-1m197-12 6-1m103 34 5-1"/>
+          </g>
+          <g fill="var(--winter-snow-highlight)">
+            <ellipse cx="192" cy="112" rx="10" ry="3"/><ellipse cx="296" cy="121" rx="8" ry="3"/>
+            <ellipse cx="394" cy="109" rx="10" ry="3"/><ellipse cx="499" cy="128" rx="9" ry="3"/>
+          </g>
+          <!-- Small drifts gather around the feet of the bed. -->
+          <path d="M65 231c16-10 24-5 35-10 10-5 17-2 23 4 15-5 34 2 43 11-35 7-73 3-101-5Zm435 22c17-11 23-7 35-12 14-6 21 0 29 1 18-12 36-10 51-2-29 15-74 20-115 13Z" fill="var(--winter-snow-mid)"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="winter-note" aria-label="Season status">
+  <div class="winter-note-icon" aria-hidden="true">❄️</div>
+  <h1 class="winter-note-title">Resting for the winter</h1>
+  <p class="winter-note-body">
+    The beds are put to bed and the sensors are off until spring.
+    Sprout &amp; Circuit wakes up again when the soil does. 🌱
+  </p>
+</section>

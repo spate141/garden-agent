@@ -3125,7 +3125,9 @@ function _stopHeavyRain() {
   }
 }
 
-document.getElementById('garden-beds').addEventListener('click', function (e) {
+/* #garden-beds is absent in winter and in the no-data state. */
+const _gardenBedsEl = document.getElementById('garden-beds');
+if (_gardenBedsEl) _gardenBedsEl.addEventListener('click', function (e) {
   const plant = e.target.closest('.g-plant');
   if (!plant) return;
 
@@ -3736,11 +3738,29 @@ function renderLoadingSkeletons() {
   }
 }
 
+/** Winter (dormant season) boot: static snowy scene, no data fetches.
+ *  The sky still follows the clock (tod() buckets -- SKY is null in winter)
+ *  so the day/night theme keeps working. A synthetic snowy CURRENT (WMO 71,
+ *  light snow) routes through the normal _updateSky() -> updateWeatherRain()
+ *  path, so flurries and the snow mood persist across repaints. */
+function bootWinter() {
+  CURRENT = { weather_code: 71, cloud_cover_pct: 60, conditions: 'Snow' };
+  _initClouds();
+  _updateSky({}, null, tod());
+  setInterval(function () { _updateSky({}, null, tod()); }, 5 * 60_000);
+  _tickClock();
+  setInterval(_tickClock, 15_000);
+}
+
 /* ── Boot ── */
-renderBeds();
-renderBedMoistureCards();
-renderLoadingSkeletons();
-_tickClock();
-setInterval(_tickClock, 15_000);
-refresh();
-setInterval(refresh, 60_000);
+if (window.GARDEN_CONFIG.SEASON === 'winter') {
+  bootWinter();
+} else {
+  renderBeds();
+  renderBedMoistureCards();
+  renderLoadingSkeletons();
+  _tickClock();
+  setInterval(_tickClock, 15_000);
+  refresh();
+  setInterval(refresh, 60_000);
+}

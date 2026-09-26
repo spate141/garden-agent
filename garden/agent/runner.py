@@ -140,6 +140,11 @@ def evaluate_instant(snap_id: int, ts: str, metrics: dict) -> None:
 
 def run_cron_tick() -> None:
     """Run cron rules + daily brief. Called by the systemd timer every 15 min."""
+    if storage.is_winter():
+        # Dormant: no alerts, no brief, and no retention pruning so last
+        # season's data survives the winter.
+        log.info("Dormant (winter) — skipping cron tick")
+        return
     log.info("Cron tick starting")
     try:
         results = run_cron()
@@ -334,6 +339,9 @@ def send_daily_brief(force: bool = False) -> None:
     """
     if not cfg.daily_brief.get("enabled", True):
         log.info("Daily brief disabled in config")
+        return
+    if storage.is_winter():
+        log.info("Daily brief skipped (winter — garden dormant)")
         return
 
     local_now = _local_now()

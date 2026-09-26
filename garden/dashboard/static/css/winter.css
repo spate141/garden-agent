@@ -1,0 +1,226 @@
+/* Dormant season. Keep every rule scoped to winter. */
+html[data-season="winter"] {
+  --accent: #5b8fb0;
+  --accent-soft: rgba(91, 143, 176, 0.12);
+  --accent-border: rgba(91, 143, 176, 0.28);
+  --winter-snow-highlight: #fff;
+  --winter-snow-light: #fff;
+  --winter-snow-mid: #edf5fa;
+  --winter-snow-shade: #c6dce9;
+  --winter-ground-top: #e5eff5;
+  --winter-ground-bottom: #d5e5ef;
+  --winter-shadow: #54768f;
+  --winter-wood-light: #b78a64;
+  --winter-wood-mid: #956c4c;
+  --winter-wood-deep: #79563f;
+  --winter-wood-edge: #73513c;
+  --winter-grain: #51392d;
+  --winter-twig: #7b6a55;
+}
+
+html[data-season="winter"][data-theme="dark"] {
+  --accent: #8ab8d6;
+  --accent-soft: rgba(138, 184, 214, 0.16);
+  --accent-border: rgba(138, 184, 214, 0.32);
+  --winter-snow-highlight: #dfedf6;
+  --winter-snow-light: #cbdfea;
+  --winter-snow-mid: #a4bfce;
+  --winter-snow-shade: #7896ac;
+  --winter-ground-top: #536d80;
+  --winter-ground-bottom: #324a5d;
+  --winter-shadow: #142737;
+  --winter-wood-light: #8a715e;
+  --winter-wood-mid: #705946;
+  --winter-wood-deep: #4e4037;
+  --winter-wood-edge: #493b33;
+  --winter-grain: #2e2724;
+  --winter-twig: #625b51;
+}
+
+html[data-season="winter"] .garden--winter {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Frosted trees fade into the distance behind the bed. */
+html[data-season="winter"] .garden-tree {
+  filter: grayscale(0.8) brightness(1.3) contrast(0.75);
+  opacity: 0.65;
+}
+html[data-season="winter"][data-theme="dark"] .garden-tree {
+  filter: grayscale(0.85) brightness(0.85);
+}
+html[data-season="winter"] .garden-horizon {
+  --g-grass: var(--winter-snow-mid);
+  --g-grass-dark: var(--winter-ground-top);
+}
+html[data-season="winter"] .g-firefly { display: none; }
+
+/* Broad, quiet drifts give the ground depth. */
+html[data-season="winter"] .winter-ground {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  padding: 26px 20px 14px;
+  background:
+    radial-gradient(ellipse at 14% 3%, var(--winter-snow-light) 0%, transparent 48%),
+    linear-gradient(180deg, var(--winter-ground-top), var(--winter-ground-bottom));
+}
+html[data-season="winter"] .winter-ground::before,
+html[data-season="winter"] .winter-ground::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  width: 75%;
+  height: 42%;
+  border-radius: 50%;
+  background: var(--winter-snow-mid);
+  opacity: 0.5;
+}
+html[data-season="winter"] .winter-ground::before {
+  left: -26%;
+  bottom: -22%;
+  transform: rotate(8deg);
+}
+html[data-season="winter"] .winter-ground::after {
+  right: -30%;
+  bottom: -19%;
+  transform: rotate(-9deg);
+}
+
+html[data-season="winter"] .winter-bed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 720px);
+  min-width: 0;
+  margin: 0;
+  position: relative;
+}
+html[data-season="winter"] .winter-bed .g-bed-name {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 4px;
+  padding: 7px 15px;
+  border: 1px solid rgba(113, 145, 166, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #516b7a;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: none;
+}
+html[data-season="winter"][data-theme="dark"] .winter-bed .g-bed-name {
+  color: #dceaf3;
+  background: rgba(30, 49, 65, 0.45);
+  border-color: rgba(192, 217, 234, 0.2);
+}
+html[data-season="winter"] .winter-bed-frame {
+  width: 100%;
+  line-height: 0;
+}
+html[data-season="winter"] .winter-bed-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+html[data-season="winter"] .winter-wood-light { stop-color: var(--winter-wood-light); }
+html[data-season="winter"] .winter-wood-mid { stop-color: var(--winter-wood-mid); }
+html[data-season="winter"] .winter-wood-deep { stop-color: var(--winter-wood-deep); }
+html[data-season="winter"] .winter-snow-light { stop-color: var(--winter-snow-light); }
+html[data-season="winter"] .winter-snow-mid { stop-color: var(--winter-snow-mid); }
+html[data-season="winter"] .winter-snow-shade { stop-color: var(--winter-snow-shade); }
+
+/* Two sparse layers drift at different speeds. */
+html[data-season="winter"] .winter-snowfall {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  pointer-events: none;
+}
+html[data-season="winter"] .winter-snowfall::before,
+html[data-season="winter"] .winter-snowfall::after {
+  content: '';
+  position: absolute;
+  inset: -180px -60px;
+  background-image:
+    radial-gradient(circle at 24px 32px, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 105px 112px, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 168px 65px, #fff 0 2px, transparent 3px);
+  background-size: 220px 180px;
+  opacity: 0.55;
+  animation: winter-snow-drift 16s linear infinite;
+}
+html[data-season="winter"] .winter-snowfall::after {
+  background-position: 75px 60px;
+  opacity: 0.3;
+  filter: blur(0.6px);
+  animation-duration: 24s;
+  animation-delay: -12s;
+}
+@keyframes winter-snow-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, 180px, 0); }
+}
+
+html[data-season="winter"] .winter-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  max-width: 520px;
+  margin: 32px auto 48px;
+  padding: 28px 24px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html[data-season="winter"] .winter-note-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 2px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 28px;
+}
+html[data-season="winter"] .winter-note-title {
+  font-family: 'Bitter', Georgia, serif;
+  font-size: clamp(20px, 3vw, 24px);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+html[data-season="winter"] .winter-note-body {
+  max-width: 390px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  html[data-season="winter"] .winter-ground { padding: 22px 4px 16px; }
+  html[data-season="winter"] .winter-bed .g-bed-name { font-size: 10px; }
+  html[data-season="winter"] .winter-note { margin: 24px auto 36px; padding: 24px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-season="winter"] .winter-snowfall::before,
+  html[data-season="winter"] .winter-snowfall::after { animation: none; }
+}

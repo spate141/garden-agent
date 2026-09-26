@@ -452,3 +452,29 @@ def pause_notifications(until_iso: str) -> None:
 
 def resume_notifications() -> None:
     delete_setting(_PAUSE_KEY)
+
+
+# ── season (winter = dormant) ────────────────────────────────────────────────
+
+_SEASON_KEY = "season_override"
+SEASONS = ("summer", "winter")
+
+
+def season() -> str:
+    """
+    Effective season: the Telegram /winter or /summer override if one is
+    stored, else config.yaml's `season:`. Anything unrecognized reads as summer.
+    """
+    from garden.config import cfg
+    value = get_setting(_SEASON_KEY) or cfg.season_default
+    return value if value in SEASONS else "summer"
+
+
+def is_winter() -> bool:
+    return season() == "winter"
+
+
+def set_season(value: str) -> None:
+    if value not in SEASONS:
+        raise ValueError(f"unknown season {value!r}")
+    set_setting(_SEASON_KEY, value)

@@ -61,7 +61,7 @@ app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 @app.get("/health")
 async def health() -> JSONResponse:
     info: dict[str, Any] = storage.health_info()
-    return JSONResponse({"status": "ok", **info})
+    return JSONResponse({"status": "ok", "season": storage.season(), **info})
 
 
 # ── POST /api/ecowitt ─────────────────────────────────────────────────────────
@@ -74,6 +74,10 @@ async def ecowitt_ingest(request: Request) -> JSONResponse:
         ts, metrics, raw = parse(form)
     except IngestError as exc:
         return JSONResponse({"error": exc.detail}, status_code=exc.status)
+
+    # Winter: garden is dormant -- ack (so the gateway doesn't retry) but store nothing.
+    if storage.is_winter():
+        return JSONResponse({"ok": True, "dormant": True})
 
     snap_id = storage.write_snapshot(ts, metrics, raw)
     agent_runner.evaluate_instant(snap_id, ts, metrics)
@@ -109,6 +113,8 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks) 
 
 @app.get("/api/latest")
 async def api_latest() -> JSONResponse:
+    if storage.is_winter():
+        return JSONResponse([])
     return JSONResponse(storage.latest())
 
 
@@ -119,6 +125,8 @@ async def api_series(
     sensor: str = Query(..., description="sensor_key"),
     hours: int = Query(24, ge=1, le=168),
 ) -> JSONResponse:
+    if storage.is_winter():
+        return JSONResponse([])
     return JSONResponse(storage.series(sensor, hours))
 
 
@@ -234,6 +242,9 @@ async def api_insights() -> JSONResponse:
     ET₀ water balance, and per-bed crop stress.  Polled by the dashboard insight
     panel on the same 60 s refresh tick as /api/latest.
     """
+    if storage.is_winter():
+        return JSONResponse({})
+
     from garden.agent.weather import get_current, get_forecast
 
     latest_map: dict[str, Any] = {r["sensor_key"]: r for r in storage.latest()}
@@ -368,8 +379,36 @@ async def api_insights() -> JSONResponse:
 
 # ── GET / (dashboard) ─────────────────────────────────────────────────────────
 
+def _winter_dashboard(request: Request):
+    """Dormant-season page: one snowy placeholder bed, no sensor data or forecast."""
+    return _TEMPLATES.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "season": "winter",
+            "season_json": json.dumps("winter"),
+            "stats": [],
+            "charts": [],
+            "charts_json": "[]",
+            "last_ts": None,
+            "has_data": False,
+            "garden_thresholds": "{}",
+            "tz_json": json.dumps(cfg.location.get("timezone", "America/Chicago")),
+            "stat_groups": [],
+            "beds_json": "[]",
+            "weather_keys_json": "{}",
+            "sky_json": "null",
+            "bands_json": json.dumps({"moistureBands": {}, "vpdBands": [], "battery": {}}),
+            "moisture_group_json": "[]",
+        },
+    )
+
+
 @app.get("/")
 async def dashboard(request: Request):
+    if storage.is_winter():
+        return _winter_dashboard(request)
+
     latest_rows = storage.latest()
     latest_map = {r["sensor_key"]: r for r in latest_rows}
 
@@ -516,6 +555,8 @@ async def dashboard(request: Request):
         request,
         "index.html",
         {
+            "season": "summer",
+            "season_json": json.dumps("summer"),
             "stats": stats,
             "charts": charts,
             "charts_json": json.dumps(charts),

@@ -1,6 +1,13 @@
 # garden-agent configuration
 # All thresholds are versioned here; the LLM and deterministic rules both read from this.
 
+# ── Season ────────────────────────────────────────────────────────────────────
+# summer → live: ingest, alerts, daily brief, full dashboard.
+# winter → dormant: sensor POSTs dropped, no alerts/brief/retention pruning,
+#          dashboard shows a single snowy placeholder bed with no live data.
+# Telegram /winter and /summer override this at runtime (stored in the DB).
+season: winter
+
 # ── Sensor channel map ────────────────────────────────────────────────────────
 # Maps storage keys to display config.  Order here drives display order in the dashboard.
 # color: hex used in stat strip and charts.

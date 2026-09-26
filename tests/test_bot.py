@@ -132,8 +132,8 @@ def test_command_menu_has_one_entry_per_bed_plus_static():
     commands = {m["command"] for m in menu}
     n_beds = len(cfg.dashboard.get("beds", []))
     assert {"bed1", "bed2", "bed3", "bed4"} <= commands
-    assert {"beds", "weather", "air", "brief", "pause", "resume", "deploy", "help"} <= commands
-    assert len(menu) == n_beds + 8
+    assert {"beds", "weather", "air", "brief", "pause", "resume", "winter", "summer", "deploy", "help"} <= commands
+    assert len(menu) == n_beds + 10
 
 
 # ── dispatch: /pause, /resume ──────────────────────────────────────────────────

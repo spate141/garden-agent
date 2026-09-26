@@ -74,6 +74,9 @@ class _Config:
         self.retention: dict[str, Any] = raw.get("retention", {})
         self.derived: dict[str, Any] = raw.get("derived", {})
         self.crops: dict[str, Any] = raw.get("crops", {})
+        # "summer" (live) or "winter" (dormant). Only the default -- a Telegram
+        # /winter or /summer override stored in the DB wins; see storage.season().
+        self.season_default: str = str(raw.get("season", "summer")).strip().lower()
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

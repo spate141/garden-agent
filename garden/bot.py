@@ -1,6 +1,6 @@
 """
 bot.py — Inbound Telegram bot commands (/bed1, /beds, /weather, /air, /brief,
-/pause, /resume, /deploy, /help).
+/pause, /resume, /winter, /summer, /deploy, /help).
 
 Counterpart to telegram.py (outbound-only). Telegram delivers each command as a
 webhook POST to /api/telegram (see garden/main.py), which calls handle_update()
@@ -52,6 +52,8 @@ _STATIC_COMMANDS: list[tuple[str, str]] = [
     ("brief", "Send the morning brief now"),
     ("pause", "Pause all alerts until midnight"),
     ("resume", "Resume alerts if paused"),
+    ("winter", "Put the garden to sleep for the season"),
+    ("summer", "Wake the garden up for the season"),
     ("deploy", "Pull latest code and restart services"),
     ("help", "List all commands"),
 ]
@@ -226,6 +228,32 @@ def _resume() -> str:
     return "Notifications weren't paused."
 
 
+_DORMANT_REPLY = "❄️ The garden is dormant for winter. Send /summer to wake it up."
+
+# Commands that still work while dormant; everything else reads sensor data.
+_WINTER_COMMANDS = {"pause", "resume", "winter", "summer", "deploy", "help"}
+
+
+def _winter() -> str:
+    if storage.is_winter():
+        return "❄️ Already in winter mode."
+    storage.set_season("winter")
+    return (
+        "❄️ Winter mode on. Sensor data is ignored, alerts and the morning brief "
+        "are off, and the dashboard shows the dormant garden. Send /summer to wake it."
+    )
+
+
+def _summer() -> str:
+    if not storage.is_winter():
+        return "🌱 Already in summer mode."
+    storage.set_season("summer")
+    return (
+        "🌱 Summer mode on. Ingest, alerts and the morning brief are back. "
+        "If the sensors aren't online yet the watchdog will alert — use /pause if needed."
+    )
+
+
 def _deploy() -> str:
     """
     Kick off deploy.sh (git pull, dep sync, service restarts) and reply
@@ -280,6 +308,12 @@ def _help() -> str:
 
 def dispatch(command: str) -> str:
     """Command string (no leading '/', already lowercased) → reply text (Telegram HTML)."""
+    if command == "winter":
+        return _winter()
+    if command == "summer":
+        return _summer()
+    if storage.is_winter() and command not in _WINTER_COMMANDS:
+        return _DORMANT_REPLY
     bed_by_id = {bed.get("id"): bed for bed in cfg.dashboard.get("beds", []) if bed.get("id")}
     if command in bed_by_id:
         return _bed_summary(bed_by_id[command])
